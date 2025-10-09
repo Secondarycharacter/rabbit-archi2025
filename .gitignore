@@ -1,0 +1,43 @@
+# 시스템 및 사용자 디렉토리 제외
+AppData/
+Documents/
+Downloads/
+Desktop/
+3D Objects/
+Contacts/
+Favorites/
+Links/
+MicrosoftEdgeBackups/
+Music/
+OneDrive/
+Pictures/
+Saved Games/
+Searches/
+Videos/
+.bash_history
+.cursor/
+.gitconfig
+.idlerc/
+.python_history
+.vscode/
+NTUSER.DAT*
+ntuser.dat*
+ntuser.ini
+crash_report.txt
+
+# 백업 폴더 제외
+backup/
+
+# Readme 파일 제외
+*.md
+!README.md
+
+# 임시 파일 제외
+*.tmp
+*.log
+*.hwp
+*.psd
+*.xlsx
+
+# 컨셉 폴더 제외
+01 컨셉/

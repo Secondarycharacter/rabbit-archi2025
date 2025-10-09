@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ㅇㅇㅇ 건축사사무소 워크패드 스튜디오</title>
+<style>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  width: 100vw;
+  height: 100vh;
+  background: #000;
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-family: 'WAGURI', sans-serif;
+}
+
+/* ON/OFF 이미지 컨테이너 */
+.onoff-container {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  animation: fadeIn 1s ease forwards;
+}
+
+@keyframes fadeIn {
+  to { opacity: 1; }
+}
+
+/* ON/OFF 이미지 */
+.onoff-image {
+  cursor: pointer;
+  display: block;
+  transition: all 0.3s ease;
+}
+
+/* 붉은색 네온 효과 (기본) */
+.onoff-image.red-neon {
+  filter: drop-shadow(0 0 1px rgba(255, 50, 50, 0.8))
+          drop-shadow(0 0 2px rgba(255, 50, 50, 0.6))
+          drop-shadow(0 0 3px rgba(255, 50, 50, 0.4));
+  animation: redNeonBlink 1.5s ease-in-out infinite;
+}
+
+@keyframes redNeonBlink {
+  0%, 100% {
+    filter: drop-shadow(0 0 1px rgba(255, 50, 50, 0.8))
+            drop-shadow(0 0 2px rgba(255, 50, 50, 0.6))
+            drop-shadow(0 0 3px rgba(255, 50, 50, 0.4));
+  }
+  50% {
+    filter: drop-shadow(0 0 2px rgba(255, 50, 50, 1))
+            drop-shadow(0 0 4px rgba(255, 50, 50, 0.8))
+            drop-shadow(0 0 6px rgba(255, 50, 50, 0.6));
+  }
+}
+
+/* 녹색 네온 효과 (클릭 시) */
+.onoff-image.green-neon {
+  filter: drop-shadow(0 0 2px rgba(50, 255, 50, 1))
+          drop-shadow(0 0 4px rgba(50, 255, 50, 0.8))
+          drop-shadow(0 0 6px rgba(50, 255, 50, 0.6))
+          drop-shadow(0 0 8px rgba(50, 255, 50, 0.4));
+  animation: greenNeonBlink 0.8s ease-in-out infinite;
+}
+
+@keyframes greenNeonBlink {
+  0%, 100% {
+    filter: drop-shadow(0 0 2px rgba(50, 255, 50, 1))
+            drop-shadow(0 0 4px rgba(50, 255, 50, 0.8))
+             drop-shadow(0 0 6px rgba(50, 255, 50, 0.6))
+            drop-shadow(0 0 8px rgba(50, 255, 50, 0.4));
+  }
+  50% {
+    filter: drop-shadow(0 0 2px rgba(50, 255, 50, 1))
+            drop-shadow(0 0 4px rgba(50, 255, 50, 0.8))
+           drop-shadow(0 0 6px rgba(50, 255, 50, 0.6))
+           drop-shadow(0 0 8px rgba(50, 255, 50, 0.4));
+  }
+}
+
+/* 타자 효과 텍스트 */
+.welcome-text {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  margin-top: 85px;
+  font-size: 24px;
+  color: #fff;
+  font-weight: bold;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+  opacity: 0;
+  white-space: nowrap;
+}
+
+.welcome-text.show {
+  opacity: 1;
+}
+
+/* 페이드아웃 효과 */
+.fade-out {
+  animation: fadeOut 2s ease forwards;
+}
+
+@keyframes fadeOut {
+  to { 
+    opacity: 0;
+    background: #000;
+  }
+}
+
+/* 메인 화면 로드 준비 */
+.main-loader {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: #000;
+  z-index: 10000;
+  opacity: 1;
+  transition: opacity 1.5s ease;
+}
+
+.main-loader.fade-out {
+  opacity: 0;
+  pointer-events: none;
+}
+</style>
+</head>
+<body>
+
+<!-- ON/OFF 컨테이너 -->
+<div class="onoff-container" id="onoffContainer">
+  <img src="images/onoff.png" class="onoff-image red-neon" id="onoffImage" alt="ON/OFF">
+  <div class="welcome-text" id="welcomeText"></div>
+</div>
+
+<script>
+// 전역 변수
+const onoffImage = document.getElementById('onoffImage');
+const welcomeText = document.getElementById('welcomeText');
+const onoffContainer = document.getElementById('onoffContainer');
+let isClicked = false;
+
+// 타자 효과 함수
+function typeWriter(text, element, speed = 100) {
+  element.classList.add('show');
+  let i = 0;
+  
+  function type() {
+    if (i < text.length) {
+      element.textContent += text.charAt(i);
+      i++;
+      setTimeout(type, speed);
+    }
+  }
+  
+  type();
+}
+
+// 페이드인 완료 후 네온 효과 시작 (1초 후)
+setTimeout(() => {
+  // 붉은색 네온 효과는 이미 CSS로 적용됨
+  console.log('✅ 붉은색 네온 효과 시작');
+}, 1000);
+
+// 페이드인 완료 1초 후 텍스트 타자 효과 시작
+setTimeout(() => {
+  const message = 'ㅇㅇㅇ 건축사사무소 워크패드 스튜디오에 접속하시겠습니까?';
+  typeWriter(message, welcomeText, 80);
+}, 1000);
+
+// ON/OFF 이미지 클릭 이벤트
+onoffImage.addEventListener('click', () => {
+  if (isClicked) return; // 중복 클릭 방지
+  isClicked = true;
+  
+  console.log('🖱️ ON/OFF 이미지 클릭됨');
+  
+  // 붉은색 네온 제거, 녹색 네온 추가
+  onoffImage.classList.remove('red-neon');
+  onoffImage.classList.add('green-neon');
+  
+  // 2초 후 화면 페이드아웃 및 메인 페이지로 이동
+  setTimeout(() => {
+    console.log('🌑 화면 페이드아웃 시작');
+    
+    // 전체 컨테이너 페이드아웃
+    onoffContainer.style.transition = 'opacity 2s ease';
+    onoffContainer.style.opacity = '0';
+    
+    // 2초 후 메인 페이지로 이동
+    setTimeout(() => {
+      console.log('📺 메인 페이지로 이동 (모니터 켜지는 효과)');
+      window.location.href = 'main.html';
+    }, 2000);
+  }, 2000);
+});
+
+// 디버그용
+console.log('✅ 인덱스 페이지 로드 완료');
+console.log('📸 ON/OFF 이미지 페이드인 시작');
+</script>
+
+</body>
+</html>

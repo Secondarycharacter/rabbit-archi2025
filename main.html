@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ㅇㅇㅇ 건축사사무소 워크패드 스튜디오</title>
+<link rel="stylesheet" href="style.css">
+
+<!-- 모니터 켜지는 효과 스타일 -->
+<style>
+  /* 초기 로드 시 화면 전체를 검은색 오버레이로 덮음 */
+  #monitorOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: #000;
+    z-index: 99999;
+    opacity: 1;
+    pointer-events: none;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  
+  /* 중앙 흰색 라인 (CRT 모니터 켜지는 효과) */
+  #monitorOverlay::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: linear-gradient(90deg, 
+      transparent 0%, 
+      rgba(255, 255, 255, 0.3) 20%, 
+      rgba(255, 255, 255, 0.9) 50%, 
+      rgba(255, 255, 255, 0.3) 80%, 
+      transparent 100%);
+    transform: translateY(-50%);
+    opacity: 0;
+  }
+  
+  /* 모니터 켜지는 효과 */
+  #monitorOverlay.power-on::before {
+    animation: whiteLine 0.8s ease forwards;
+  }
+  
+  #monitorOverlay.power-on {
+    animation: monitorPowerOn 1.5s ease forwards;
+  }
+  
+  /* 흰색 라인이 위아래로 갈라지는 애니메이션 */
+  @keyframes whiteLine {
+    0% {
+      opacity: 0;
+      height: 2px;
+    }
+    20% {
+      opacity: 1;
+      height: 2px;
+    }
+    50% {
+      opacity: 0.8;
+      height: 100vh;
+    }
+    100% {
+      opacity: 0;
+      height: 100vh;
+    }
+  }
+  
+  /* 화면 전체가 밝아지는 애니메이션 */
+  @keyframes monitorPowerOn {
+    0% {
+      opacity: 1;
+    }
+    40% {
+      opacity: 1;
+    }
+    70% {
+      opacity: 0.5;
+      background: radial-gradient(ellipse at center, rgba(255,255,255,0.2) 0%, rgba(0,0,0,0.8) 60%, #000 100%);
+    }
+    100% {
+      opacity: 0;
+      background: transparent;
+    }
+  }
+  
+  /* 페이지 초기 상태 */
+  body.loading {
+    opacity: 0;
+  }
+  
+  body.loaded {
+    opacity: 1;
+    animation: screenBrighten 1s ease forwards;
+  }
+  
+  @keyframes screenBrighten {
+    0% {
+      filter: brightness(3) contrast(0.5);
+    }
+    50% {
+      filter: brightness(1.5) contrast(0.8);
+    }
+    100% {
+      filter: brightness(1) contrast(1);
+    }
+  }
+</style>
+
+<!-- SweetAlert2 for Beautiful Modals -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@sweetalert2/theme-material-ui/material-ui.css">
+
+<!-- Dropzone for Drag & Drop File Upload -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/dropzone@5.9.3/dist/min/dropzone.min.css">
+<script src="https://cdn.jsdelivr.net/npm/dropzone@5.9.3/dist/min/dropzone.min.js"></script>
+
+<!-- Pickr Color Picker -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@simonwep/pickr/dist/themes/nano.min.css">
+<script src="https://cdn.jsdelivr.net/npm/@simonwep/pickr/dist/pickr.min.js"></script>
+
+<!-- Custom Font -->
+<style>
+  @font-face {
+    font-family: 'WAGURI';
+    src: url('fonts/WAGURI TTF.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+  }
+</style>
+</head>
+<body class="loading">
+
+<!-- 모니터 켜지는 효과 오버레이 -->
+<div id="monitorOverlay"></div>
+<div class="reset-btn" id="resetBtn">초기화</div>
+<div class="container" id="iconContainer">
+<!-- 왼쪽 1~8 (메인화면 M00-M07) -->
+<div class="icon-wrapper icon icon-left" data-id="M00">
+  <img src="images/icon.png" class="icon-image">
+  <div class="icon-label">메인화면00</div>
+</div>
+<div class="icon-wrapper icon icon-left" data-id="M01">
+  <img src="images/icon.png" class="icon-image">
+  <div class="icon-label">메인화면01</div>
+</div>
+<div class="icon-wrapper icon icon-left" data-id="M02">
+  <img src="images/icon.png" class="icon-image">
+  <div class="icon-label">메인화면02</div>
+</div>
+<div class="icon-wrapper icon icon-left" data-id="M03">
+  <img src="images/icon.png" class="icon-image">
+  <div class="icon-label">메인화면03</div>
+</div>
+<div class="icon-wrapper icon icon-left" data-id="M04">
+  <img src="images/icon.png" class="icon-image">
+  <div class="icon-label">메인화면04</div>
+</div>
+<div class="icon-wrapper icon icon-left" data-id="M05">
+  <img src="images/icon.png" class="icon-image">
+  <div class="icon-label">메인화면05</div>
+</div>
+<div class="icon-wrapper icon icon-left" data-id="M06">
+  <img src="images/icon.png" class="icon-image">
+  <div class="icon-label">메인화면06</div>
+</div>
+<div class="icon-wrapper icon icon-left" data-id="M07">
+  <img src="images/icon.png" class="icon-image">
+  <div class="icon-label">메인화면07</div>
+</div>
+
+<!-- 왼쪽 A~H (메인화면 M10-M17) -->
+<div class="icon-wrapper icon icon-af" data-id="M10">
+  <img src="images/icon.png" class="icon-image">
+  <div class="icon-label">메인화면10</div>
+</div>
+<div class="icon-wrapper icon icon-af" data-id="M11">
+  <img src="images/icon.png" class="icon-image">
+  <div class="icon-label">메인화면11</div>
+</div>
+<div class="icon-wrapper icon icon-af" data-id="M12">
+  <img src="images/icon.png" class="icon-image">
+  <div class="icon-label">메인화면12</div>
+</div>
+<div class="icon-wrapper icon icon-af" data-id="M13">
+  <img src="images/icon.png" class="icon-image">
+  <div class="icon-label">메인화면13</div>
+</div>
+<div class="icon-wrapper icon icon-af" data-id="M14">
+  <img src="images/icon.png" class="icon-image">
+  <div class="icon-label">메인화면14</div>
+</div>
+<div class="icon-wrapper icon icon-af" data-id="M15">
+  <img src="images/icon.png" class="icon-image">
+  <div class="icon-label">메인화면15</div>
+</div>
+<div class="icon-wrapper icon icon-af" data-id="M16">
+  <img src="images/icon.png" class="icon-image">
+  <div class="icon-label">메인화면16</div>
+</div>
+<div class="icon-wrapper icon icon-af" data-id="M17">
+  <img src="images/icon.png" class="icon-image">
+  <div class="icon-label">메인화면17</div>
+</div>
+
+<!-- 중앙 프로젝트 스크린 -->
+<img src="images/project_screen.png" class="icon project-screen" data-id="project" style="left: 440px; top: 80px;">
+
+<!-- 스크린 내부 초기화 버튼 -->
+<div class="screen-reset-btn" id="screenResetBtn">초기화</div>
+
+<!-- 스크린 최소화/최대화 버튼 -->
+<div class="screen-minimize-btn" id="screenMinimizeBtn">최소화</div>
+
+<!-- 화살표 1 (icon_arrow1) - 위쪽에서 내려오는 용도 -->
+<img src="images/icon_arrow1.png" id="arrowTop" class="arrow arrow-top">
+
+<!-- 화살표 2 (icon_arrow2) - 아래쪽에서 올라오는 용도 -->
+<img src="images/icon_arrow2.png" id="arrowBottom" class="arrow arrow-bottom">
+
+<!-- 오른쪽 아이콘들 -->
+<div class="icon-wrapper icon icon-right" data-id="cabinet">
+  <img src="images/icon_cabinet.png" class="icon-image">
+  <div class="icon-label">캐비넷</div>
+</div>
+<div class="icon-wrapper icon icon-right" data-id="favorites">
+  <img src="images/icon_favorites.png" class="icon-image">
+  <div class="icon-label">즐겨찾기</div>
+</div>
+<div class="icon-wrapper icon icon-right" data-id="manager">
+  <img src="images/icon_manager.png" class="icon-image">
+  <div class="icon-label">관리자</div>
+</div>
+<div class="icon-wrapper icon icon-right" data-id="park">
+  <img src="images/icon_park.png" class="icon-image">
+  <div class="icon-label">공원</div>
+</div>
+<div class="icon-wrapper icon icon-right" data-id="yong">
+  <img src="images/icon_yong.png" class="icon-image">
+  <div class="icon-label">용</div>
+</div>
+<div class="icon-wrapper icon icon-right" data-id="trash">
+  <img src="images/icon_jang.png?v=2" class="icon-image">
+  <div class="icon-label">장독대</div>
+</div>
+</div>
+
+<!-- JavaScript 모듈 로드 -->
+<script src="script.js"></script>
+<script src="manager.js"></script>
+<script src="manager-mainscreen.js"></script>
+<script src="project-viewer.js"></script>
+
+<!-- 모니터 켜지는 효과 스크립트 -->
+<script>
+// 페이지 로드 완료 시 모니터 켜지는 효과 실행
+window.addEventListener('load', () => {
+  console.log('📺 메인 페이지 로드 완료, 모니터 켜지는 효과 시작');
+  
+  const monitorOverlay = document.getElementById('monitorOverlay');
+  const body = document.body;
+  
+  // 잠시 후 모니터 켜지는 효과 시작
+  setTimeout(() => {
+    monitorOverlay.classList.add('power-on');
+    body.classList.remove('loading');
+    body.classList.add('loaded');
+    
+    console.log('✅ 모니터 켜지는 효과 완료');
+    
+    // 애니메이션 완료 후 오버레이 제거
+    setTimeout(() => {
+      monitorOverlay.remove();
+    }, 1500);
+  }, 100);
+});
+</script>
+</body>
+</html>
