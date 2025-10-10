@@ -72,7 +72,8 @@ function showManagerUI() {
     { text: '생성하기', action: 'create', icon: '➕', color: '#667eea', desc: '새 프로젝트 추가' },
     { text: '수정하기', action: 'edit', icon: '✏️', color: '#f093fb', desc: '프로젝트 편집' },
     { text: '삭제하기', action: 'delete', icon: '🗑️', color: '#fa709a', desc: '프로젝트 제거' },
-    { text: '전광판', action: 'marquee', icon: '📰', color: '#4ecdc4', desc: '전광판 텍스트 수정' }
+    { text: '전광판', action: 'marquee', icon: '📰', color: '#4ecdc4', desc: '전광판 텍스트 수정' },
+    { text: '폴더연동', action: 'sync', icon: '🔗', color: '#ff6b6b', desc: 'Projects 폴더 자동 연동' }
   ];
   
   actions.forEach(actionInfo => {
@@ -106,10 +107,13 @@ function showManagerUI() {
     btn.onclick = () => {
       currentAction = actionInfo.action;
       
-      // 전광판은 위치 선택 불필요
+      // 전광판과 폴더연동은 위치 선택 불필요
       if (actionInfo.action === 'marquee') {
         overlay.remove();
         showMarqueeEditUI();
+      } else if (actionInfo.action === 'sync') {
+        overlay.remove();
+        showProjectFolderSyncUI();
       } else {
         showLocationSelectUI(actionInfo.action, actionInfo.text);
       }
@@ -981,6 +985,237 @@ function collectFavoriteItems(sectionId) {
   
   console.log(`${sectionId} 항목 수집:`, items.length, '개');
   return items;
+}
+
+// ==================== 프로젝트 폴더 자동 연동 UI ====================
+
+function showProjectFolderSyncUI() {
+  console.log('🔗 프로젝트 폴더 자동 연동 시작');
+  
+  // 관리자 오버레이 열림 플래그 설정
+  if (typeof isManagerOverlayOpen !== 'undefined') {
+    isManagerOverlayOpen = true;
+  }
+  
+  // 폴더 선택 다이얼로그 바로 열기
+  const folderInput = document.createElement('input');
+  folderInput.type = 'file';
+  folderInput.webkitdirectory = true;
+  folderInput.directory = true;
+  folderInput.multiple = true;
+  
+  folderInput.onchange = async () => {
+    const files = Array.from(folderInput.files);
+    console.log('📂 선택된 파일 개수:', files.length);
+    
+    if (files.length === 0) {
+      alert('❌ 파일이 선택되지 않았습니다.');
+      if (typeof isManagerOverlayOpen !== 'undefined') {
+        isManagerOverlayOpen = false;
+      }
+      return;
+    }
+    
+    // 로딩 오버레이 표시
+    const loadingOverlay = createOverlay();
+    const loadingBox = document.createElement('div');
+    loadingBox.style.cssText = `
+      background: white;
+      border-radius: 15px;
+      padding: 40px;
+      text-align: center;
+      min-width: 400px;
+    `;
+    loadingBox.innerHTML = `
+      <div style="font-size: 48px; margin-bottom: 20px;">⏳</div>
+      <h3 style="margin: 0 0 15px 0; color: #2c3e50;">프로젝트 연동 중...</h3>
+      <p style="color: #7f8c8d; margin: 0;">잠시만 기다려주세요.</p>
+      <div id="syncProgress" style="margin-top: 15px; color: #3498db; font-weight: bold;"></div>
+    `;
+    loadingOverlay.appendChild(loadingBox);
+    document.body.appendChild(loadingOverlay);
+    
+    // 프로젝트 폴더 분석 및 연동
+    const projects = await analyzeProjectFolders(files);
+    await syncAllProjectsAuto(projects, files);
+    
+    loadingOverlay.remove();
+    
+    if (typeof isManagerOverlayOpen !== 'undefined') {
+      isManagerOverlayOpen = false;
+    }
+  };
+  
+  // 취소 시 플래그 해제
+  folderInput.oncancel = () => {
+    if (typeof isManagerOverlayOpen !== 'undefined') {
+      isManagerOverlayOpen = false;
+    }
+  };
+  
+  folderInput.click();
+}
+
+// 프로젝트 폴더 분석
+async function analyzeProjectFolders(files) {
+  console.log('🔍 프로젝트 폴더 분석 시작...');
+  
+  const projects = {};
+  
+  // 파일을 프로젝트별로 그룹화
+  files.forEach(file => {
+    const pathParts = file.webkitRelativePath.split('/');
+    
+    // projects/년도/년월 프로젝트명/파일명 구조 파싱
+    if (pathParts.length >= 4 && pathParts[0] === 'projects') {
+      const year = pathParts[1];  // 2024
+      const projectFolder = pathParts[2];  // 202401 구로동도서관
+      const fileName = pathParts[3];  // 구로동도서관.jpg
+      
+      // 프로젝트명 추출 (년월 제거)
+      const projectName = projectFolder.replace(/^\d{6}\s*/, '').trim();
+      
+      if (!projects[projectName]) {
+        projects[projectName] = {
+          name: projectName,
+          year: year,
+          folder: projectFolder,
+          fullPath: `projects/${year}/${projectFolder}`,
+          mainImageFile: null,
+          additionalImageFiles: [],
+          mainImagePath: null,
+          additionalImagePaths: []
+        };
+      }
+      
+      // 파일 분류 (File 객체와 경로 모두 저장)
+      if (fileName.endsWith('.jpg') || fileName.endsWith('.JPG')) {
+        projects[projectName].mainImageFile = file;
+        projects[projectName].mainImagePath = `${projects[projectName].fullPath}/${fileName}`;
+      } else if (fileName.match(/project\d+\.(png|jpg|jpeg)/i)) {
+        projects[projectName].additionalImageFiles.push(file);
+        projects[projectName].additionalImagePaths.push(`${projects[projectName].fullPath}/${fileName}`);
+      }
+    }
+  });
+  
+  // 추가 이미지 정렬 (파일명 기준)
+  Object.values(projects).forEach(project => {
+    // 파일과 경로를 함께 정렬
+    const combined = project.additionalImageFiles.map((file, i) => ({
+      file: file,
+      path: project.additionalImagePaths[i]
+    }));
+    combined.sort((a, b) => a.path.localeCompare(b.path));
+    
+    project.additionalImageFiles = combined.map(item => item.file);
+    project.additionalImagePaths = combined.map(item => item.path);
+  });
+  
+  console.log('✅ 프로젝트 분석 완료:', Object.keys(projects).length, '개');
+  return projects;
+}
+
+// 파일을 base64로 읽기
+function readFileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => resolve(e.target.result);
+    reader.onerror = (e) => reject(e);
+    reader.readAsDataURL(file);
+  });
+}
+
+// 모든 프로젝트 자동 연동 (파일을 base64로 변환)
+async function syncAllProjectsAuto(projects, files) {
+  console.log('🔗 모든 프로젝트 자동 연동 시작:', Object.keys(projects).length, '개');
+  
+  const projectList = Object.values(projects);
+  const progressEl = document.getElementById('syncProgress');
+  
+  let successCount = 0;
+  let failCount = 0;
+  
+  // M00부터 순서대로 연동
+  const iconIds = ['M00', 'M01', 'M02', 'M03', 'M04', 'M05', 'M06', 'M07',
+                   'M10', 'M11', 'M12', 'M13', 'M14', 'M15', 'M16'];
+  
+  for (let i = 0; i < Math.min(projectList.length, iconIds.length); i++) {
+    const project = projectList[i];
+    const iconId = iconIds[i];
+    
+    if (progressEl) {
+      progressEl.textContent = `${i + 1}/${projectList.length}: ${project.name}`;
+    }
+    
+    try {
+      // 메인 이미지를 base64로 읽기
+      let mainImageData = null;
+      if (project.mainImageFile) {
+        mainImageData = await readFileAsBase64(project.mainImageFile);
+        console.log(`📸 메인 이미지 읽음: ${project.mainImagePath}`);
+      }
+      
+      // 추가 이미지들을 base64로 읽기
+      const additionalImagesData = [];
+      for (const imageFile of project.additionalImageFiles) {
+        const imageData = await readFileAsBase64(imageFile);
+        additionalImagesData.push(imageData);
+      }
+      console.log(`📸 추가 이미지 읽음: ${additionalImagesData.length}개`);
+      
+      // 프로젝트 데이터 생성
+      const projectData = {
+        projectName: {
+          text: project.name,
+          color: '#ffffff',
+          startYear: project.year,
+          endYear: project.year
+        },
+        usage: { text: '', color: '#ffffff' },
+        location: { text: '', color: '#ffffff' },
+        buildingArea: { text: '', color: '#ffffff' },
+        totalArea: { text: '', color: '#ffffff' },
+        designers: [],
+        staff: [],
+        mainImage: mainImageData,
+        additionalImages: additionalImagesData,
+        useInMainLoop: true
+      };
+      
+      // IndexedDB에 저장
+      const storageKey = `projectData_${iconId}`;
+      
+      if (typeof saveProjectToDB === 'function') {
+        await saveProjectToDB(storageKey, projectData);
+        
+        // 아이콘 업데이트
+        if (typeof updateIconImage === 'function') {
+          updateIconImage(iconId, projectData);
+        }
+        
+        // 프로젝트 목록 업데이트
+        if (typeof updateProjectList === 'function') {
+          updateProjectList(iconId);
+        }
+        
+        console.log(`✅ ${iconId}: ${project.name} 연동 완료`);
+        successCount++;
+      }
+    } catch (error) {
+      console.error(`❌ ${iconId}: ${project.name} 연동 실패`, error);
+      failCount++;
+    }
+  }
+  
+  alert(`✅ 자동 연동 완료!\n\n성공: ${successCount}개\n실패: ${failCount}개\n\n페이지가 새로고침됩니다.`);
+  
+  // 페이지 새로고침하여 변경사항 반영
+  if (successCount > 0) {
+    setTimeout(() => {
+      location.reload();
+    }, 1000);
+  }
 }
 
 // ==================== 전광판 수정 UI ====================
