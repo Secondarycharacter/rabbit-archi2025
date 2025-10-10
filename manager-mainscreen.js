@@ -123,9 +123,21 @@ function showMainScreenForm(action) {
     'delete': '프로젝트 삭제하기'
   }[action] || '프로젝트 관리';
   
+  // 이미지 데이터 초기화 (생성 모드)
+  if (action === 'create') {
+    croppedImages.main = null;
+    croppedImages.additional = [];
+    console.log('🔄 이미지 데이터 초기화 (생성 모드)');
+  }
+  
   // 기존 데이터 로드 (수정 모드인 경우)
   if (action === 'edit') {
     loadMainScreenData();
+  }
+  
+  // 관리자 오버레이 열림 플래그 설정
+  if (typeof isManagerOverlayOpen !== 'undefined') {
+    isManagerOverlayOpen = true;
   }
   
   // 오버레이 생성
@@ -216,6 +228,11 @@ function showMainScreenForm(action) {
         successMsg.remove();
         overlay.remove();
         
+        // 관리자 오버레이 닫힘 플래그 설정
+        if (typeof isManagerOverlayOpen !== 'undefined') {
+          isManagerOverlayOpen = false;
+        }
+        
         // 저장 후 모든 메인 아이콘 이미지 업데이트
         if (typeof updateAllMainIconImages === 'function') {
           updateAllMainIconImages();
@@ -239,6 +256,12 @@ function showMainScreenForm(action) {
   `;
   backBtn.onclick = () => {
     overlay.remove();
+    
+    // 관리자 오버레이는 계속 열려있음 (위치 선택 UI로 전환)
+    if (typeof isManagerOverlayOpen !== 'undefined') {
+      isManagerOverlayOpen = true;
+    }
+    
     showLocationSelectUI(action, actionText);
   };
   
@@ -255,7 +278,14 @@ function showMainScreenForm(action) {
     font-size: 16px;
     font-weight: 600;
   `;
-  closeBtn.onclick = () => overlay.remove();
+  closeBtn.onclick = () => {
+    overlay.remove();
+    
+    // 관리자 오버레이 닫힘 플래그 설정
+    if (typeof isManagerOverlayOpen !== 'undefined') {
+      isManagerOverlayOpen = false;
+    }
+  };
   
   footerBtns.appendChild(saveBtn);
   footerBtns.appendChild(backBtn);
@@ -267,8 +297,15 @@ function showMainScreenForm(action) {
   overlay.appendChild(container);
   document.body.appendChild(overlay);
   
-  // 핸들러 초기화
-  initializeFormHandlers();
+  // DOM 렌더링 후 핸들러 초기화 (약간의 지연)
+  setTimeout(() => {
+    console.log('📋 폼 핸들러 초기화 시작...');
+    console.log('   - Pickr 로드 확인:', typeof Pickr !== 'undefined' ? '✅' : '❌');
+    console.log('   - 색상 버튼 수:', document.querySelectorAll('.color-picker-btn').length);
+    
+    initializeFormHandlers();
+    console.log('✅ 폼 핸들러 초기화 완료');
+  }, 200);
 }
 
 // 폼 HTML 생성
@@ -340,7 +377,7 @@ function generateMainScreenFormHTML() {
             설계개요
           </label>
           <div class="color-picker-btn" data-target="designOverview" 
-            style="width: 50px; height: 50px; border: 2px solid #ddd; border-radius: 8px; cursor: pointer; background: white;">
+            style="width: 50px; height: 50px; border: 2px solid #ddd; border-radius: 8px; cursor: pointer; background: white; pointer-events: auto;">
           </div>
         </div>
       </div>
@@ -355,7 +392,7 @@ function generateMainScreenFormHTML() {
             placeholder="사업명을 입력하세요"
             style="flex: 1; padding: 12px; font-size: 16px; border: 2px solid #ddd; border-radius: 8px; font-family: 'WAGURI', sans-serif;">
           <div class="color-picker-btn" data-target="projectName" 
-            style="width: 50px; height: 50px; border: 2px solid #ddd; border-radius: 8px; cursor: pointer; background: white;">
+            style="width: 50px; height: 50px; border: 2px solid #ddd; border-radius: 8px; cursor: pointer; background: white; pointer-events: auto;">
           </div>
         </div>
         <div style="display: flex; gap: 10px; align-items: center;">
@@ -377,7 +414,7 @@ function generateMainScreenFormHTML() {
             placeholder="주용도를 입력하세요"
             style="flex: 1; padding: 12px; font-size: 16px; border: 2px solid #ddd; border-radius: 8px; font-family: 'WAGURI', sans-serif;">
           <div class="color-picker-btn" data-target="usage" 
-            style="width: 50px; height: 50px; border: 2px solid #ddd; border-radius: 8px; cursor: pointer; background: white;">
+            style="width: 50px; height: 50px; border: 2px solid #ddd; border-radius: 8px; cursor: pointer; background: white; pointer-events: auto;">
           </div>
         </div>
       </div>
@@ -392,7 +429,7 @@ function generateMainScreenFormHTML() {
             placeholder="대지위치를 입력하세요"
             style="flex: 1; padding: 12px; font-size: 16px; border: 2px solid #ddd; border-radius: 8px; font-family: 'WAGURI', sans-serif;">
           <div class="color-picker-btn" data-target="siteLocation" 
-            style="width: 50px; height: 50px; border: 2px solid #ddd; border-radius: 8px; cursor: pointer; background: white;">
+            style="width: 50px; height: 50px; border: 2px solid #ddd; border-radius: 8px; cursor: pointer; background: white; pointer-events: auto;">
           </div>
         </div>
       </div>
@@ -407,7 +444,7 @@ function generateMainScreenFormHTML() {
             placeholder="건축면적을 입력하세요"
             style="flex: 1; padding: 12px; font-size: 16px; border: 2px solid #ddd; border-radius: 8px; font-family: 'WAGURI', sans-serif;">
           <div class="color-picker-btn" data-target="buildingArea" 
-            style="width: 50px; height: 50px; border: 2px solid #ddd; border-radius: 8px; cursor: pointer; background: white;">
+            style="width: 50px; height: 50px; border: 2px solid #ddd; border-radius: 8px; cursor: pointer; background: white; pointer-events: auto;">
           </div>
         </div>
       </div>
@@ -422,7 +459,7 @@ function generateMainScreenFormHTML() {
             placeholder="연면적을 입력하세요"
             style="flex: 1; padding: 12px; font-size: 16px; border: 2px solid #ddd; border-radius: 8px; font-family: 'WAGURI', sans-serif;">
           <div class="color-picker-btn" data-target="totalArea" 
-            style="width: 50px; height: 50px; border: 2px solid #ddd; border-radius: 8px; cursor: pointer; background: white;">
+            style="width: 50px; height: 50px; border: 2px solid #ddd; border-radius: 8px; cursor: pointer; background: white; pointer-events: auto;">
           </div>
         </div>
       </div>
@@ -477,9 +514,15 @@ function generateMainScreenFormHTML() {
         
         <!-- 대표 이미지 -->
         <div style="margin-bottom: 20px;">
-          <label style="font-size: 16px; font-weight: 600; display: block; margin-bottom: 8px; color: #34495e;">
-            대표 이미지 <span style="color: red;">*</span>
-          </label>
+          <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 8px;">
+            <label style="font-size: 16px; font-weight: 600; color: #34495e; margin: 0;">
+              대표 이미지 <span style="color: red;">*</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px; color: #2c3e50; background: #e8f5e9; padding: 8px 12px; border-radius: 6px; border: 2px solid #4caf50;">
+              <input type="checkbox" id="useInMainLoop" style="width: 18px; height: 18px; cursor: pointer;">
+              <span style="font-weight: 600;">메인화면 자동 루프에 사용</span>
+            </label>
+          </div>
           <div id="mainImageDropzone" style="
             border: 3px dashed #3498db;
             border-radius: 12px;
@@ -529,29 +572,33 @@ function generateDesignerRow(index, required = false) {
   return `
     <div class="designer-row" data-index="${index}" style="
       display: flex;
+      flex-direction: column;
       gap: 10px;
-      align-items: center;
       margin-bottom: 10px;
       padding: 12px;
       background: #f8f9fa;
       border-radius: 8px;
     ">
-      <input type="text" class="designer-field" placeholder="분야" ${required ? 'required' : ''}
-        style="flex: 1; padding: 10px; font-size: 14px; border: 2px solid #ddd; border-radius: 6px; font-family: 'WAGURI', sans-serif;">
-      <input type="text" class="designer-office" placeholder="사무소명" ${required ? 'required' : ''}
-        style="flex: 1; padding: 10px; font-size: 14px; border: 2px solid #ddd; border-radius: 6px; font-family: 'WAGURI', sans-serif;">
-      <div class="color-picker-btn" data-target="designer${index}" 
-        style="width: 40px; height: 40px; border: 2px solid #ddd; border-radius: 6px; cursor: pointer; background: white;">
+      <div style="display: flex; gap: 10px; align-items: center;">
+        <input type="text" class="designer-field" placeholder="분야" ${required ? 'required' : ''}
+          style="flex: 1; padding: 10px; font-size: 14px; border: 2px solid #ddd; border-radius: 6px; font-family: 'WAGURI', sans-serif;">
+        <input type="text" class="designer-office" placeholder="사무소명" ${required ? 'required' : ''}
+          style="flex: 1; padding: 10px; font-size: 14px; border: 2px solid #ddd; border-radius: 6px; font-family: 'WAGURI', sans-serif;">
+        <div class="color-picker-btn" data-target="designer${index}" 
+          style="width: 40px; height: 40px; border: 2px solid #ddd; border-radius: 6px; cursor: pointer; background: white; pointer-events: auto;">
+        </div>
+        ${!required ? `<button type="button" class="remove-designer-btn" style="
+          padding: 8px 12px;
+          background: #e74c3c;
+          color: white;
+          border: none;
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 12px;
+        ">삭제</button>` : ''}
       </div>
-      ${!required ? `<button type="button" class="remove-designer-btn" style="
-        padding: 8px 12px;
-        background: #e74c3c;
-        color: white;
-        border: none;
-        border-radius: 6px;
-        cursor: pointer;
-        font-size: 12px;
-      ">삭제</button>` : ''}
+      <input type="url" class="designer-homepage" placeholder="홈페이지 주소 (선택사항, 예: https://www.example.com)"
+        style="width: 100%; padding: 10px; font-size: 14px; border: 2px solid #ddd; border-radius: 6px; font-family: 'WAGURI', sans-serif;">
     </div>
   `;
 }
@@ -576,7 +623,7 @@ function generateStaffRow(index, required = false) {
       <input type="text" class="staff-role" placeholder="담당업무" ${required ? 'required' : ''}
         style="flex: 2; padding: 10px; font-size: 14px; border: 2px solid #ddd; border-radius: 6px; font-family: 'WAGURI', sans-serif;">
       <div class="color-picker-btn" data-target="staff${index}" 
-        style="width: 40px; height: 40px; border: 2px solid #ddd; border-radius: 6px; cursor: pointer; background: white;">
+        style="width: 40px; height: 40px; border: 2px solid #ddd; border-radius: 6px; cursor: pointer; background: white; pointer-events: auto;">
       </div>
       ${!required ? `<button type="button" class="remove-staff-btn" style="
         padding: 8px 12px;
@@ -687,89 +734,64 @@ function initializeFormHandlers() {
   initializeDropzones();
 }
 
-// 색상 선택기 초기화
+// 색상 선택기 초기화 (HTML5 Color Input 사용)
 function initializeColorPickers() {
+  console.log('🎨 색상 선택기 초기화 시작...');
+  
   try {
-    // 기존 색상 선택기 제거 (destroy만 사용, Remove 사용 안 함)
-    colorPickers.forEach(picker => {
-      try {
-        if (picker && typeof picker.destroy === 'function') {
-          picker.destroy();
-        }
-      } catch (e) {
-        console.log('Pickr 제거 중 오류 (무시):', e);
-      }
-    });
-    colorPickers = [];
-    
-    // 모든 Pickr 패널 제거
-    document.querySelectorAll('.pcr-app').forEach(app => app.remove());
-    
     const buttons = document.querySelectorAll('.color-picker-btn');
-    console.log('색상 선택기 버튼 개수:', buttons.length);
+    console.log(`📍 발견된 색상 선택기 버튼: ${buttons.length}개`);
     
     buttons.forEach((btn, index) => {
-      // 이미 Pickr가 있으면 스킵
-      if (btn.classList.contains('pickr-initialized')) {
-        console.log(`버튼 ${index} 이미 초기화됨, 스킵`);
-        return;
+      const target = btn.dataset.target;
+      const color = btn.dataset.color || '#ffffff';
+      
+      console.log(`  [${index}] target="${target}", color="${color}"`);
+      
+      // 기존 color input 제거
+      const existingInput = btn.querySelector('input[type="color"]');
+      if (existingInput) {
+        existingInput.remove();
       }
       
-      try {
-        const pickr = Pickr.create({
-          el: btn,
-          theme: 'nano',
-          default: btn.dataset.color || '#ffffff',  // 기존 색상 또는 흰색
-          swatches: [
-            '#ffffff', '#000000', '#ff0000', '#00ff00', '#0000ff',
-            '#ffff00', '#ff00ff', '#00ffff', '#ffa500', '#800080'
-          ],
-          components: {
-            preview: true,
-            opacity: false,
-            hue: true,
-            interaction: {
-              hex: true,
-              rgba: false,
-              hsla: false,
-              hsva: false,
-              cmyk: false,
-              input: true,
-              save: true
-            }
-          }
-        });
-        
-        // 초기 색상 설정
-        if (!btn.dataset.color) {
-          btn.style.background = '#ffffff';  // 기본값 흰색
-          btn.dataset.color = '#ffffff';
-        } else {
-          btn.style.background = btn.dataset.color;
-        }
-        btn.classList.add('pickr-initialized');
-        
-        pickr.on('save', (color, instance) => {
-          const hexColor = color.toHEXA().toString();
-          btn.style.background = hexColor;
-          btn.dataset.color = hexColor;
-          pickr.hide();
-          
-          const target = btn.dataset.target;
-          console.log(`✅ 색상 저장 완료 [${target}]:`, hexColor);
-          console.log('   - 버튼 배경:', btn.style.background);
-          console.log('   - dataset.color:', btn.dataset.color);
-        });
-        
-        colorPickers.push(pickr);
-      } catch (error) {
-        console.error(`Pickr 생성 오류 (버튼 ${index}):`, error);
-      }
+      // HTML5 color input 생성
+      const colorInput = document.createElement('input');
+      colorInput.type = 'color';
+      colorInput.value = color;
+      colorInput.style.cssText = `
+        width: 100%;
+        height: 100%;
+        border: none;
+        cursor: pointer;
+        background: transparent;
+      `;
+      
+      // 색상 변경 이벤트
+      colorInput.addEventListener('input', (e) => {
+        const newColor = e.target.value;
+        btn.style.background = newColor;
+        btn.dataset.color = newColor;
+        console.log(`✅ 색상 변경 [${target}]: ${newColor}`);
+      });
+      
+      colorInput.addEventListener('change', (e) => {
+        const newColor = e.target.value;
+        btn.style.background = newColor;
+        btn.dataset.color = newColor;
+        console.log(`✅ 색상 저장 [${target}]: ${newColor}`);
+      });
+      
+      btn.appendChild(colorInput);
+      btn.style.background = color;
+      btn.style.padding = '0';
+      btn.style.overflow = 'hidden';
+      
+      console.log(`  ✓ 색상 선택기 생성 성공: ${target}`);
     });
     
-    console.log('색상 선택기 초기화 완료:', colorPickers.length, '개');
+    console.log(`✅ 색상 선택기 초기화 완료: ${buttons.length}개`);
   } catch (error) {
-    console.error('색상 선택기 초기화 전체 오류:', error);
+    console.error('❌ 색상 선택기 초기화 오류:', error);
   }
 }
 
@@ -793,6 +815,27 @@ function initializeDropzones() {
   // 대표 이미지 드롭존
   Dropzone.autoDiscover = false;
   
+  // V, X 아이콘 숨기기 위한 CSS 추가
+  const style = document.createElement('style');
+  style.textContent = `
+    .dz-success-mark,
+    .dz-error-mark {
+      display: none !important;
+    }
+    .dropzone .dz-preview .dz-image img {
+      max-width: 100% !important;
+      max-height: 100% !important;
+      object-fit: contain !important;
+    }
+    .dropzone .dz-preview {
+      margin: 10px !important;
+    }
+  `;
+  if (!document.getElementById('dropzone-custom-style')) {
+    style.id = 'dropzone-custom-style';
+    document.head.appendChild(style);
+  }
+  
   const mainImageZone = new Dropzone('#mainImageDropzone', {
     url: '#',
     autoProcessQueue: false,
@@ -801,12 +844,29 @@ function initializeDropzones() {
     addRemoveLinks: false,
     dictDefaultMessage: '대표 이미지를 드래그하거나 클릭하여 업로드',
     dictRemoveFile: '삭제',
-    thumbnailWidth: null,
-    thumbnailHeight: null,
+    thumbnailWidth: 300,
+    thumbnailHeight: 200,
     init: function() {
       this.on('addedfile', function(file) {
         if (this.files.length > 1) {
           this.removeFile(this.files[0]);
+        }
+        
+        // V, X 아이콘 숨기기
+        const previewElement = file.previewElement;
+        if (previewElement) {
+          const successMark = previewElement.querySelector('.dz-success-mark');
+          const errorMark = previewElement.querySelector('.dz-error-mark');
+          if (successMark) successMark.style.display = 'none';
+          if (errorMark) errorMark.style.display = 'none';
+          
+          // 이미지 크기 조정 (드롭박스 경계 내)
+          const thumbnail = previewElement.querySelector('img');
+          if (thumbnail) {
+            thumbnail.style.maxWidth = '100%';
+            thumbnail.style.maxHeight = '200px';
+            thumbnail.style.objectFit = 'contain';
+          }
         }
         
         // 크롭 에디터 표시
@@ -824,9 +884,28 @@ function initializeDropzones() {
     addRemoveLinks: false,
     dictDefaultMessage: '추가 이미지를 드래그하거나 클릭하여 업로드 (여러 개 가능)',
     dictRemoveFile: '삭제',
-    thumbnailWidth: null,
-    thumbnailHeight: null,
+    thumbnailWidth: 150,
+    thumbnailHeight: 100,
     init: function() {
+      this.on('addedfile', function(file) {
+        // V, X 아이콘 숨기기
+        const previewElement = file.previewElement;
+        if (previewElement) {
+          const successMark = previewElement.querySelector('.dz-success-mark');
+          const errorMark = previewElement.querySelector('.dz-error-mark');
+          if (successMark) successMark.style.display = 'none';
+          if (errorMark) errorMark.style.display = 'none';
+          
+          // 이미지 크기 조정 (드롭박스 경계 내)
+          const thumbnail = previewElement.querySelector('img');
+          if (thumbnail) {
+            thumbnail.style.maxWidth = '100%';
+            thumbnail.style.maxHeight = '150px';
+            thumbnail.style.objectFit = 'contain';
+          }
+        }
+      });
+      
       this.on('addedfiles', function(files) {
         files.forEach((file, index) => {
           // 크롭 에디터 표시
@@ -967,10 +1046,12 @@ function validateAndSaveForm() {
       designers: collectDesigners(),
       staff: collectStaff(),
       mainImage: collectMainImage(),
-      additionalImages: collectAdditionalImages()
+      additionalImages: collectAdditionalImages(),
+      useInMainLoop: document.getElementById('useInMainLoop')?.checked || false
     };
     
     console.log('수집된 데이터:', mainScreenData);
+    console.log('메인 루프 사용:', mainScreenData.useInMainLoop);
     
     // IndexedDB에 저장 (비동기)
     const storageKey = `projectData_${iconId}`;
@@ -1022,14 +1103,16 @@ function collectDesigners() {
     document.querySelectorAll('.designer-row').forEach(row => {
       const fieldInput = row.querySelector('.designer-field');
       const officeInput = row.querySelector('.designer-office');
+      const homepageInput = row.querySelector('.designer-homepage');
       const colorBtn = row.querySelector('.color-picker-btn');
       
       const field = fieldInput ? fieldInput.value : '';
       const office = officeInput ? officeInput.value : '';
+      const homepage = homepageInput ? homepageInput.value : '';
       const color = colorBtn?.dataset?.color || '#ffffff';
       
       if (field || office) {
-        designers.push({ field, office, color });
+        designers.push({ field, office, homepage, color });
       }
     });
     console.log('설계자 수집 완료:', designers.length, '명');
@@ -1194,6 +1277,7 @@ function attachImageButtonHandlers() {
         border-radius: 8px;
         cursor: pointer;
         background: ${currentColor};
+        pointer-events: auto;
       `;
       
       colorSection.appendChild(colorLabel);
@@ -1230,9 +1314,6 @@ function attachImageButtonHandlers() {
         font-size: 16px;
         font-weight: 600;
       `;
-      
-      // Pickr 인스턴스 변수 (버튼 이벤트보다 먼저 선언)
-      let pickrInstance = null;
       
       // 클로저 문제 방지: row와 descDiv를 명시적으로 캡처
       const targetRow = row;
@@ -1275,38 +1356,13 @@ function attachImageButtonHandlers() {
         // 팝업 제거
         popup.remove();
         
-        // Pickr 정리
-        if (pickrInstance) {
-          try {
-            pickrInstance.destroyAndRemove();
-          } catch (e) {
-            console.log('Pickr 제거 중 오류 (무시 가능):', e);
-          }
-        }
-        
-        // Pickr 패널 강제 제거
-        const pickrApp = document.querySelector('.pcr-app');
-        if (pickrApp) pickrApp.remove();
-        
-        console.log('✅✅✅ 이미지 설명 저장 완료:', { text, color });
+        console.log('✅ 이미지 설명 저장 완료:', { text, color });
       };
       
       // 취소 버튼 이벤트 (DOM 생성 즉시 연결)
       cancelBtn.onclick = () => {
         console.log('취소 버튼 클릭됨');
         popup.remove();
-        
-        if (pickrInstance) {
-          try {
-            pickrInstance.destroyAndRemove();
-          } catch (e) {
-            console.log('Pickr 제거 중 오류 (무시 가능):', e);
-          }
-        }
-        
-        // Pickr 패널 강제 제거
-        const pickrApp = document.querySelector('.pcr-app');
-        if (pickrApp) pickrApp.remove();
       };
       
       buttonSection.appendChild(confirmBtn);
@@ -1319,59 +1375,37 @@ function attachImageButtonHandlers() {
       
       document.body.appendChild(popup);
       
-      try {
-        // 색상 선택기 초기화
-        pickrInstance = Pickr.create({
-          el: '#popupColorPicker',
-          theme: 'nano',
-          default: currentColor,
-          swatches: [
-            '#000000', '#ffffff', '#ff0000', '#00ff00', '#0000ff',
-            '#ffff00', '#ff00ff', '#00ffff', '#ffa500', '#800080'
-          ],
-          components: {
-            preview: true,
-            opacity: false,
-            hue: true,
-            interaction: {
-              hex: true,
-              input: true,
-              save: true
-            }
-          }
-        });
-        
-        console.log('Pickr 초기화 완료');
-        
-        pickrInstance.on('save', (color) => {
-          console.log('색상 저장됨:', color);
-          const hexColor = color.toHEXA().toString();
-          const colorPickerDiv = document.getElementById('popupColorPicker');
-          const textInput = document.getElementById('imageDescInput');
-          
-          if (colorPickerDiv && textInput) {
-            // 색상 업데이트
-            colorPickerDiv.style.background = hexColor;
-            colorPickerDiv.dataset.color = hexColor;
-            
-            // 입력창 텍스트 색상도 변경
-            textInput.style.color = hexColor;
-            
-            console.log('텍스트 색상 변경됨:', hexColor);
-          }
-          
-          // 색상 선택기 닫기
-          pickrInstance.hide();
-          
-          // Pickr 패널도 완전히 닫기
-          setTimeout(() => {
-            const pickrApp = document.querySelector('.pcr-app');
-            if (pickrApp) pickrApp.remove();
-          }, 100);
-        });
-      } catch (error) {
-        console.error('Pickr 초기화 오류:', error);
-      }
+      // HTML5 color input으로 색상 선택기 추가
+      const colorInput = document.createElement('input');
+      colorInput.type = 'color';
+      colorInput.value = currentColor;
+      colorInput.style.cssText = `
+        width: 100%;
+        height: 100%;
+        border: none;
+        cursor: pointer;
+        background: transparent;
+      `;
+      
+      colorInput.addEventListener('input', (e) => {
+        const newColor = e.target.value;
+        colorPickerDiv.style.background = newColor;
+        colorPickerDiv.dataset.color = newColor;
+        textInput.style.color = newColor;
+        console.log(`✅ 색상 변경: ${newColor}`);
+      });
+      
+      colorInput.addEventListener('change', (e) => {
+        const newColor = e.target.value;
+        colorPickerDiv.style.background = newColor;
+        colorPickerDiv.dataset.color = newColor;
+        textInput.style.color = newColor;
+        console.log(`✅ 색상 저장: ${newColor}`);
+      });
+      
+      colorPickerDiv.appendChild(colorInput);
+      colorPickerDiv.style.padding = '0';
+      colorPickerDiv.style.overflow = 'hidden';
       
       // Enter 키로 확인
       textInput.onkeydown = (e) => {
@@ -1420,33 +1454,19 @@ function collectMainImage() {
 // 추가 이미지 수집
 function collectAdditionalImages() {
   try {
-    const images = [];
-    const rows = document.querySelectorAll('.additional-image-row');
-    console.log('추가 이미지 row 개수:', rows.length);
+    console.log('📸 추가 이미지 수집 시작...');
+    console.log('croppedImages.additional 배열 길이:', croppedImages.additional.length);
     
-    rows.forEach((row, index) => {
-      // 크롭된 이미지 데이터 사용
-      const imageData = croppedImages.additional[index];
-      const filename = row.dataset.filename;
-      const descText = row.dataset.descText || '';
-      const descColor = row.dataset.descColor || '#000000';
-      
-      console.log(`이미지 ${index}: filename=${filename}, hasData=${!!imageData}, desc=${descText}`);
-      
-      if (imageData) {
-        images.push({
-          imageData: imageData,
-          filename: filename,
-          description: {
-            text: descText,
-            color: descColor
-          },
-          index: index
-        });
-      }
+    // croppedImages.additional 배열에서 data만 추출
+    const images = croppedImages.additional.map((imgObj, index) => {
+      const imageData = imgObj.data || imgObj;  // 객체 또는 문자열 지원
+      const filename = imgObj.filename || `image_${index + 1}`;
+      console.log(`이미지 ${index + 1}: ${filename}, length=${imageData?.length || 0}`);
+      return imageData;
     });
     
-    console.log('추가 이미지 수집 완료 (크롭됨):', images.length, '개');
+    console.log('✅ 추가 이미지 수집 완료:', images.length, '개');
+    console.log('📋 순서:', croppedImages.additional.map(img => img.filename || '(파일명 없음)'));
     return images;
   } catch (error) {
     console.error('추가 이미지 수집 오류:', error);
@@ -1461,6 +1481,51 @@ function loadMainScreenData() {
     mainScreenData = JSON.parse(saved);
     console.log('메인화면 데이터 로드됨:', mainScreenData);
   }
+}
+
+// 추가 이미지 프리뷰 다시 로드
+function reloadAdditionalImagesPreviews() {
+  const additionalPreview = document.getElementById('additionalImagesPreview');
+  if (!additionalPreview) return;
+  
+  additionalPreview.innerHTML = '';
+  
+  croppedImages.additional.forEach((imgObj, idx) => {
+    const imgContainer = document.createElement('div');
+    imgContainer.style.cssText = 'position: relative; display: inline-block; margin: 5px;';
+    imgContainer.dataset.imageIndex = idx;
+    
+    const img = document.createElement('img');
+    img.src = imgObj.data || imgObj;  // 객체 또는 문자열 지원
+    img.style.cssText = 'max-width: 150px; border: 2px solid #9b59b6; border-radius: 8px;';
+    
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.textContent = '✕';
+    removeBtn.style.cssText = `
+      position: absolute; top: -10px; right: -10px; background: #e74c3c; color: white; border: none; 
+      border-radius: 50%; width: 25px; height: 25px; cursor: pointer; font-weight: bold; font-size: 12px;
+    `;
+    removeBtn.onclick = function() {
+      const containerIndex = parseInt(this.parentElement.dataset.imageIndex);
+      croppedImages.additional.splice(containerIndex, 1);
+      // 다시 렌더링
+      reloadAdditionalImagesPreviews();
+    };
+    
+    const label = document.createElement('div');
+    const filename = imgObj.filename || `이미지 ${idx + 1}`;
+    label.textContent = filename;
+    label.style.cssText = 'text-align: center; font-size: 11px; color: #7f8c8d; margin-top: 5px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;';
+    label.title = filename;  // 전체 파일명 툴팁
+    
+    imgContainer.appendChild(img);
+    imgContainer.appendChild(removeBtn);
+    imgContainer.appendChild(label);
+    additionalPreview.appendChild(imgContainer);
+  });
+  
+  console.log(`✅ 추가 이미지 프리뷰 재로드 완료: ${croppedImages.additional.length}개`);
 }
 
 // 프로젝트 데이터를 폼에 불러오기
@@ -1514,15 +1579,19 @@ async function loadProjectDataToForm(iconId) {
       
       projectData.designers.forEach((designer, index) => {
         const rowHTML = `
-          <div class="designer-row" style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;">
-            <input type="text" class="designer-field" value="${designer.field || ''}" placeholder="분야"
-              style="flex: 1; padding: 10px; font-size: 14px; border: 2px solid #ddd; border-radius: 8px; font-family: 'WAGURI', sans-serif;">
-            <input type="text" class="designer-office" value="${designer.office || ''}" placeholder="사무소명"
-              style="flex: 1; padding: 10px; font-size: 14px; border: 2px solid #ddd; border-radius: 8px; font-family: 'WAGURI', sans-serif;">
-            <div class="color-picker-btn" data-target="designer${index}" data-color="${designer.color || '#ffffff'}"
-              style="width: 50px; height: 50px; border: 2px solid #ddd; border-radius: 8px; cursor: pointer; background: ${designer.color || '#ffffff'};">
+          <div class="designer-row" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px; padding: 12px; background: #f8f9fa; border-radius: 8px;">
+            <div style="display: flex; gap: 10px; align-items: center;">
+              <input type="text" class="designer-field" value="${designer.field || ''}" placeholder="분야"
+                style="flex: 1; padding: 10px; font-size: 14px; border: 2px solid #ddd; border-radius: 8px; font-family: 'WAGURI', sans-serif;">
+              <input type="text" class="designer-office" value="${designer.office || ''}" placeholder="사무소명"
+                style="flex: 1; padding: 10px; font-size: 14px; border: 2px solid #ddd; border-radius: 8px; font-family: 'WAGURI', sans-serif;">
+              <div class="color-picker-btn" data-target="designer${index}" data-color="${designer.color || '#ffffff'}"
+                style="width: 50px; height: 50px; border: 2px solid #ddd; border-radius: 8px; cursor: pointer; background: ${designer.color || '#ffffff'}; pointer-events: auto;">
+              </div>
+              ${index > 0 ? '<button type="button" class="remove-designer-btn" style="padding: 8px 12px; background: #e74c3c; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600;">삭제</button>' : ''}
             </div>
-            ${index > 0 ? '<button type="button" class="remove-designer-btn" style="padding: 8px 12px; background: #e74c3c; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600;">삭제</button>' : ''}
+            <input type="url" class="designer-homepage" value="${designer.homepage || ''}" placeholder="홈페이지 주소 (선택사항, 예: https://www.example.com)"
+              style="width: 100%; padding: 10px; font-size: 14px; border: 2px solid #ddd; border-radius: 6px; font-family: 'WAGURI', sans-serif;">
           </div>
         `;
         designersContainer.insertAdjacentHTML('beforeend', rowHTML);
@@ -1546,7 +1615,7 @@ async function loadProjectDataToForm(iconId) {
             <input type="text" class="staff-role" value="${member.role || ''}" placeholder="담당업무"
               style="flex: 1; padding: 10px; font-size: 14px; border: 2px solid #ddd; border-radius: 8px; font-family: 'WAGURI', sans-serif;">
             <div class="color-picker-btn" data-target="staff${index}" data-color="${member.color || '#ffffff'}"
-              style="width: 50px; height: 50px; border: 2px solid #ddd; border-radius: 8px; cursor: pointer; background: ${member.color || '#ffffff'};">
+              style="width: 50px; height: 50px; border: 2px solid #ddd; border-radius: 8px; cursor: pointer; background: ${member.color || '#ffffff'}; pointer-events: auto;">
             </div>
             ${index > 0 ? '<button type="button" class="remove-staff-btn" style="padding: 8px 12px; background: #e74c3c; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600;">삭제</button>' : ''}
           </div>
@@ -1557,38 +1626,75 @@ async function loadProjectDataToForm(iconId) {
       console.log('담당업무 데이터 불러옴:', projectData.staff.length, '명');
     }
     
+    // 이미지 데이터 불러오기 (대표 이미지)
+    if (projectData.mainImage) {
+      console.log('🖼️ 대표 이미지 불러오기...');
+      croppedImages.main = projectData.mainImage;
+      
+      const mainPreview = document.getElementById('mainImagePreview');
+      if (mainPreview) {
+        const container = document.createElement('div');
+        container.style.cssText = 'position: relative; display: inline-block;';
+        
+        const img = document.createElement('img');
+        img.src = projectData.mainImage;
+        img.style.cssText = 'max-width: 300px; border: 2px solid #3498db; border-radius: 8px;';
+        
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.textContent = '✕';
+        removeBtn.style.cssText = `
+          position: absolute; top: -10px; right: -10px; background: #e74c3c; color: white; border: none;
+          border-radius: 50%; width: 30px; height: 30px; cursor: pointer; font-weight: bold;
+        `;
+        removeBtn.onclick = function() {
+          croppedImages.main = null;
+          this.parentElement.remove();
+        };
+        
+        container.appendChild(img);
+        container.appendChild(removeBtn);
+        mainPreview.innerHTML = '';
+        mainPreview.appendChild(container);
+      }
+    }
+    
+    // 이미지 데이터 불러오기 (추가 이미지)
+    if (projectData.additionalImages && projectData.additionalImages.length > 0) {
+      console.log(`🖼️ 추가 이미지 ${projectData.additionalImages.length}개 불러오기...`);
+      
+      // 기존 데이터를 새로운 구조로 변환 (파일명 추가)
+      croppedImages.additional = projectData.additionalImages.map((imgData, idx) => {
+        return {
+          filename: `기존이미지_${String(idx + 1).padStart(3, '0')}`,
+          data: imgData
+        };
+      });
+      
+      // 프리뷰 로드
+      reloadAdditionalImagesPreviews();
+    }
+    
+    // 메인 루프 체크박스 설정
+    const useInMainLoopCheckbox = document.getElementById('useInMainLoop');
+    if (useInMainLoopCheckbox) {
+      useInMainLoopCheckbox.checked = projectData.useInMainLoop || false;
+      console.log('✅ 메인 루프 사용 설정:', projectData.useInMainLoop);
+    }
+    
     // 색상 선택기 재초기화 (새로 추가된 설계자/담당업무 포함)
     setTimeout(() => {
-      // 기존 Pickr 인스턴스 완전히 제거
-      colorPickers.forEach(picker => {
-        try {
-          if (picker && typeof picker.destroy === 'function') {
-            picker.destroy();
-          }
-        } catch (e) {
-          console.log('Pickr 제거 중 오류 (무시):', e);
-        }
-      });
-      colorPickers = [];
-      
-      // 모든 Pickr 패널 제거
-      document.querySelectorAll('.pcr-app').forEach(app => app.remove());
-      
-      // pickr-initialized 클래스 모두 제거
-      document.querySelectorAll('.color-picker-btn').forEach(btn => {
-        btn.classList.remove('pickr-initialized');
-      });
+      console.log('🔧 색상 선택기 재초기화 시작...');
       
       // 색상 선택기 재초기화
       initializeColorPickers();
       attachRemoveHandlers();
       
       console.log('✅ 색상 선택기 완전 재초기화 완료');
-      console.log('   - 활성 Pickr 인스턴스:', colorPickers.length, '개');
-    }, 300);  // 200ms → 300ms로 증가 (안정성 향상)
+    }, 300);
     
-    alert(`✅ ${iconId} 데이터를 불러왔습니다!`);
-    console.log('데이터 로드 완료 (설계자, 담당업무 포함)');
+    alert(`✅ ${iconId} 데이터를 불러왔습니다! (이미지 ${projectData.additionalImages?.length || 0}개 포함)`);
+    console.log('데이터 로드 완료 (설계자, 담당업무, 이미지 포함)');
     
   } catch (error) {
     console.error('데이터 로드 오류:', error);
@@ -1640,9 +1746,9 @@ function showImageCropEditor(file, type, dropzoneInstance, index = 0) {
     title.textContent = type === 'main' ? '대표 이미지 편집' : `추가 이미지 편집 (${index + 1})`;
     editorOverlay.appendChild(title);
     
-    // 크롭 영역 컨테이너 (1800x1235 비율 유지)
+    // 크롭 영역 컨테이너 (1440x960 비율 유지)
     const containerWidth = Math.min(900, window.innerWidth - 100);  // 최대 900px
-    const containerHeight = containerWidth * (1235 / 1800);  // 비율 유지
+    const containerHeight = containerWidth * (960 / 1440);  // 비율 유지
     
     const cropContainer = document.createElement('div');
     cropContainer.style.cssText = `
@@ -1655,7 +1761,7 @@ function showImageCropEditor(file, type, dropzoneInstance, index = 0) {
       margin-bottom: 20px;
     `;
     
-    // 붉은색 점선 박스 (1800:1235 비율)
+    // 붉은색 점선 박스 (1440:960 비율)
     const cropBox = document.createElement('div');
     cropBox.style.cssText = `
       position: absolute;
@@ -1682,7 +1788,7 @@ function showImageCropEditor(file, type, dropzoneInstance, index = 0) {
     // 이미지 로드 후 초기 위치 설정
     img.onload = function() {
       const imgAspect = img.naturalWidth / img.naturalHeight;
-      const containerAspect = 1800 / 1235;
+      const containerAspect = 1440 / 960;
       
       let imgWidth, imgHeight;
       
@@ -1769,17 +1875,27 @@ function showImageCropEditor(file, type, dropzoneInstance, index = 0) {
       
       if (type === 'main') {
         croppedImages.main = croppedData;
+        console.log('✅ 대표 이미지 크롭 완료');
       } else {
-        croppedImages.additional[index] = croppedData;
+        // 추가 이미지는 파일명과 함께 저장
+        croppedImages.additional.push({
+          filename: file.name,
+          data: croppedData
+        });
+        
+        // 파일명 기준으로 정렬 (오름차순)
+        croppedImages.additional.sort((a, b) => {
+          return a.filename.localeCompare(b.filename, undefined, { numeric: true, sensitivity: 'base' });
+        });
+        
+        console.log(`✅ 추가 이미지 크롭 완료: ${file.name} (총 ${croppedImages.additional.length}개)`);
+        console.log(`📋 정렬된 파일 순서:`, croppedImages.additional.map(img => img.filename));
+        
+        // 프리뷰 다시 로드
+        reloadAdditionalImagesPreviews();
       }
       
       editorOverlay.remove();
-      console.log(`${type} 이미지 크롭 완료`);
-      
-      // 추가 이미지인 경우 리스트에 추가
-      if (type === 'additional') {
-        addImageToAdditionalList(file.name, index);
-      }
     };
     
     // 취소 버튼
@@ -1931,8 +2047,8 @@ function updateHandlePosition(handle, img, position) {
 // 이미지 크롭 (캔버스로 캡처)
 function cropImage(img, container, containerWidth, containerHeight) {
   const canvas = document.createElement('canvas');
-  canvas.width = 1800;
-  canvas.height = 1235;
+  canvas.width = 1440;
+  canvas.height = 960;
   const ctx = canvas.getContext('2d');
   
   // 현재 이미지의 위치와 크기
@@ -1945,7 +2061,7 @@ function cropImage(img, container, containerWidth, containerHeight) {
   const scaleX = img.naturalWidth / imgWidth;
   const scaleY = img.naturalHeight / imgHeight;
   
-  // 크롭 영역 (컨테이너 전체 = 1800x1235 비율)
+  // 크롭 영역 (컨테이너 전체 = 1440x960 비율)
   const cropX = -imgLeft * scaleX;
   const cropY = -imgTop * scaleY;
   const cropWidth = containerWidth * scaleX;
@@ -1955,11 +2071,24 @@ function cropImage(img, container, containerWidth, containerHeight) {
   ctx.drawImage(
     img,
     cropX, cropY, cropWidth, cropHeight,  // 소스 영역
-    0, 0, 1800, 1235  // 대상 영역 (1800x1235로 고정)
+    0, 0, 1440, 960  // 대상 영역 (1440x960으로 고정)
   );
   
   return canvas.toDataURL('image/jpeg', 0.95);
 }
 
+// 디버깅 함수: 색상 선택기 상태 확인
+window.checkColorPickers = function() {
+  console.log('🔍 색상 선택기 상태 확인:');
+  console.log('   - 색상 버튼 개수:', document.querySelectorAll('.color-picker-btn').length);
+  console.log('   - color input 개수:', document.querySelectorAll('.color-picker-btn input[type="color"]').length);
+  
+  document.querySelectorAll('.color-picker-btn').forEach((btn, i) => {
+    const hasInput = btn.querySelector('input[type="color"]') !== null;
+    console.log(`   [${i}] ${btn.dataset.target}: ${hasInput ? '✅' : '❌'} (color: ${btn.dataset.color})`);
+  });
+};
+
 console.log('%c✅ 메인화면 폼 모듈 로드됨', 'color: #3498db; font-weight: bold; font-size: 14px;');
+console.log('%c💡 색상 선택기 문제 시 콘솔에서 checkColorPickers() 실행', 'color: #f39c12; font-size: 12px;');
 

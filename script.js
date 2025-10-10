@@ -1,21 +1,16 @@
 const container = document.getElementById("iconContainer");
 const icons = document.querySelectorAll(".icon-wrapper");
 const resetBtn = document.getElementById("resetBtn");
-const screenResetBtn = document.getElementById("screenResetBtn");
-const screenMinimizeBtn = document.getElementById("screenMinimizeBtn");
 const arrowTop = document.getElementById("arrowTop");
 const arrowBottom = document.getElementById("arrowBottom");
-const projectScreen = document.querySelector(".project-screen");
 
 let dragging = null;
 let startX, startY, origX, origY;
 let initialPositions = {};
-let screenIconInitialPositions = {}; // 스크린 내부 아이콘 초기 위치 저장
 let afIndex = 0; // A~G 올라온 개수
 let isResponsive = false; // 반응형 모드 여부
 let isFirstLoad = true; // 최초 로드 여부
 let imageSizes = {}; // 이미지 크기 저장
-let isScreenMinimized = false; // 스크린 최소화 상태
 
 // 그리드 설정 (컨테이너 전체)
 const GRID_X = 120;
@@ -25,18 +20,6 @@ const GRID_START_Y = 80;
 const MARGIN = 80;
 const CONTAINER_WIDTH = 2560;
 const CONTAINER_HEIGHT = 1440;
-
-// 프로젝트 스크린 그리드 설정
-const SCREEN_GRID_X = 120;
-const SCREEN_GRID_Y = 160;
-const SCREEN_MARGIN_LEFT = 60;
-const SCREEN_MARGIN_RIGHT = 60;
-const SCREEN_MARGIN_TOP = 100;
-const SCREEN_MARGIN_BOTTOM = 60;
-const SCREEN_DEFAULT_X = 440;  // 그리드 3,0의 X좌표 (80 + 3*120)
-const SCREEN_DEFAULT_Y = 80;   // 그리드 0,0의 Y좌표 (80 + 0*160)
-const SCREEN_DEFAULT_WIDTH = 1800;  // 프로젝트 스크린 기본 크기
-const SCREEN_DEFAULT_HEIGHT = 1100;
 
 // 각 아이콘의 그리드 위치 (위치별 이니셜 기반)
 const iconGridPositions = {
@@ -62,8 +45,8 @@ const iconGridPositions = {
   'cabinet': { gridX: 19, gridY: 0 },    // 캐비넷
   'favorites': { gridX: 19, gridY: 1 },  // 즐겨찾기 (Favorites)
   'manager': { gridX: 19, gridY: 2 },    // 관리자 (Manager)
-  'park': { gridX: 17, gridY: 7 },       // 공원 (Park)
-  'yong': { gridX: 16, gridY: 7 },       // 용 (yLong -> L)
+  'yong': { gridX: 19, gridY: 5 },       // 용
+  'park': { gridX: 19, gridY: 6 },       // 공원
   'trash': { gridX: 19, gridY: 7 }       // 장독대 (Jang)
 };
 
@@ -78,482 +61,8 @@ function gridToPixel(gridX, gridY, imageWidth, imageHeight) {
   };
 }
 
-// 프로젝트 스크린 그리드 좌표를 픽셀 좌표로 변환 (중앙 정렬)
-function screenGridToPixel(screenGridX, screenGridY, imageWidth, imageHeight) {
-  // 스크린의 절대 위치 계산
-  const screenLeft = projectScreen.style.left;
-  const screenTop = projectScreen.style.top;
-  const screenAbsX = screenLeft ? parseInt(screenLeft) : SCREEN_DEFAULT_X;
-  const screenAbsY = screenTop ? parseInt(screenTop) : SCREEN_DEFAULT_Y;
-  
-  // 스크린 내부 그리드의 시작점 계산
-  const screenGridStartX = screenAbsX + SCREEN_MARGIN_LEFT;
-  const screenGridStartY = screenAbsY + SCREEN_MARGIN_TOP;
-  
-  // 그리드 좌표를 픽셀 좌표로 변환
-  const centerX = screenGridStartX + (screenGridX * SCREEN_GRID_X) + (SCREEN_GRID_X / 2);
-  const centerY = screenGridStartY + (screenGridY * SCREEN_GRID_Y) + (SCREEN_GRID_Y / 2);
-  
-  return {
-    x: centerX - (imageWidth / 2),
-    y: centerY - (imageHeight / 2)
-  };
-}
 
-// 픽셀 좌표를 프로젝트 스크린 그리드 좌표로 변환
-function pixelToScreenGrid(pixelX, pixelY, imageWidth, imageHeight) {
-  // 스크린의 절대 위치 계산
-  const screenLeft = projectScreen.style.left;
-  const screenTop = projectScreen.style.top;
-  const screenAbsX = screenLeft ? parseInt(screenLeft) : SCREEN_DEFAULT_X;
-  const screenAbsY = screenTop ? parseInt(screenTop) : SCREEN_DEFAULT_Y;
-  
-  // 스크린 내부 그리드의 시작점 계산
-  const screenGridStartX = screenAbsX + SCREEN_MARGIN_LEFT;
-  const screenGridStartY = screenAbsY + SCREEN_MARGIN_TOP;
-  
-  // 아이콘의 중심점 계산
-  const centerX = pixelX + (imageWidth / 2);
-  const centerY = pixelY + (imageHeight / 2);
-  
-  // 그리드 좌표로 변환
-  const gridX = Math.round((centerX - screenGridStartX - SCREEN_GRID_X/2) / SCREEN_GRID_X);
-  const gridY = Math.round((centerY - screenGridStartY - SCREEN_GRID_Y/2) / SCREEN_GRID_Y);
-  
-  return { gridX, gridY };
-}
 
-// 스크린 그리드 범위 계산
-function getScreenGridBounds() {
-  // 스크린의 실제 크기 계산
-  const screenWidth = projectScreen.naturalWidth || SCREEN_DEFAULT_WIDTH;
-  const screenHeight = projectScreen.naturalHeight || SCREEN_DEFAULT_HEIGHT;
-  
-  // 그리드 영역 크기 계산
-  const gridAreaWidth = screenWidth - SCREEN_MARGIN_LEFT - SCREEN_MARGIN_RIGHT;
-  const gridAreaHeight = screenHeight - SCREEN_MARGIN_TOP - SCREEN_MARGIN_BOTTOM;
-  
-  // 그리드 개수 계산
-  const maxGridX = Math.floor(gridAreaWidth / SCREEN_GRID_X) - 1;
-  const maxGridY = Math.floor(gridAreaHeight / SCREEN_GRID_Y) - 1;
-  
-  return {
-    minGridX: 0,
-    minGridY: 0,
-    maxGridX: maxGridX,
-    maxGridY: maxGridY
-  };
-}
-
-// 스크린 내부 이미지 충돌 감지
-function checkScreenImageCollision(gridX, gridY, excludeWrapper = null) {
-  const screenWrappers = document.querySelectorAll('.screen-icon-wrapper');
-  
-  for (let wrapper of screenWrappers) {
-    if (wrapper === excludeWrapper) continue;
-    
-    const wrapperX = parseInt(wrapper.style.left);
-    const wrapperY = parseInt(wrapper.style.top);
-    const img = wrapper.querySelector('.screen-content-image-element');
-    if (!img) continue;
-    
-    const imgWidth = img.naturalWidth || parseInt(img.style.width) || 120;
-    const imgHeight = img.naturalHeight || parseInt(img.style.height) || 160;
-    
-    const wrapperGrid = pixelToScreenGrid(wrapperX, wrapperY, imgWidth, imgHeight);
-    
-    // 그리드 위치가 겹치는지 확인
-    if (wrapperGrid.gridX === gridX && wrapperGrid.gridY === gridY) {
-      return true;
-    }
-  }
-  
-  return false;
-}
-
-// 스크린 초기화 버튼 위치 업데이트
-function updateScreenResetButtonPosition() {
-  const screenLeft = projectScreen.style.left;
-  const screenTop = projectScreen.style.top;
-  const screenAbsX = screenLeft ? parseInt(screenLeft) : SCREEN_DEFAULT_X;
-  const screenAbsY = screenTop ? parseInt(screenTop) : SCREEN_DEFAULT_Y;
-  const screenWidth = projectScreen.naturalWidth || SCREEN_DEFAULT_WIDTH;
-  
-  // 스크린 우측 상단 내부에 배치 (스크린 내부 오른쪽에서 15px, 위에서 15px)
-  screenResetBtn.style.left = (screenAbsX + screenWidth - 60) + 'px';
-  screenResetBtn.style.top = (screenAbsY + 55) + 'px';
-}
-
-// 스크린 최소화 버튼 위치 업데이트
-function updateScreenMinimizeButtonPosition() {
-  const screenLeft = projectScreen.style.left;
-  const screenTop = projectScreen.style.top;
-  const screenAbsX = screenLeft ? parseInt(screenLeft) : SCREEN_DEFAULT_X;
-  const screenAbsY = screenTop ? parseInt(screenTop) : SCREEN_DEFAULT_Y;
-  
-  // 현재 스크린의 실제 표시 크기 사용 (최소화 시에도 정확한 위치)
-  const screenWidth = projectScreen.offsetWidth || projectScreen.naturalWidth || SCREEN_DEFAULT_WIDTH;
-  
-  // 초기화 버튼 왼쪽에 배치 (초기화 버튼 width는 약 45px)
-  screenMinimizeBtn.style.left = (screenAbsX + screenWidth - 115) + 'px';
-  screenMinimizeBtn.style.top = (screenAbsY + 55) + 'px';
-}
-
-// 스크린 내부에 아이콘 이름 표시
-function showScreenTitle(iconName) {
-  // 기존 타이틀 제거
-  const existingTitle = document.getElementById('screenIconTitle');
-  if (existingTitle) {
-    existingTitle.remove();
-  }
-  
-  // 타이틀 엘리먼트 생성
-  const title = document.createElement('div');
-  title.id = 'screenIconTitle';
-  title.className = 'screen-icon-title';
-  title.textContent = iconName;
-  
-  // 스크린 위치 계산
-  const screenLeft = projectScreen.style.left;
-  const screenTop = projectScreen.style.top;
-  const screenAbsX = screenLeft ? parseInt(screenLeft) : SCREEN_DEFAULT_X;
-  const screenAbsY = screenTop ? parseInt(screenTop) : SCREEN_DEFAULT_Y;
-  
-  // 스크린 좌측 상단 내부에 배치
-  title.style.position = 'absolute';
-  title.style.left = (screenAbsX + SCREEN_MARGIN_LEFT) + 'px';
-  title.style.top = (screenAbsY + 10) + 'px';
-  title.style.zIndex = '1650';
-  
-  container.appendChild(title);
-  
-  console.log(`스크린 타이틀 표시: ${iconName}`);
-}
-
-// 스크린 타이틀 위치 업데이트
-function updateScreenTitlePosition() {
-  const title = document.getElementById('screenIconTitle');
-  if (!title) return;
-  
-  const screenLeft = projectScreen.style.left;
-  const screenTop = projectScreen.style.top;
-  const screenAbsX = screenLeft ? parseInt(screenLeft) : SCREEN_DEFAULT_X;
-  const screenAbsY = screenTop ? parseInt(screenTop) : SCREEN_DEFAULT_Y;
-  
-  title.style.left = (screenAbsX + SCREEN_MARGIN_LEFT) + 'px';
-  title.style.top = (screenAbsY + 10) + 'px';  // showScreenTitle과 동일한 값으로 통일
-}
-
-// 스크린에 이미지 로딩하는 함수 (레이블 포함)
-function loadImageToScreen(imagePath, screenGridX, screenGridY, imageId, labelText = '') {
-  // 기존 래퍼가 있으면 제거
-  const existingWrapper = document.getElementById(imageId + '_wrapper');
-  if (existingWrapper) {
-    existingWrapper.remove();
-  }
-  
-  // 래퍼 생성
-  const wrapper = document.createElement('div');
-  wrapper.id = imageId + '_wrapper';
-  wrapper.className = 'screen-icon-wrapper';
-  wrapper.style.position = 'absolute';
-  wrapper.style.zIndex = '1550';
-  wrapper.style.cursor = 'grab';
-  wrapper.style.transition = 'all 0.5s ease';
-  wrapper.style.display = 'flex';
-  wrapper.style.flexDirection = 'column';
-  wrapper.style.alignItems = 'center';
-  wrapper.style.gap = '4px';
-  
-  // 이미지 생성
-  const img = new Image();
-  img.id = imageId;
-  img.src = imagePath;
-  img.className = 'screen-content-image-element';
-  img.style.display = 'block';
-  img.style.pointerEvents = 'none';
-  
-  img.onload = function() {
-    console.log(`이미지 로드 성공: ${imagePath}`);
-    
-    const imageWidth = img.naturalWidth;
-    const imageHeight = img.naturalHeight;
-    
-    // 스크린 위치 계산
-    const screenLeft = projectScreen.style.left;
-    const screenTop = projectScreen.style.top;
-    const screenAbsX = screenLeft ? parseInt(screenLeft) : SCREEN_DEFAULT_X;
-    const screenAbsY = screenTop ? parseInt(screenTop) : SCREEN_DEFAULT_Y;
-    const screenGridStartX = screenAbsX + SCREEN_MARGIN_LEFT;
-    const screenGridStartY = screenAbsY + SCREEN_MARGIN_TOP;
-    
-    // x 좌표는 그리드 중앙 정렬, y 좌표는 그리드 상단 정렬
-    const finalX = screenGridStartX + (screenGridX * SCREEN_GRID_X) + (SCREEN_GRID_X / 2) - (imageWidth / 2);
-    const finalY = screenGridStartY + (screenGridY * SCREEN_GRID_Y); // 이미지 상단을 그리드 상단에 맞춤
-    
-    wrapper.style.left = finalX + 'px';
-    wrapper.style.top = finalY + 'px';
-    
-    // 초기 위치 저장
-    screenIconInitialPositions[imageId] = {
-      gridX: screenGridX,
-      gridY: screenGridY,
-      left: finalX,
-      top: finalY,
-      labelText: labelText
-    };
-    
-    // 레이블 생성
-    const label = document.createElement('div');
-    label.className = 'screen-icon-label';
-    label.textContent = labelText || `항목 ${screenGridY + 1}`;
-    label.style.background = 'rgba(255, 255, 255, 0.8)';
-    label.style.padding = '2px 6px';
-    label.style.borderRadius = '3px';
-    label.style.fontSize = '12px';
-    label.style.textAlign = 'center';
-    label.style.minWidth = '60px';
-    label.style.color = '#000';
-    label.style.fontWeight = 'bold';
-    label.style.border = '1px solid #ccc';
-    label.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
-    
-    wrapper.appendChild(img);
-    wrapper.appendChild(label);
-    container.appendChild(wrapper);
-    
-    console.log(`래퍼 추가됨: ${wrapper.id}, 위치: (${finalX}, ${finalY})`);
-    
-    // 드래그 기능 추가
-    setupScreenImageDrag(wrapper, imageWidth, imageHeight);
-    
-    console.log(`이미지 로딩 완료: ${imagePath} -> 스크린 그리드(${screenGridX}, ${screenGridY}) -> 픽셀(${finalX}, ${finalY})`);
-  };
-  
-  img.onerror = function() {
-    console.error(`이미지 로딩 실패: ${imagePath}`);
-    console.warn(`파일을 확인하세요: ${imagePath}`);
-  };
-}
-
-// 스크린 이미지 드래그 기능 설정 (래퍼 기반)
-function setupScreenImageDrag(wrapper, imageWidth, imageHeight) {
-  wrapper.addEventListener("mousedown", (e) => {
-    if (dragging) return;
-    
-    e.preventDefault();
-    e.stopPropagation();
-    
-    dragging = wrapper;
-    const startX = e.clientX;
-    const startY = e.clientY;
-    const origX = parseInt(wrapper.style.left);
-    const origY = parseInt(wrapper.style.top);
-    
-    wrapper.style.cursor = 'grabbing';
-    wrapper.style.opacity = '0.7';
-    
-    // 드래그 중에는 transition 비활성화
-    wrapper.style.transition = 'none';
-    
-    const onMouseMove = (e) => {
-      // 마우스 이동 거리만큼 래퍼 이동 (1:1 비율, 메인 아이콘과 동일)
-      const deltaX = e.clientX - startX;
-      const deltaY = e.clientY - startY;
-      
-      const newX = origX + deltaX;
-      const newY = origY + deltaY;
-      
-      wrapper.style.left = newX + "px";
-      wrapper.style.top = newY + "px";
-    };
-    
-    const onMouseUp = (e) => {
-      wrapper.style.cursor = 'grab';
-      wrapper.style.opacity = '1';
-      
-      // transition 복원
-      wrapper.style.transition = 'all 0.5s ease';
-      
-      // 현재 위치를 스크린 그리드 좌표로 변환
-      const currentX = parseInt(wrapper.style.left);
-      const currentY = parseInt(wrapper.style.top);
-      const grid = pixelToScreenGrid(currentX, currentY, imageWidth, imageHeight);
-      const bounds = getScreenGridBounds();
-      
-      // 스크린 영역 밖으로 나갔는지 확인
-      const screenStyleLeft = projectScreen.style.left;
-      const screenStyleTop = projectScreen.style.top;
-      const screenAbsX = screenStyleLeft ? parseInt(screenStyleLeft) : SCREEN_DEFAULT_X;
-      const screenAbsY = screenStyleTop ? parseInt(screenStyleTop) : SCREEN_DEFAULT_Y;
-      const screenWidth = projectScreen.naturalWidth || SCREEN_DEFAULT_WIDTH;
-      const screenHeight = projectScreen.naturalHeight || SCREEN_DEFAULT_HEIGHT;
-      
-      const screenLeft = screenAbsX + SCREEN_MARGIN_LEFT;
-      const screenRight = screenAbsX + screenWidth - SCREEN_MARGIN_RIGHT;
-      const screenTop = screenAbsY + SCREEN_MARGIN_TOP;
-      const screenBottom = screenAbsY + screenHeight - SCREEN_MARGIN_BOTTOM;
-      
-      const wrapperCenterX = currentX + (imageWidth / 2);
-      const wrapperCenterY = currentY + (imageHeight / 2);
-      
-      // 스크린 영역을 벗어났으면 원래 위치로 복귀
-      if (wrapperCenterX < screenLeft || wrapperCenterX > screenRight || 
-          wrapperCenterY < screenTop || wrapperCenterY > screenBottom) {
-        console.log(`이미지 ${wrapper.id}: 스크린 영역 밖으로 드래그 -> 원래 위치로 복귀`);
-        wrapper.style.left = origX + 'px';
-        wrapper.style.top = origY + 'px';
-      } else {
-        // 그리드 경계 내로 제한
-        grid.gridX = Math.max(bounds.minGridX, Math.min(grid.gridX, bounds.maxGridX));
-        grid.gridY = Math.max(bounds.minGridY, Math.min(grid.gridY, bounds.maxGridY));
-        
-        // 충돌 체크
-        if (checkScreenImageCollision(grid.gridX, grid.gridY, wrapper)) {
-          console.log(`이미지 ${wrapper.id}: 그리드(${grid.gridX}, ${grid.gridY})에 다른 이미지 존재 -> 원래 위치로 복귀`);
-          wrapper.style.left = origX + 'px';
-          wrapper.style.top = origY + 'px';
-        } else {
-          // 픽셀 위치로 변환하여 적용 (그리드 상단에 정렬 - 이미지 y=0을 그리드 y=0에 맞춤)
-          const screenGridStartX = screenAbsX + SCREEN_MARGIN_LEFT;
-          const screenGridStartY = screenAbsY + SCREEN_MARGIN_TOP;
-          
-          // x 좌표는 그리드 중앙 정렬, y 좌표는 그리드 상단 정렬
-          const finalX = screenGridStartX + (grid.gridX * SCREEN_GRID_X) + (SCREEN_GRID_X / 2) - (imageWidth / 2);
-          const finalY = screenGridStartY + (grid.gridY * SCREEN_GRID_Y); // 이미지 상단을 그리드 상단에 맞춤
-          
-          wrapper.style.left = finalX + 'px';
-          wrapper.style.top = finalY + 'px';
-          
-          console.log(`이미지 스냅: ${wrapper.id} -> 스크린 그리드(${grid.gridX}, ${grid.gridY}) -> 픽셀(${finalX}, ${finalY})`);
-        }
-      }
-      
-      document.removeEventListener("mousemove", onMouseMove);
-      document.removeEventListener("mouseup", onMouseUp);
-      dragging = null;
-    };
-    
-    document.addEventListener("mousemove", onMouseMove);
-    document.addEventListener("mouseup", onMouseUp);
-  });
-}
-
-// 여러 이미지를 스크린에 로딩하는 함수
-function loadImagesToScreen(imagePathsArray) {
-  imagePathsArray.forEach((item, index) => {
-    loadImageToScreen(item.path, item.gridX, item.gridY, item.id);
-  });
-}
-
-// 스크린 내부 모든 아이콘 제거
-function clearAllScreenIcons() {
-  // 모든 스크린 아이콘 래퍼 제거
-  const allWrappers = document.querySelectorAll('.screen-icon-wrapper');
-  allWrappers.forEach(wrapper => {
-    wrapper.remove();
-  });
-  
-  // 초기 위치 정보는 유지 (로딩 후 덮어쓰기)
-  console.log('스크린 내부 모든 아이콘 제거 완료');
-}
-
-// 모든 스크린 콘텐츠 제거 (아이콘 + 이미지 + 텍스트)
-function clearAllScreenContent() {
-  console.log('🧹 모든 스크린 콘텐츠 초기화 시작');
-  
-  // 1. 스크린 아이콘 래퍼 제거
-  const allWrappers = document.querySelectorAll('.screen-icon-wrapper');
-  console.log(`제거할 아이콘 래퍼: ${allWrappers.length}개`);
-  allWrappers.forEach(wrapper => wrapper.remove());
-  
-  // 2. 프로젝트 관련 요소들 제거
-  const mainImageBg = document.getElementById('projectMainImageBg');
-  const designOverview = document.getElementById('projectDesignOverview');
-  const textOverlay = document.getElementById('projectTextOverlay');
-  const additionalImageDisplay = document.getElementById('additionalImageDisplay');
-  const arrowUp = document.getElementById('imageNavigatorArrowUp');
-  const arrowDown = document.getElementById('imageNavigatorArrowDown');
-  
-  if (mainImageBg) {
-    console.log('메인 이미지 제거');
-    mainImageBg.remove();
-  }
-  if (designOverview) {
-    console.log('설계개요 제거');
-    designOverview.remove();
-  }
-  if (textOverlay) {
-    console.log('텍스트 오버레이 제거');
-    textOverlay.remove();
-  }
-  if (additionalImageDisplay) {
-    console.log('추가 이미지 제거');
-    additionalImageDisplay.remove();
-  }
-  if (arrowUp) {
-    console.log('위쪽 화살표 제거');
-    arrowUp.remove();
-  }
-  if (arrowDown) {
-    console.log('아래쪽 화살표 제거');
-    arrowDown.remove();
-  }
-  
-  // 3. 스크린 타이틀 숨김
-  const screenTitle = document.getElementById('screenTitle');
-  if (screenTitle) {
-    screenTitle.style.display = 'none';
-  }
-  
-  console.log('✅ 모든 스크린 콘텐츠 초기화 완료');
-  
-  // 4. 스크린 그리드 다시 표시
-  visualizeScreenGrid();
-}
-
-// 아이콘별 콘텐츠 로딩 함수 (통합)
-function loadIconContent(iconId, iconType) {
-  console.log(`📂 ${iconType} 콘텐츠 로딩 시작`);
-  
-  // 모든 스크린 콘텐츠 완전히 초기화 (프로젝트 이미지 포함)
-  console.log('🧹 스크린 완전 초기화 시작...');
-  clearAllScreenContent();
-  
-  // 초기 위치 정보 초기화 (새로운 아이콘을 위해)
-  screenIconInitialPositions = {};
-  console.log('✅ 스크린 완전 초기화 완료');
-  
-  // 폴더명 한글 매핑
-  const folderNames = {
-    'cabinet': '캐비넷',
-    'favorites': '즐겨찾기',
-    'trash': '장독대',
-    'yong': '용',
-    'park': '공원'
-  };
-  
-  const folderName = folderNames[iconType] || iconType;
-  
-  // 이미지 로딩
-  console.log(`${iconType} 더블클릭 - icon.png 로딩 시작`);
-  
-  // 짧은 지연 후 이미지 로딩 (DOM 정리 후)
-  setTimeout(() => {
-    for (let i = 0; i < 6; i++) {
-      // 그리드 좌표를 XY 형식으로 레이블 생성 (0,0 -> 00, 0,1 -> 01, ...)
-      const gridLabel = `${folderName}0${i}`;
-      
-      loadImageToScreen(
-        `images/icon.png`, 
-        0, 
-        i, 
-        `${iconType}_img_${i}`,
-        gridLabel
-      );
-    }
-  }, 50);
-}
 
 // 픽셀 좌표를 가장 가까운 그리드 좌표로 변환
 function pixelToGrid(pixelX, pixelY, imageWidth, imageHeight) {
@@ -591,17 +100,6 @@ function applyCalculatedPosition(img, width, height) {
   // wrapper인 경우 고정된 아이콘 크기 사용 (90px)
   const finalWidth = wrapper ? 90 : width;
   const finalHeight = wrapper ? 90 : height;
-  
-  // project_screen은 그리드 시스템 적용하지 않고 고정 좌표 사용
-  if (id === 'project') {
-    imageSizes[id] = { width: finalWidth, height: finalHeight };
-    element.style.width = finalWidth + 'px';
-    element.style.height = finalHeight + 'px';
-    element.style.left = SCREEN_DEFAULT_X + 'px';
-    element.style.top = SCREEN_DEFAULT_Y + 'px';
-    console.log(`스크린 위치 설정 (applyCalculatedPosition): (${SCREEN_DEFAULT_X}, ${SCREEN_DEFAULT_Y})`);
-    return;
-  }
   
   const gridPos = iconGridPositions[id];
   
@@ -688,6 +186,17 @@ async function updateAllMainIconImages() {
   const mainIconIds = ['M00', 'M01', 'M02', 'M03', 'M04', 'M05', 'M06', 'M07',
                        'M10', 'M11', 'M12', 'M13', 'M14', 'M15', 'M16', 'M17'];
   
+  console.log('🔄 메인 아이콘 업데이트 시작...');
+  
+  // 먼저 모든 메인 아이콘 숨김
+  mainIconIds.forEach(iconId => {
+    const iconWrapper = document.querySelector(`.icon-wrapper[data-id="${iconId}"]`);
+    if (iconWrapper) {
+      iconWrapper.style.display = 'none';
+      iconWrapper.style.visibility = 'hidden';
+    }
+  });
+  
   // IndexedDB에서 로드 (비동기)
   for (const iconId of mainIconIds) {
     const projectKey = `projectData_${iconId}`;
@@ -696,13 +205,26 @@ async function updateAllMainIconImages() {
       // manager-mainscreen.js의 loadProjectFromDB 함수 사용
       const projectData = await loadProjectFromDB(projectKey);
       
+      const iconWrapper = document.querySelector(`.icon-wrapper[data-id="${iconId}"]`);
+      
       if (projectData) {
+        // 프로젝트 데이터가 있으면 아이콘 업데이트 및 표시
         updateIconImage(iconId, projectData);
+        if (iconWrapper) {
+          iconWrapper.style.display = 'flex';
+          iconWrapper.style.visibility = 'visible';
+          console.log(`✅ ${iconId} 아이콘 표시됨 (프로젝트 있음)`);
+        }
+      } else {
+        // 프로젝트 데이터가 없으면 아이콘 숨김 유지
+        console.log(`❌ ${iconId} 아이콘 숨김 (프로젝트 없음)`);
       }
     } catch (e) {
       console.error(`${iconId} 프로젝트 데이터 로드 실패:`, e);
     }
   }
+  
+  console.log('✅ 메인 아이콘 업데이트 완료');
 }
 
 // 아이콘에 프로젝트 이미지 및 레이블 적용
@@ -775,33 +297,27 @@ function updateContainerScale() {
 // 페이지가 완전히 로드된 후 초기 위치 불러오기, 저장 및 이미지 위치 계산
 window.addEventListener('load', () => {
   setTimeout(() => {
-    // 스크린 초기 위치 강제 설정 (항상 기본 위치로)
-    projectScreen.style.left = SCREEN_DEFAULT_X + 'px';
-    projectScreen.style.top = SCREEN_DEFAULT_Y + 'px';
-    console.log(`스크린 초기 위치 설정: (${SCREEN_DEFAULT_X}, ${SCREEN_DEFAULT_Y})`);
-    
-    loadInitialPositions(); // 이 위치로 이동
+    loadInitialPositions();
     calculateImagePositions();
     saveInitialPositions();
     updateContainerScale();
-    updateScreenResetButtonPosition(); // 스크린 초기화 버튼 위치 설정
-    updateScreenMinimizeButtonPosition(); // 스크린 최소화 버튼 위치 설정
     visualizeMainGrid(); // 메인 그리드 시각화
-    visualizeScreenGrid(); // 스크린 그리드 시각화
     
-    // 홈페이지 접속 시 스크린 최소화 상태로 시작
-    setTimeout(() => {
-      minimizeScreen();
-      console.log('🔽 초기 로드: 스크린 최소화 상태로 설정됨');
-    }, 200);
+    // 캐비넷/장독대 아이콘 이벤트 등록
+    initializeCabinetTrashIcons();
+    
+    // 전광판 초기화
+    loadMarqueeText();
+    initMarquee();
+    
+    // 메인 루프 시작
+    startMainImageLoop();
   }, 100);
 });
 
 
 // 스냅 기능 (마그네틱) - 그리드 안의 이미지 위치 유지
 function snapToGrid(icon) {
-  if (icon.classList.contains('project-screen')) return; // 프로젝트 스크린 제외
-  
   const id = icon.dataset?.id;
   const size = imageSizes[id] || { width: 120, height: 160 };
   
@@ -833,7 +349,6 @@ function snapToGrid(icon) {
 function checkCollision(gridX, gridY, spanX = 1, spanY = 1, excludeIcon = null) {
   for (let icon of document.querySelectorAll('.icon-wrapper')) {
     if (icon === excludeIcon) continue;
-    if (icon.classList.contains('project-screen')) continue;
     
     const id = icon.dataset?.id;
     const iconGrid = pixelToGrid(
@@ -936,12 +451,11 @@ icons.forEach((icon, index) => {
       const newY = origY + deltaY;
       
       // 화면 경계 체크만 적용 (드래그 중에는 그리드 스냅 없음)
-      const isProjectScreen = icon.classList.contains('project-screen');
-      const iconWidth = isProjectScreen ? (icon.naturalWidth || 1800) : (icon.naturalWidth || 120);
-      const iconHeight = isProjectScreen ? (icon.naturalHeight || 1100) : (icon.naturalHeight || 120);
+      const iconWidth = icon.naturalWidth || 120;
+      const iconHeight = icon.naturalHeight || 120;
 
-      const boundedX = Math.max(isProjectScreen ? 0 : MARGIN, Math.min(newX, CONTAINER_WIDTH - (isProjectScreen ? 0 : MARGIN) - iconWidth));
-      const boundedY = Math.max(isProjectScreen ? 0 : MARGIN, Math.min(newY, CONTAINER_HEIGHT - (isProjectScreen ? 0 : MARGIN) - iconHeight));
+      const boundedX = Math.max(MARGIN, Math.min(newX, CONTAINER_WIDTH - MARGIN - iconWidth));
+      const boundedY = Math.max(MARGIN, Math.min(newY, CONTAINER_HEIGHT - MARGIN - iconHeight));
       
       icon.style.left = boundedX + "px";
       icon.style.top = boundedY + "px";
@@ -953,11 +467,9 @@ icons.forEach((icon, index) => {
       // transition 복원
       icon.style.transition = "all 0.5s ease";
       
-      // 프로젝트 스크린이 아닌 경우에만 그리드 적용 (마그네틱 기능)
-      if (!icon.classList.contains('project-screen')) {
+      // 그리드 적용 (마그네틱 기능)
         snapToGrid(icon);
         preventOverlap(icon);
-      }
       
       document.removeEventListener("mousemove", onMouseMove);
       document.removeEventListener("mouseup", onMouseUp);
@@ -968,42 +480,29 @@ icons.forEach((icon, index) => {
     document.addEventListener("mouseup", onMouseUp);
   });
 
-  // 클릭 이벤트 추가 (레이블 확장/축소)
+  // 클릭 이벤트 추가 (메인 아이콘은 이미지 표시, 다른 아이콘은 레이블 확장/축소)
   icon.addEventListener("click", (e) => {
     // 드래그 중이거나 레이블 편집 중이면 무시
     if (dragging || e.target.classList.contains('icon-label')) return;
     
-    // active 클래스 토글
+    // 메인화면 아이콘 (M00~M17) 클릭 시 이미지 표시
+    if (icon.classList.contains('icon-left') || icon.classList.contains('icon-af')) {
+      const iconId = icon.dataset.id;
+      console.log(`🖱️ 메인 아이콘 ${iconId} 클릭됨 - 이미지 표시`);
+      showProjectImageOnMainGrid(iconId);
+    } else {
+      // 다른 아이콘들은 active 클래스 토글
     icon.classList.toggle('active');
     console.log(`아이콘 ${icon.dataset.id} 클릭, active: ${icon.classList.contains('active')}`);
+    }
   });
 
   // 더블클릭 이벤트 추가
   icon.addEventListener("dblclick", (e) => {
     e.preventDefault();
     
-    if (icon.classList.contains('project-screen')) {
-      // 프로젝트 스크린 더블클릭 시 내용 표시 로직
-      console.log("Project Screen 더블클릭");
-    } else if (icon.classList.contains('icon-right')) {
+    if (icon.classList.contains('icon-right')) {
       const iconId = icon.dataset.id;
-      
-      // 아이콘 이름 매핑
-      const iconNames = {
-        'cabinet': '캐비넷',
-        'favorites': '즐겨찾기',
-        'manager': '관리자',
-        'park': '공원',
-        'yong': '용',
-        'trash': '장독대'
-      };
-      
-      // 스크린 타이틀 표시
-      const iconName = iconNames[iconId] || iconId;
-      showScreenTitle(iconName);
-      
-      // 오른쪽 아이콘별 특수 처리
-      const contentIcons = ['cabinet', 'favorites', 'trash', 'yong', 'park'];
       
       if (iconId === 'manager') {
         // 관리자 모드 UI 표시 (manager.js)
@@ -1012,44 +511,10 @@ icons.forEach((icon, index) => {
         } else {
           console.error('showManagerUI 함수를 찾을 수 없습니다. manager.js가 로드되었는지 확인하세요.');
         }
-      } else if (contentIcons.includes(iconId)) {
-        // 콘텐츠를 가진 아이콘들은 통합 함수로 처리
-        // 최소화 상태면 먼저 최대화
-        if (isScreenMinimized) {
-          console.log(`📺 스크린 최소화 상태 → 최대화 (${iconId})`);
-          maximizeScreen();
-          // 최대화 애니메이션 완료 후 내용 로드
-          setTimeout(() => {
-            loadIconContent(iconId, iconId);
-          }, 400);
-        } else {
-          loadIconContent(iconId, iconId);
-        }
-      } else {
-        // 그 외 아이콘들은 기존 방식으로 처리
-        projectScreen.src = `images/project_screen_${iconId}.png`;
-        console.log(`${iconId} 더블클릭, projectScreen 업데이트`);
       }
-    } else if (icon.classList.contains('icon-left') || icon.classList.contains('icon-af')) {
-      // 왼쪽 아이콘들 (M00~M17) 더블클릭 시 프로젝트 데이터 표시
-      const iconId = icon.dataset.id;
-      const iconLabel = icon.querySelector('.icon-label');
-      const iconName = iconLabel ? iconLabel.textContent : `아이콘 ${iconId}`;
-      
-      console.log(`🖱️ 메인 아이콘 ${iconId} 더블클릭됨`);
-      
-      // 최소화 상태면 먼저 최대화
-      if (isScreenMinimized) {
-        console.log('📺 스크린 최소화 상태 → 최대화');
-        maximizeScreen();
-        // 최대화 애니메이션 완료 후 내용 로드
-        setTimeout(() => {
-          loadProjectContent(iconId, iconName);
-        }, 400);
-      } else {
-        loadProjectContent(iconId, iconName);
-      }
+      // 다른 오른쪽 아이콘들은 더블클릭 기능 제거 (스크린 없음)
     }
+    // 메인 아이콘들 (M00~M17)은 클릭으로만 작동하므로 더블클릭 기능 제거
   });
 
   // 라벨 더블클릭 이벤트 추가 (글씨 부분에서만 작동)
@@ -1059,24 +524,6 @@ icons.forEach((icon, index) => {
   }
 });
 
-// 프로젝트 내용 로드 헬퍼 함수
-function loadProjectContent(iconId, iconName) {
-  // 모든 스크린 내용 완전히 초기화 (이미지 포함)
-  console.log('🧹 스크린 초기화 시작...');
-  clearAllScreenContent();
-  console.log('✅ 스크린 초기화 완료');
-  
-  showScreenTitle(iconName);
-  console.log(`📺 스크린 타이틀 표시: ${iconName}`);
-  console.log(`📂 프로젝트 데이터 로드 시도: ${iconId}`);
-      
-  // 프로젝트 데이터 표시 (project-viewer.js)
-  if (typeof displayProjectData === 'function') {
-    displayProjectData(iconId);
-  } else {
-    console.error('❌ displayProjectData 함수를 찾을 수 없습니다.');
-  }
-}
 
 // 라벨 이벤트 리스너 등록
 icons.forEach(icon => {
@@ -1147,268 +594,35 @@ icons.forEach(icon => {
   }
 });
 
-// 프로젝트 스크린 드래그 기능 (별도 처리)
-projectScreen.addEventListener("mousedown", (e) => {
-  if (dragging) return;
-  
-  e.preventDefault();
-  
-  dragging = projectScreen;
-  startX = e.clientX;
-  startY = e.clientY;
-  origX = parseInt(projectScreen.style.left);
-  origY = parseInt(projectScreen.style.top);
-  projectScreen.classList.add("dragging");
-  
-  // 드래그 중에는 transition 비활성화하여 부드러운 움직임
-  projectScreen.style.transition = "none";
-  
-  // 드래그 중 투명도 효과
-  projectScreen.style.opacity = "0.7";
-  
-  // 스크린 내부 래퍼들과 콘텐츠 요소들의 transition도 비활성화
-  const screenElements = document.querySelectorAll('.screen-icon-wrapper, .screen-content-element');
-  screenElements.forEach(element => {
-    element.style.transition = 'none';
-  });
 
-  const onMouseMove = (e) => {
-    // 마우스 이동 거리만큼 아이콘 이동 (1:1 비율)
-    const deltaX = e.clientX - startX;
-    const deltaY = e.clientY - startY;
-    
-    const newX = origX + deltaX;
-    const newY = origY + deltaY;
-    
-    // 프로젝트 스크린은 화면 경계 체크만 적용 (그리드 스냅 없음)
-    const iconWidth = projectScreen.naturalWidth || 1800;
-    const iconHeight = projectScreen.naturalHeight || 1100;
-
-    const boundedX = Math.max(0, Math.min(newX, CONTAINER_WIDTH - iconWidth));
-    const boundedY = Math.max(0, Math.min(newY, CONTAINER_HEIGHT - iconHeight));
-    
-    projectScreen.style.left = boundedX + "px";
-    projectScreen.style.top = boundedY + "px";
-    
-    // 스크린 내부 래퍼들과 콘텐츠 요소들도 함께 이동
-    const screenElements = document.querySelectorAll('.screen-icon-wrapper, .screen-content-element');
-    screenElements.forEach(element => {
-      // 현재 위치 가져오기
-      const currentX = parseInt(element.style.left);
-      const currentY = parseInt(element.style.top);
-      
-      // 스크린 드래그 시작 시점의 요소 위치 저장 (한 번만)
-      if (!element.dataset.screenDragStartX) {
-        element.dataset.screenDragStartX = currentX;
-        element.dataset.screenDragStartY = currentY;
-      }
-      
-      const elemOrigX = parseInt(element.dataset.screenDragStartX);
-      const elemOrigY = parseInt(element.dataset.screenDragStartY);
-      
-      // 스크린 이동량만큼 요소도 이동
-      const elemNewX = elemOrigX + (boundedX - origX);
-      const elemNewY = elemOrigY + (boundedY - origY);
-      
-      element.style.left = elemNewX + 'px';
-      element.style.top = elemNewY + 'px';
-    });
-    
-    // 스크린 그리드, 초기화 버튼, 최소화 버튼, 타이틀도 실시간 업데이트
-    // 최소화 상태가 아닐 때만 그리드 업데이트
-    if (!isScreenMinimized) {
-      visualizeScreenGrid();
-    }
-    updateScreenResetButtonPosition();
-    updateScreenMinimizeButtonPosition();
-    updateScreenTitlePosition();
-  };
-
-  const onMouseUp = (e) => {
-    projectScreen.classList.remove("dragging");
-    
-    // transition 복원
-    projectScreen.style.transition = "all 0.5s ease";
-    
-    // 투명도 복원
-    projectScreen.style.opacity = "1";
-    
-    // 스크린 내부 요소들의 드래그 시작 위치 데이터 제거 및 transition 복원
-    const screenElements = document.querySelectorAll('.screen-icon-wrapper, .screen-content-element');
-    screenElements.forEach(element => {
-      delete element.dataset.screenDragStartX;
-      delete element.dataset.screenDragStartY;
-    });
-    
-    // transition 복원 (icon-wrapper만)
-    document.querySelectorAll('.screen-icon-wrapper').forEach(wrapper => {
-      wrapper.style.transition = 'all 0.5s ease';
-    });
-    
-    // 스크린 그리드, 초기화 버튼, 타이틀 위치 업데이트
-    visualizeScreenGrid();
-    updateScreenResetButtonPosition();
-    updateScreenTitlePosition();
-    
-    document.removeEventListener("mousemove", onMouseMove);
-    document.removeEventListener("mouseup", onMouseUp);
-    dragging = null;
-  };
-
-  document.addEventListener("mousemove", onMouseMove);
-  document.addEventListener("mouseup", onMouseUp);
-});
-
-// 초기화 버튼 (메인)
-resetBtn.addEventListener("click", () => {
-  // 프로젝트 스크린 초기화 (별도 처리)
-  projectScreen.style.left = SCREEN_DEFAULT_X + 'px';
-  projectScreen.style.top = SCREEN_DEFAULT_Y + 'px';
-  projectScreen.style.opacity = '1';
-  projectScreen.style.transform = 'translateY(0)';
+// 화면 초기화 함수 (완전 리프레시)
+function resetMainScreen() {
+  console.log('🔄 화면 리프레시...');
   
-  // 아이콘 래퍼들 초기화
-  document.querySelectorAll(".icon-wrapper").forEach(el => {
-    let key = el.dataset?.id || el.id;
-    
-    if (initialPositions[key]) {
-      el.style.left = initialPositions[key].left;
-      el.style.top = initialPositions[key].top;
-      el.style.opacity = initialPositions[key].opacity || "1";
-      el.style.transform = initialPositions[key].transform || "translateY(0)";
-      
-      // 라벨 텍스트 복원
-      const label = el.querySelector('.icon-label');
-      if (label && initialPositions[key].labelText) {
-        label.textContent = initialPositions[key].labelText;
-      }
-    }
-  });
-  
-  // 스크린 내부 아이콘들도 초기화
-  console.log('스크린 내부 아이콘 초기화 시작');
-  Object.keys(screenIconInitialPositions).forEach(imageId => {
-    const wrapper = document.getElementById(imageId + '_wrapper');
-    if (wrapper && screenIconInitialPositions[imageId]) {
-      const initPos = screenIconInitialPositions[imageId];
-      
-      // 스크린 위치 계산 (초기화된 스크린 위치 기준으로)
-      const screenAbsX = SCREEN_DEFAULT_X;
-      const screenAbsY = SCREEN_DEFAULT_Y;
-      const screenGridStartX = screenAbsX + SCREEN_MARGIN_LEFT;
-      const screenGridStartY = screenAbsY + SCREEN_MARGIN_TOP;
-      
-      // 이미지 크기 가져오기
-      const img = wrapper.querySelector('.screen-content-image-element');
-      const imageWidth = img ? (img.naturalWidth || 120) : 120;
-      const imageHeight = img ? (img.naturalHeight || 160) : 160;
-      
-      // 초기 그리드 위치를 픽셀 좌표로 변환
-      const finalX = screenGridStartX + (initPos.gridX * SCREEN_GRID_X) + (SCREEN_GRID_X / 2) - (imageWidth / 2);
-      const finalY = screenGridStartY + (initPos.gridY * SCREEN_GRID_Y);
-      
-      wrapper.style.left = finalX + 'px';
-      wrapper.style.top = finalY + 'px';
-      
-      // 레이블 텍스트 복원
-      const label = wrapper.querySelector('.screen-icon-label');
-      if (label && initPos.labelText) {
-        label.textContent = initPos.labelText;
-      }
-      
-      console.log(`${imageId} 초기화: 그리드(${initPos.gridX}, ${initPos.gridY}) -> 픽셀(${finalX}, ${finalY})`);
-    }
-  });
-  console.log('스크린 내부 아이콘 초기화 완료');
-  
-  // A~H 상태 초기화
-  afIndex = 0;
-  arrowTop.classList.remove("show");
-  
-  // 반응형 모드 해제
-  if (isResponsive) {
-    toggleResponsiveMode(false);
-  }
-  
-  // 스크린 그리드, 초기화 버튼, 타이틀 위치 업데이트
-  setTimeout(() => {
-    visualizeScreenGrid();
-    updateScreenResetButtonPosition();
-    updateScreenTitlePosition();
-  }, 100);
-  
-  console.log('초기화 완료 - 저장된 초기 위치로 복원');
-});
-
-// 스크린 초기화 버튼 (스크린 내부 아이콘 초기화)
-screenResetBtn.addEventListener("click", () => {
-  console.log('스크린 내부 아이콘 초기화 시작');
-  
-  // 모든 스크린 내부 래퍼를 초기 위치로 복원
-  Object.keys(screenIconInitialPositions).forEach(imageId => {
-    const wrapper = document.getElementById(imageId + '_wrapper');
-    if (wrapper && screenIconInitialPositions[imageId]) {
-      const initPos = screenIconInitialPositions[imageId];
-      
-      // 스크린 위치 계산 (현재 스크린 위치 기준으로 재계산)
-      const screenLeft = projectScreen.style.left;
-      const screenTop = projectScreen.style.top;
-      const screenAbsX = screenLeft ? parseInt(screenLeft) : SCREEN_DEFAULT_X;
-      const screenAbsY = screenTop ? parseInt(screenTop) : SCREEN_DEFAULT_Y;
-      const screenGridStartX = screenAbsX + SCREEN_MARGIN_LEFT;
-      const screenGridStartY = screenAbsY + SCREEN_MARGIN_TOP;
-      
-      // 이미지 크기 가져오기
-      const img = wrapper.querySelector('.screen-content-image-element');
-      const imageWidth = img ? (img.naturalWidth || 120) : 120;
-      const imageHeight = img ? (img.naturalHeight || 160) : 160;
-      
-      // 초기 그리드 위치를 현재 스크린 위치 기준으로 픽셀 좌표로 변환
-      // x: 중앙 정렬, y: 상단 정렬 (loadImageToScreen과 동일)
-      const finalX = screenGridStartX + (initPos.gridX * SCREEN_GRID_X) + (SCREEN_GRID_X / 2) - (imageWidth / 2);
-      const finalY = screenGridStartY + (initPos.gridY * SCREEN_GRID_Y);  // Y축은 상단 정렬
-      
-      wrapper.style.left = finalX + 'px';
-      wrapper.style.top = finalY + 'px';
-      
-      // 레이블 텍스트 복원
-      const label = wrapper.querySelector('.screen-icon-label');
-      if (label && initPos.labelText) {
-        label.textContent = initPos.labelText;
-      }
-      
-      console.log(`${imageId} 초기화: 그리드(${initPos.gridX}, ${initPos.gridY}) -> 픽셀(${finalX}, ${finalY})`);
-    }
-  });
-  
-  console.log('스크린 내부 아이콘 초기화 완료');
-});
-
-// 프로젝트 스크린 위치 감시
-function checkProjectScreenPosition() {
-  const projectX = parseInt(projectScreen.style.left);
-  
-  // gridX: 0~1 영역 계산 (80px ~ 320px)
-  const grid0Start = GRID_START_X; // 80px
-  const grid1End = GRID_START_X + (2 * GRID_X); // 80 + (2 * 120) = 320px
-  
-  console.log(`Project screen position check: x=${projectX}, grid0Start=${grid0Start}, grid1End=${grid1End}, isResponsive=${isResponsive}`);
-  
-  if (projectX >= grid0Start && projectX <= grid1End && !isResponsive) {
-    isResponsive = true;
-    toggleResponsiveMode(true);
-    console.log('Entering responsive mode');
-  } else if ((projectX < grid0Start || projectX > grid1End) && isResponsive) {
-    isResponsive = false;
-    toggleResponsiveMode(false);
-    console.log('Exiting responsive mode');
+  // 캐비넷/장독대 모드였다면 메인 모드로 복귀
+  if (currentGridMode !== 'main') {
+    returnToMainMode();
+  } else {
+    location.reload();
   }
 }
+
+// 초기화 버튼 (메인)
+resetBtn.addEventListener("click", resetMainScreen);
+
+// F5 키 감지 (리프레시)
+window.addEventListener("keydown", (e) => {
+  if (e.key === 'F5') {
+    // F5는 기본 동작(새로고침) 허용
+    console.log('🔄 F5 키: 페이지 새로고침');
+  }
+});
+
 
 // 반응형 모드 토글
 function toggleResponsiveMode(enable) {
   const afIcons = document.querySelectorAll(".icon-wrapper.icon-af");
-  const baseIcons = document.querySelectorAll(".icon-wrapper:not(.icon-af):not(.icon-right):not(.project-screen)");
+  const baseIcons = document.querySelectorAll(".icon-wrapper:not(.icon-af):not(.icon-right)");
   
   if (enable) {
     // 1~8번 아이콘들을 초기 그리드 위치로 복원
@@ -1747,69 +961,6 @@ function visualizeMainGrid() {
   console.log(`메인 그리드 크기: ${GRID_X}x${GRID_Y}`);
 }
 
-// 프로젝트 스크린 그리드 시각화 (디버그용)
-function visualizeScreenGrid() {
-  // 기존 그리드 제거
-  const existingGrid = document.getElementById('screenGridVisualization');
-  if (existingGrid) {
-    existingGrid.remove();
-  }
-  
-  // 스크린 위치와 크기 계산
-  const screenLeft = projectScreen.style.left;
-  const screenTop = projectScreen.style.top;
-  const screenAbsX = screenLeft ? parseInt(screenLeft) : SCREEN_DEFAULT_X;
-  const screenAbsY = screenTop ? parseInt(screenTop) : SCREEN_DEFAULT_Y;
-  const screenWidth = projectScreen.naturalWidth || SCREEN_DEFAULT_WIDTH;
-  const screenHeight = projectScreen.naturalHeight || SCREEN_DEFAULT_HEIGHT;
-  
-  // 그리드 컨테이너 생성
-  const gridContainer = document.createElement('div');
-  gridContainer.id = 'screenGridVisualization';
-  gridContainer.style.position = 'absolute';
-  gridContainer.style.left = (screenAbsX + SCREEN_MARGIN_LEFT) + 'px';
-  gridContainer.style.top = (screenAbsY + SCREEN_MARGIN_TOP) + 'px';
-  gridContainer.style.width = (screenWidth - SCREEN_MARGIN_LEFT - SCREEN_MARGIN_RIGHT) + 'px';
-  gridContainer.style.height = (screenHeight - SCREEN_MARGIN_TOP - SCREEN_MARGIN_BOTTOM) + 'px';
-  gridContainer.style.pointerEvents = 'none';
-  gridContainer.style.zIndex = '9999';  // 모든 요소 위에 표시 (메인: 1500, 추가: 1650, 텍스트: 1550, 화살표: 1700)
-  gridContainer.style.border = '2px dashed red';
-  
-  // 그리드 범위 계산
-  const bounds = getScreenGridBounds();
-  
-  // 그리드 셀 생성
-  for (let y = 0; y <= bounds.maxGridY; y++) {
-    for (let x = 0; x <= bounds.maxGridX; x++) {
-      const cell = document.createElement('div');
-      cell.style.position = 'absolute';
-      cell.style.left = (x * SCREEN_GRID_X) + 'px';
-      cell.style.top = (y * SCREEN_GRID_Y) + 'px';
-      cell.style.width = SCREEN_GRID_X + 'px';
-      cell.style.height = SCREEN_GRID_Y + 'px';
-      cell.style.border = '1px dashed rgba(0, 255, 0, 0.3)';
-      cell.style.boxSizing = 'border-box';
-      
-      // 그리드 좌표 표시
-      const label = document.createElement('div');
-      label.textContent = `${x},${y}`;
-      label.style.fontSize = '10px';
-      label.style.color = 'lime';
-      label.style.position = 'absolute';
-      label.style.top = '2px';
-      label.style.left = '2px';
-      cell.appendChild(label);
-      
-      gridContainer.appendChild(cell);
-    }
-  }
-  
-  container.appendChild(gridContainer);
-  
-  console.log(`스크린 그리드 생성: ${bounds.maxGridX + 1}x${bounds.maxGridY + 1} (총 ${(bounds.maxGridX + 1) * (bounds.maxGridY + 1)}개 셀)`);
-  console.log(`스크린 위치: (${screenAbsX}, ${screenAbsY}), 크기: ${screenWidth}x${screenHeight}`);
-  console.log(`그리드 영역: 좌우마진 ${SCREEN_MARGIN_LEFT}, 상마진 ${SCREEN_MARGIN_TOP}, 하마진 ${SCREEN_MARGIN_BOTTOM}`);
-}
 
 // 메인 그리드 토글 함수 (콘솔에서 호출 가능)
 window.toggleMainGrid = function() {
@@ -1823,77 +974,11 @@ window.toggleMainGrid = function() {
   }
 };
 
-// 스크린 그리드 토글 함수 (콘솔에서 호출 가능)
-window.toggleScreenGrid = function() {
-  const grid = document.getElementById('screenGridVisualization');
-  if (grid) {
-    grid.remove();
-    console.log('스크린 그리드 숨김');
-  } else {
-    visualizeScreenGrid();
-    console.log('스크린 그리드 표시');
-  }
-};
-
-// 모든 그리드 토글 함수 (콘솔에서 호출 가능)
-window.toggleAllGrids = function() {
-  window.toggleMainGrid();
-  window.toggleScreenGrid();
-};
-
-// 스크린 그리드 정보 출력 함수 (콘솔에서 호출 가능)
-window.getScreenGridInfo = function() {
-  const bounds = getScreenGridBounds();
-  const screenLeft = projectScreen.style.left;
-  const screenTop = projectScreen.style.top;
-  const screenAbsX = screenLeft ? parseInt(screenLeft) : SCREEN_DEFAULT_X;
-  const screenAbsY = screenTop ? parseInt(screenTop) : SCREEN_DEFAULT_Y;
-  const screenWidth = projectScreen.naturalWidth || SCREEN_DEFAULT_WIDTH;
-  const screenHeight = projectScreen.naturalHeight || SCREEN_DEFAULT_HEIGHT;
-  
-  const info = {
-    스크린위치: { x: screenAbsX, y: screenAbsY },
-    스크린크기: { width: screenWidth, height: screenHeight },
-    마진: {
-      좌: SCREEN_MARGIN_LEFT,
-      우: SCREEN_MARGIN_RIGHT,
-      상: SCREEN_MARGIN_TOP,
-      하: SCREEN_MARGIN_BOTTOM
-    },
-    그리드크기: { x: SCREEN_GRID_X, y: SCREEN_GRID_Y },
-    그리드개수: { 
-      가로: bounds.maxGridX + 1, 
-      세로: bounds.maxGridY + 1,
-      총개수: (bounds.maxGridX + 1) * (bounds.maxGridY + 1)
-    },
-    그리드영역: {
-      시작X: screenAbsX + SCREEN_MARGIN_LEFT,
-      시작Y: screenAbsY + SCREEN_MARGIN_TOP,
-      너비: screenWidth - SCREEN_MARGIN_LEFT - SCREEN_MARGIN_RIGHT,
-      높이: screenHeight - SCREEN_MARGIN_TOP - SCREEN_MARGIN_BOTTOM
-    }
-  };
-  
-  console.table(info);
-  return info;
-};
-
 // 프로젝트 스크린 위치 체크를 위한 주기적 업데이트
 setInterval(() => {
-  checkProjectScreenPosition();
   checkFirstIconPosition();
 }, 100);
 
-// 스크린 아이콘 상태 확인 함수 (디버깅용)
-window.checkScreenIcons = function() {
-  const wrappers = document.querySelectorAll('.screen-icon-wrapper');
-  console.log(`현재 스크린에 표시된 아이콘 개수: ${wrappers.length}`);
-  wrappers.forEach((wrapper, index) => {
-    console.log(`  ${index + 1}. ID: ${wrapper.id}, 위치: (${wrapper.style.left}, ${wrapper.style.top})`);
-  });
-  console.log('초기 위치 정보:', screenIconInitialPositions);
-  return wrappers.length;
-};
 
 // localStorage 초기화 함수 (디버깅용)
 window.resetM00Position = function() {
@@ -1915,138 +1000,2272 @@ window.resetAllPositions = function() {
   location.reload();
 };
 
-// ==================== 스크린 최소화/최대화 기능 ====================
+// ==================== 메인 그리드 이미지 표시 기능 ====================
 
-// 스크린 최소화/최대화 토글
-screenMinimizeBtn.addEventListener('click', () => {
-  if (isScreenMinimized) {
-    // 최대화 (원래 크기로)
-    maximizeScreen();
+// 현재 표시 중인 이미지 데이터
+let currentDisplayedProject = {
+  iconId: null,
+  mainImage: null,
+  additionalImages: [],
+  currentImageIndex: 0  // 현재 표시 중인 이미지 인덱스 (0: 메인, 1~: 추가)
+};
+
+// 관리자 창 열림 상태
+let isManagerOverlayOpen = false;
+
+// 자동 루프 관련 변수
+let mainLoopImages = [];  // 루프할 이미지 배열
+let currentLoopIndex = 0;  // 현재 루프 인덱스
+let loopIntervalId = null;  // 루프 타이머 ID
+let isLoopActive = false;  // 루프 활성화 상태
+
+// 메인 그리드에 프로젝트 이미지 표시
+async function showProjectImageOnMainGrid(iconId) {
+  console.log(`📷 메인 그리드에 이미지 표시 시작: ${iconId}`);
+  
+  // 1. 12분할 뷰 즉시 완전 제거
+  const gridView = document.getElementById('grid12View');
+  if (gridView) {
+    console.log('🗑️ 12분할 뷰 즉시 제거');
+    gridView.remove();
+  }
+  hide12GridArrows();
+  const pieceBtn = document.getElementById('pieceButton');
+  if (pieceBtn) pieceBtn.remove();
+  isGrid12ViewMode = false;
+  
+  // 2. 자동 루프 중지
+  stopMainImageLoop();
+  
+  // 프로젝트 데이터 로드
+  const storageKey = `projectData_${iconId}`;
+  const projectData = await loadProjectFromDB(storageKey);
+  
+  if (!projectData) {
+    console.log(`❌ ${iconId}에 저장된 프로젝트 데이터 없음`);
+    alert(`${iconId}에 등록된 프로젝트가 없습니다.`);
+    return;
+  }
+  
+  if (!projectData.mainImage) {
+    console.log(`❌ ${iconId}에 메인 이미지 없음`);
+    alert(`${iconId}에 등록된 이미지가 없습니다.`);
+    return;
+  }
+  
+  console.log(`✅ 프로젝트 데이터 로드 완료`, projectData);
+  console.log(`📸 메인 이미지:`, projectData.mainImage ? `있음 (${projectData.mainImage.length} bytes)` : '없음');
+  console.log(`📸 추가 이미지:`, projectData.additionalImages?.length || 0, '개');
+  
+  // 3. 기존 프로젝트 이미지 즉시 제거
+  const existingProjectImage = document.getElementById('mainGridDisplayImage');
+  if (existingProjectImage) {
+    console.log('🗑️ 기존 프로젝트 이미지 즉시 제거');
+    existingProjectImage.remove();
+  }
+  
+  // 4. 텍스트 오버레이 즉시 제거
+  const existingText = document.getElementById('mainGridTextOverlay');
+  if (existingText) {
+    console.log('🗑️ 기존 텍스트 오버레이 즉시 제거');
+    existingText.remove();
+  }
+  
+  // 5. 네비게이션 화살표 제거
+  hideImageNavigationArrows();
+  
+  // 현재 프로젝트 정보 저장
+  currentDisplayedProject = {
+    iconId: iconId,
+    mainImage: projectData.mainImage,
+    additionalImages: projectData.additionalImages || [],
+    currentImageIndex: 0
+  };
+  
+  console.log(`🔄 현재 표시 프로젝트:`, currentDisplayedProject.iconId);
+  console.log(`🔄 추가 이미지 배열 타입:`, Array.isArray(currentDisplayedProject.additionalImages) ? 'Array' : typeof currentDisplayedProject.additionalImages);
+  if (currentDisplayedProject.additionalImages.length > 0) {
+    console.log(`🔄 첫 번째 추가 이미지 타입:`, typeof currentDisplayedProject.additionalImages[0]);
+  }
+  
+  // 이미지 표시 (그리드 6,1부터 17,6까지 = 1440x960)
+  displayImageOnMainGrid(projectData.mainImage, 0);
+  
+  // 텍스트 오버레이 표시 (그리드 3,1에서 시작)
+  displayProjectTextOnMainGrid(projectData);
+  
+  // 추가 이미지가 있으면 네비게이션 화살표 표시
+  if (currentDisplayedProject.additionalImages.length > 0) {
+    showImageNavigationArrows();
+  }
+}
+
+// 메인 그리드에 이미지 표시 (실제 렌더링)
+function displayImageOnMainGrid(imageData, imageIndex) {
+  console.log(`🖼️ 이미지 표시 중... (인덱스: ${imageIndex})`);
+  
+  // 12분할 뷰 즉시 제거 (있다면)
+  const gridView = document.getElementById('grid12View');
+  if (gridView) {
+    console.log('🗑️ displayImageOnMainGrid: 12분할 뷰 즉시 제거');
+    gridView.remove();
+    hide12GridArrows();
+    const pieceBtn = document.getElementById('pieceButton');
+    if (pieceBtn) pieceBtn.remove();
+    isGrid12ViewMode = false;
+  }
+  
+  // 기존 이미지 페이드아웃 후 제거
+  const existingImage = document.getElementById('mainGridDisplayImage');
+  
+  // 그리드 6,1의 픽셀 좌표 계산
+  const startGridX = 6;
+  const startGridY = 1;
+  const imageWidth = 1440;  // 12 그리드 * 120px (6~17 = 12칸)
+  const imageHeight = 960;  // 6 그리드 * 160px (1~6 = 6칸)
+  
+  // 픽셀 좌표 계산
+  const pixelX = GRID_START_X + (startGridX * GRID_X);
+  const pixelY = GRID_START_Y + (startGridY * GRID_Y);
+  
+  console.log(`📍 이미지 위치: (${pixelX}, ${pixelY}), 크기: ${imageWidth}x${imageHeight}`);
+  
+  // 새 이미지 생성 함수
+  const createNewImage = () => {
+    // 12분할 뷰 다시 한 번 확인 (혹시 모를 경우)
+    const checkGridView = document.getElementById('grid12View');
+    if (checkGridView) {
+      console.log('⚠️ createNewImage: 12분할 뷰 발견! 즉시 제거');
+      checkGridView.remove();
+      hide12GridArrows();
+      const checkPieceBtn = document.getElementById('pieceButton');
+      if (checkPieceBtn) checkPieceBtn.remove();
+    }
+    
+    // 이미지 요소 생성 (처음에는 숨김)
+    const img = document.createElement('img');
+    img.id = 'mainGridDisplayImage';
+    img.src = imageData;
+    img.style.cssText = `
+      position: absolute;
+      left: ${pixelX}px;
+      top: ${pixelY}px;
+      width: ${imageWidth}px;
+      height: ${imageHeight}px;
+      z-index: 500;
+      object-fit: cover;
+      border: 3px solid #fff;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    `;
+    
+    container.appendChild(img);
+    
+    // 이미지 로드 완료 후 표시
+    img.onload = () => {
+      requestAnimationFrame(() => {
+        img.style.opacity = '1';
+      });
+    };
+  };
+  
+  // 기존 이미지가 있으면 크로스 페이드 (기존 페이드아웃과 새 이미지 페이드인 동시 진행)
+  if (existingImage) {
+    // 새 이미지를 먼저 생성 (opacity: 0)
+    createNewImage();
+    
+    // 기존 이미지 페이드아웃
+    existingImage.style.transition = 'opacity 0.3s ease';
+    existingImage.style.opacity = '0';
+    existingImage.style.zIndex = '499';  // 새 이미지보다 아래
+    
+    // 300ms 후 기존 이미지 제거
+    setTimeout(() => {
+      existingImage.remove();
+    }, 300);
   } else {
-    // 최소화 (10% 크기로)
-    minimizeScreen();
+    // 기존 이미지 없으면 바로 표시
+    createNewImage();
+  }
+  
+  console.log(`✅ 이미지 표시 완료`);
+}
+
+// 메인 그리드 이미지 제거
+function clearMainGridImages() {
+  console.log(`🧹 메인 그리드 이미지 제거`);
+  
+  // 12분할 뷰 제거 (있다면)
+  if (isGrid12ViewMode) {
+    const gridView = document.getElementById('grid12View');
+    if (gridView) gridView.remove();
+    hide12GridArrows();
+    const pieceBtn = document.getElementById('pieceButton');
+    if (pieceBtn) pieceBtn.remove();
+    isGrid12ViewMode = false;
+  }
+  
+  // ID로 찾아서 즉시 제거
+  const existingImage = document.getElementById('mainGridDisplayImage');
+  if (existingImage) {
+    console.log('🗑️ mainGridDisplayImage 즉시 제거');
+    existingImage.remove();
+  }
+  
+  // 모든 프로젝트 이미지 제거 (ID 패턴 매칭)
+  const allProjectImages = document.querySelectorAll('[id^="mainGridDisplayImage"]');
+  allProjectImages.forEach(img => {
+    console.log('🗑️ 추가 프로젝트 이미지 제거:', img.id);
+    img.remove();
+  });
+  
+  // z-index 499~501 범위의 이미지 제거 (크로스페이드 중인 이미지)
+  const container = document.querySelector('.container');
+  if (container) {
+    const allImages = container.querySelectorAll('img');
+    allImages.forEach(img => {
+      const zIndex = parseInt(img.style.zIndex) || 0;
+      if (zIndex >= 499 && zIndex <= 501) {
+        console.log('🗑️ 페이드 중인 프로젝트 이미지 제거 (z-index:', zIndex, ')');
+        img.remove();
+      }
+    });
+  }
+  
+  // 텍스트 오버레이 제거
+  const existingText = document.getElementById('mainGridTextOverlay');
+  if (existingText) {
+    console.log('🗑️ mainGridTextOverlay 즉시 제거');
+    existingText.remove();
+  }
+  
+  // 모든 텍스트 오버레이 제거
+  const allTextOverlays = document.querySelectorAll('[id^="mainGridTextOverlay"]');
+  allTextOverlays.forEach(txt => {
+    console.log('🗑️ 추가 텍스트 오버레이 제거:', txt.id);
+    txt.remove();
+  });
+  
+  // z-index 550인 div 제거 (텍스트 오버레이)
+  if (container) {
+    const allDivs = container.querySelectorAll('div');
+    allDivs.forEach(div => {
+      const zIndex = parseInt(div.style.zIndex) || 0;
+      if (zIndex === 550) {
+        console.log('🗑️ 텍스트 오버레이 제거 (z-index: 550)');
+        div.remove();
+      }
+    });
+  }
+  
+  // 네비게이션 화살표도 제거
+  hideImageNavigationArrows();
+  
+  // Several 버튼 제거
+  hideSeveralButton();
+  
+  // z-index 600~700 범위의 요소 제거 (화살표, 버튼 등)
+  if (container) {
+    const allElements = container.querySelectorAll('*');
+    allElements.forEach(el => {
+      const zIndex = parseInt(el.style.zIndex) || 0;
+      if (zIndex >= 600 && zIndex <= 700) {
+        console.log('🗑️ UI 요소 제거 (z-index:', zIndex, ')');
+        el.remove();
+      }
+    });
+  }
+  
+  // 현재 프로젝트 정보 초기화
+  currentDisplayedProject = {
+    iconId: null,
+    mainImage: null,
+    additionalImages: [],
+    currentImageIndex: 0
+  };
+  
+  console.log('✅ 메인 그리드 이미지 제거 완료');
+  
+  // 자동 루프 재개 (캐비넷/장독대 모드가 아닐 때만)
+  if (currentGridMode === 'main') {
+    resumeMainImageLoop();
+  }
+}
+
+// 메인 그리드에 프로젝트 텍스트 표시
+function displayProjectTextOnMainGrid(projectData) {
+  console.log(`📝 프로젝트 텍스트 표시 시작`);
+  
+  // 기존 텍스트 제거
+  const existingText = document.getElementById('mainGridTextOverlay');
+  if (existingText) {
+    existingText.remove();
+  }
+  
+  // 텍스트 시작 위치 (그리드 3,1)
+  const textStartGridX = 3;
+  const textStartGridY = 1;
+  const textStartX = GRID_START_X + (textStartGridX * GRID_X);
+  const textStartY = GRID_START_Y + (textStartGridY * GRID_Y);
+  
+  // "건축면적"의 자연스러운 너비 측정
+  const tempSpan = document.createElement('span');
+  tempSpan.style.cssText = `
+    position: absolute;
+    visibility: hidden;
+    font-size: 18px;
+    font-weight: bold;
+    font-family: 'WAGURI', sans-serif;
+  `;
+  tempSpan.textContent = '건축면적';
+  document.body.appendChild(tempSpan);
+  const labelWidth = tempSpan.offsetWidth;
+  document.body.removeChild(tempSpan);
+  
+  console.log(`📏 "건축면적" 자연 너비: ${labelWidth}px`);
+  
+  // 텍스트 오버레이 컨테이너 (처음에는 숨김)
+  const textOverlay = document.createElement('div');
+  textOverlay.id = 'mainGridTextOverlay';
+  textOverlay.style.cssText = `
+    position: absolute;
+    left: ${textStartX}px;
+    top: ${textStartY}px;
+    z-index: 550;
+    color: white;
+    font-family: 'WAGURI', sans-serif;
+    pointer-events: none;
+    opacity: 0;
+  `;
+  
+  let currentY = 0;
+  const lineHeight = 30;
+  const contentGap = 10;   // 타이틀과 내용 사이 간격
+  
+  // 설계개요
+  if (projectData.designOverview) {
+    const designOverviewText = document.createElement('div');
+    designOverviewText.textContent = '설계개요';
+    designOverviewText.style.cssText = `
+      font-size: 24px;
+      font-weight: bold;
+      color: ${projectData.designOverview.color || '#ffffff'};
+      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+      margin-bottom: 15px;
+    `;
+    textOverlay.appendChild(designOverviewText);
+    currentY += 39;
+  }
+  
+  // 사업명
+  if (projectData.projectName && projectData.projectName.text) {
+    const row = document.createElement('div');
+    row.style.cssText = `display: flex; margin-bottom: 10px;`;
+    
+    // 레이블 (양쪽정렬)
+    const labelContainer = document.createElement('div');
+    labelContainer.style.cssText = `
+      width: ${labelWidth}px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 18px;
+      font-weight: bold;
+      color: ${projectData.projectName.color || '#ffffff'};
+      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+    `;
+    
+    // "사업명"을 각 글자로 분리
+    const chars = '사업명'.split('');
+    chars.forEach(char => {
+      const span = document.createElement('span');
+      span.textContent = char;
+      labelContainer.appendChild(span);
+    });
+    
+    const content = document.createElement('span');
+    content.textContent = projectData.projectName.text;
+    content.style.cssText = `
+      font-size: 18px;
+      font-weight: bold;
+      color: ${projectData.projectName.color || '#ffffff'};
+      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+      margin-left: ${contentGap}px;
+    `;
+    
+    row.appendChild(labelContainer);
+    row.appendChild(content);
+    textOverlay.appendChild(row);
+    currentY += lineHeight;
+    
+    // 년도가 있으면 아랫줄에 표시
+    if (projectData.projectName.startYear && projectData.projectName.endYear) {
+      const yearRow = document.createElement('div');
+      yearRow.style.cssText = `display: flex; margin-bottom: 10px;`;
+      
+      // 빈 레이블 공간
+      const emptyLabel = document.createElement('div');
+      emptyLabel.style.cssText = `width: ${labelWidth}px;`;
+      
+      const yearContent = document.createElement('span');
+      yearContent.textContent = `(${projectData.projectName.startYear}~${projectData.projectName.endYear})`;
+      yearContent.style.cssText = `
+        font-size: 18px;
+        font-weight: bold;
+        color: ${projectData.projectName.color || '#ffffff'};
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+        margin-left: ${contentGap}px;
+      `;
+      
+      yearRow.appendChild(emptyLabel);
+      yearRow.appendChild(yearContent);
+      textOverlay.appendChild(yearRow);
+      currentY += lineHeight;
+    }
+  }
+  
+  // 주용도
+  if (projectData.usage && projectData.usage.text) {
+    const row = document.createElement('div');
+    row.style.cssText = `display: flex; margin-bottom: 10px;`;
+    
+    // 레이블 (양쪽정렬)
+    const labelContainer = document.createElement('div');
+    labelContainer.style.cssText = `
+      width: ${labelWidth}px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 18px;
+      font-weight: bold;
+      color: ${projectData.usage.color || '#ffffff'};
+      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+    `;
+    
+    // "주용도"를 각 글자로 분리
+    const chars = '주용도'.split('');
+    chars.forEach(char => {
+      const span = document.createElement('span');
+      span.textContent = char;
+      labelContainer.appendChild(span);
+    });
+    
+    const content = document.createElement('span');
+    content.textContent = projectData.usage.text;
+    content.style.cssText = `
+      font-size: 18px;
+      font-weight: bold;
+      color: ${projectData.usage.color || '#ffffff'};
+      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+      margin-left: ${contentGap}px;
+    `;
+    
+    row.appendChild(labelContainer);
+    row.appendChild(content);
+    textOverlay.appendChild(row);
+    currentY += lineHeight;
+  }
+  
+  // 건축면적
+  if (projectData.buildingArea && projectData.buildingArea.text) {
+    const row = document.createElement('div');
+    row.style.cssText = `display: flex; margin-bottom: 10px;`;
+    
+    // 레이블 (양쪽정렬)
+    const labelContainer = document.createElement('div');
+    labelContainer.style.cssText = `
+      width: ${labelWidth}px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 18px;
+      font-weight: bold;
+      color: ${projectData.buildingArea.color || '#ffffff'};
+      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+    `;
+    
+    // "건축면적"을 각 글자로 분리
+    const chars = '건축면적'.split('');
+    chars.forEach(char => {
+      const span = document.createElement('span');
+      span.textContent = char;
+      labelContainer.appendChild(span);
+    });
+    
+    const content = document.createElement('span');
+    content.textContent = `${projectData.buildingArea.text} m2`;
+    content.style.cssText = `
+      font-size: 18px;
+      font-weight: bold;
+      color: ${projectData.buildingArea.color || '#ffffff'};
+      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+      margin-left: ${contentGap}px;
+    `;
+    
+    row.appendChild(labelContainer);
+    row.appendChild(content);
+    textOverlay.appendChild(row);
+    currentY += lineHeight;
+  }
+  
+  // 연면적
+  if (projectData.totalArea && projectData.totalArea.text) {
+    const row = document.createElement('div');
+    row.style.cssText = `display: flex; margin-bottom: 10px;`;
+    
+    // 레이블 (양쪽정렬)
+    const labelContainer = document.createElement('div');
+    labelContainer.style.cssText = `
+      width: ${labelWidth}px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 18px;
+      font-weight: bold;
+      color: ${projectData.totalArea.color || '#ffffff'};
+      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+    `;
+    
+    // "연면적"을 각 글자로 분리
+    const chars = '연면적'.split('');
+    chars.forEach(char => {
+      const span = document.createElement('span');
+      span.textContent = char;
+      labelContainer.appendChild(span);
+    });
+    
+    const content = document.createElement('span');
+    content.textContent = `${projectData.totalArea.text} m2`;
+    content.style.cssText = `
+      font-size: 18px;
+      font-weight: bold;
+      color: ${projectData.totalArea.color || '#ffffff'};
+      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+      margin-left: ${contentGap}px;
+    `;
+    
+    row.appendChild(labelContainer);
+    row.appendChild(content);
+    textOverlay.appendChild(row);
+    currentY += lineHeight;
+  }
+  
+  // 설계자 섹션
+  if (projectData.designers && projectData.designers.length > 0) {
+    // 빈 row 추가
+    const emptyRow1 = document.createElement('div');
+    emptyRow1.style.cssText = `height: ${lineHeight}px;`;
+    textOverlay.appendChild(emptyRow1);
+    currentY += lineHeight;
+    
+    // "설계자" 타이틀 (양쪽정렬)
+    const designerTitleContainer = document.createElement('div');
+    designerTitleContainer.style.cssText = `
+      width: ${labelWidth}px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 18px;
+      font-weight: bold;
+      color: #ffffff;
+      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+      margin-bottom: 10px;
+    `;
+    
+    // "설계자"를 각 글자로 분리
+    const titleChars = '설계자'.split('');
+    titleChars.forEach(char => {
+      const span = document.createElement('span');
+      span.textContent = char;
+      designerTitleContainer.appendChild(span);
+    });
+    
+    textOverlay.appendChild(designerTitleContainer);
+    currentY += lineHeight;
+    
+    // 설계자 항목들
+    projectData.designers.forEach((designer, index) => {
+      if (designer.field || designer.office) {
+        const row = document.createElement('div');
+        row.style.cssText = `display: flex; margin-bottom: 10px;`;
+        
+        // 분야 레이블 (양쪽정렬)
+        const fieldContainer = document.createElement('div');
+        fieldContainer.style.cssText = `
+          width: ${labelWidth}px;
+          display: flex;
+          justify-content: space-between;
+          font-size: 18px;
+          font-weight: bold;
+          color: ${designer.color || '#ffffff'};
+          text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+        `;
+        
+        // 분야명을 각 글자로 분리
+        const fieldText = designer.field || '';
+        const fieldChars = fieldText.split('');
+        fieldChars.forEach(char => {
+          const span = document.createElement('span');
+          span.textContent = char;
+          fieldContainer.appendChild(span);
+        });
+        
+        const office = document.createElement('span');
+        office.textContent = designer.office || '';
+        office.style.cssText = `
+          font-size: 18px;
+          font-weight: bold;
+          color: ${designer.color || '#ffffff'};
+          text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+          margin-left: ${contentGap}px;
+        `;
+        
+        // 홈페이지 주소가 있으면 클릭 가능하게 설정
+        if (designer.homepage) {
+          office.style.cursor = 'pointer';
+          office.style.textDecoration = 'underline';
+          office.style.pointerEvents = 'auto';
+          office.onclick = () => {
+            console.log(`🌐 홈페이지 열기: ${designer.homepage}`);
+            window.open(designer.homepage, '_blank');
+          };
+          office.onmouseover = () => {
+            office.style.opacity = '0.7';
+          };
+          office.onmouseout = () => {
+            office.style.opacity = '1';
+          };
+        }
+        
+        row.appendChild(fieldContainer);
+        row.appendChild(office);
+        textOverlay.appendChild(row);
+        currentY += lineHeight;
+      }
+    });
+    
+    // 설계자와 담당업무 사이 빈 row 추가
+    const emptyRow2 = document.createElement('div');
+    emptyRow2.style.cssText = `height: ${lineHeight}px;`;
+    textOverlay.appendChild(emptyRow2);
+    currentY += lineHeight;
+  }
+  
+  // 담당업무 섹션
+  if (projectData.staff && projectData.staff.length > 0) {
+    // 설계자가 없는 경우에만 빈 줄 추가
+    if (!projectData.designers || projectData.designers.length === 0) {
+      const emptyRow2 = document.createElement('div');
+      emptyRow2.style.cssText = `height: ${lineHeight}px;`;
+      textOverlay.appendChild(emptyRow2);
+      currentY += lineHeight;
+    }
+    
+    // "담당업무" 타이틀
+    const staffTitle = document.createElement('div');
+    staffTitle.textContent = '담당업무';
+    staffTitle.style.cssText = `
+      font-size: 18px;
+      font-weight: bold;
+      color: #ffffff;
+      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+      margin-bottom: 10px;
+    `;
+    textOverlay.appendChild(staffTitle);
+    currentY += lineHeight;
+    
+    // 담당업무 항목들
+    projectData.staff.forEach((member, index) => {
+      if (member.name || member.position || member.role) {
+        const row = document.createElement('div');
+        row.style.cssText = `display: flex; margin-bottom: 10px;`;
+        
+        // 이름 (양쪽정렬)
+        const nameContainer = document.createElement('div');
+        nameContainer.style.cssText = `
+          width: ${labelWidth}px;
+          display: flex;
+          justify-content: space-between;
+          font-size: 18px;
+          font-weight: bold;
+          color: ${member.color || '#ffffff'};
+          text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+        `;
+        
+        // 이름을 각 글자로 분리
+        const nameText = member.name || '';
+        const nameChars = nameText.split('');
+        nameChars.forEach(char => {
+          const span = document.createElement('span');
+          span.textContent = char;
+          nameContainer.appendChild(span);
+        });
+        
+        const position = document.createElement('span');
+        position.textContent = member.position || '';
+        position.style.cssText = `
+          font-size: 18px;
+          font-weight: bold;
+          color: ${member.color || '#ffffff'};
+          text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+          margin-left: ${contentGap}px;
+          min-width: 60px;
+        `;
+        
+        const role = document.createElement('span');
+        role.textContent = member.role || '';
+        role.style.cssText = `
+          font-size: 18px;
+          font-weight: bold;
+          color: ${member.color || '#ffffff'};
+          text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+          margin-left: ${contentGap}px;
+        `;
+        
+        row.appendChild(nameContainer);
+        if (position.textContent) row.appendChild(position);
+        if (role.textContent) row.appendChild(role);
+        textOverlay.appendChild(row);
+        currentY += lineHeight;
+      }
+    });
+  }
+  
+  container.appendChild(textOverlay);
+  
+  // 모든 내용이 추가된 후에 표시 (reflow 최소화)
+  requestAnimationFrame(() => {
+    textOverlay.style.opacity = '1';
+  });
+  
+  console.log(`✅ 프로젝트 텍스트 표시 완료 (그리드 3,1에서 시작)`);
+}
+
+// 이미지 네비게이션 화살표 표시
+function showImageNavigationArrows() {
+  console.log(`🔼🔽 이미지 네비게이션 화살표 표시`);
+  
+  // 기존 화살표 제거
+  hideImageNavigationArrows();
+  
+  // 이미지 표시 영역 계산 (그리드 6,1~17,6)
+  const imageAreaStartX = GRID_START_X + (6 * GRID_X);  // 800
+  const imageAreaStartY = GRID_START_Y + (1 * GRID_Y);  // 240
+  const imageAreaWidth = 1440;
+  const imageAreaHeight = 960;
+  const imageAreaCenterX = imageAreaStartX + (imageAreaWidth / 2);  // 1520
+  const imageAreaCenterY = imageAreaStartY + (imageAreaHeight / 2);  // 720
+  
+  // 위쪽 화살표 (icon_arrow1.png) - 먼저 임시로 로드하여 높이 확인
+  const upArrow = document.createElement('img');
+  upArrow.id = 'imageNavArrowUp';
+  upArrow.src = 'images/icon_arrow1.png';
+  upArrow.style.cssText = `
+    position: absolute;
+    cursor: pointer;
+    z-index: 600;
+    transition: opacity 0.2s ease, transform 0.3s ease;
+    opacity: 0;
+  `;
+  
+  upArrow.onload = function() {
+    // 이미지 로드 후 원본 크기 적용
+    const arrowWidth = upArrow.naturalWidth;
+    const arrowHeight = upArrow.naturalHeight;
+    
+    // 원본 크기 명시적으로 설정
+    upArrow.style.width = arrowWidth + 'px';
+    upArrow.style.height = arrowHeight + 'px';
+    
+    // x: 이미지 중심 = 이미지 영역 중심
+    // y: 이미지 영역 y=0 위치에서 - 화살표 높이 - 30
+    const finalX = imageAreaCenterX - (arrowWidth / 2);
+    const finalY = imageAreaStartY - arrowHeight - 30;
+    
+    upArrow.style.left = finalX + 'px';
+    upArrow.style.top = finalY + 'px';
+    
+    // 로드 완료 후 표시
+    requestAnimationFrame(() => {
+      upArrow.style.opacity = '0.8';
+    });
+    
+    console.log(`위쪽 화살표 위치: (${finalX}, ${finalY}), 원본 크기: ${arrowWidth}x${arrowHeight}`);
+  };
+  
+  upArrow.onmouseover = () => {
+    upArrow.style.opacity = '1';
+    upArrow.style.transform = 'scale(1.1)';
+  };
+  upArrow.onmouseout = () => {
+    upArrow.style.opacity = '0.8';
+    upArrow.style.transform = 'scale(1)';
+  };
+  upArrow.onclick = () => navigateImage(-1);
+  
+  // 아래쪽 화살표 (icon_arrow2.png)
+  const downArrow = document.createElement('img');
+  downArrow.id = 'imageNavArrowDown';
+  downArrow.src = 'images/icon_arrow2.png';
+  downArrow.style.cssText = `
+    position: absolute;
+    cursor: pointer;
+    z-index: 600;
+    transition: opacity 0.2s ease, transform 0.3s ease;
+    opacity: 0;
+  `;
+  
+  downArrow.onload = function() {
+    // 이미지 로드 후 원본 크기 적용
+    const arrowWidth = downArrow.naturalWidth;
+    const arrowHeight = downArrow.naturalHeight;
+    
+    // 원본 크기 명시적으로 설정
+    downArrow.style.width = arrowWidth + 'px';
+    downArrow.style.height = arrowHeight + 'px';
+    
+    // x: 이미지 중심 = 이미지 영역 중심
+    // y: 이미지 영역 y=960 위치 + 30
+    const finalX = imageAreaCenterX - (arrowWidth / 2);
+    const finalY = imageAreaStartY + imageAreaHeight + 30;
+    
+    downArrow.style.left = finalX + 'px';
+    downArrow.style.top = finalY + 'px';
+    
+    // 로드 완료 후 표시
+    requestAnimationFrame(() => {
+      downArrow.style.opacity = '0.8';
+    });
+    
+    console.log(`아래쪽 화살표 위치: (${finalX}, ${finalY}), 원본 크기: ${arrowWidth}x${arrowHeight}`);
+  };
+  
+  downArrow.onmouseover = () => {
+    downArrow.style.opacity = '1';
+    downArrow.style.transform = 'scale(1.1)';
+  };
+  downArrow.onmouseout = () => {
+    downArrow.style.opacity = '0.8';
+    downArrow.style.transform = 'scale(1)';
+  };
+  downArrow.onclick = () => navigateImage(1);
+  
+  // 현재 이미지 인덱스 표시
+  const indexDisplay = document.createElement('div');
+  indexDisplay.id = 'imageIndexDisplay';
+  indexDisplay.style.cssText = `
+    position: absolute;
+    background: rgba(0, 0, 0, 0.8);
+    border: 2px solid #fff;
+    border-radius: 8px;
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    color: white;
+    font-size: 14px;
+    font-weight: bold;
+    z-index: 600;
+    pointer-events: none;
+    padding: 5px;
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  `;
+  
+  // 초기 텍스트 설정하여 크기 계산
+  updateImageIndexDisplay();
+  
+  // DOM에 추가 후 크기 계산
+  container.appendChild(indexDisplay);
+  
+  // 위치 계산 (이미지 영역 오른쪽 경계에서 +10px, y축 중심 정렬)
+  requestAnimationFrame(() => {
+    const displayWidth = indexDisplay.offsetWidth;
+    const displayHeight = indexDisplay.offsetHeight;
+    
+    const finalX = imageAreaStartX + imageAreaWidth + 10;
+    const finalY = imageAreaCenterY - (displayHeight / 2);
+    
+    indexDisplay.style.left = finalX + 'px';
+    indexDisplay.style.top = finalY + 'px';
+    
+    // 위치 설정 후 표시
+    requestAnimationFrame(() => {
+      indexDisplay.style.opacity = '0.8';
+    });
+    
+    console.log(`이미지 인덱스 표시 위치: (${finalX}, ${finalY}), 크기: ${displayWidth}x${displayHeight}`);
+  });
+  
+  container.appendChild(upArrow);
+  container.appendChild(downArrow);
+  
+  // 마우스 휠 이벤트 등록
+  document.addEventListener('wheel', handleImageWheel);
+}
+
+// 이미지 네비게이션 화살표 숨김
+function hideImageNavigationArrows() {
+  const upArrow = document.getElementById('imageNavArrowUp');
+  const downArrow = document.getElementById('imageNavArrowDown');
+  const indexDisplay = document.getElementById('imageIndexDisplay');
+  
+  if (upArrow) upArrow.remove();
+  if (downArrow) downArrow.remove();
+  if (indexDisplay) indexDisplay.remove();
+  
+  // 휠 이벤트 제거
+  document.removeEventListener('wheel', handleImageWheel);
+}
+
+// 이미지 인덱스 표시 업데이트
+function updateImageIndexDisplay() {
+  const indexDisplay = document.getElementById('imageIndexDisplay');
+  if (!indexDisplay) return;
+  
+  const totalImages = 1 + currentDisplayedProject.additionalImages.length;
+  const currentIndex = currentDisplayedProject.currentImageIndex + 1;
+  indexDisplay.textContent = `${currentIndex}/${totalImages}`;
+}
+
+// 이미지 네비게이션 (direction: -1=이전, 1=다음)
+function navigateImage(direction) {
+  const totalImages = 1 + currentDisplayedProject.additionalImages.length;
+  
+  // 새로운 인덱스 계산 (순환)
+  let newIndex = currentDisplayedProject.currentImageIndex + direction;
+  
+  if (newIndex < 0) {
+    newIndex = totalImages - 1;  // 마지막 이미지로
+  } else if (newIndex >= totalImages) {
+    newIndex = 0;  // 첫 번째 이미지로
+  }
+  
+  currentDisplayedProject.currentImageIndex = newIndex;
+  
+  // 이미지 표시
+  let imageData;
+  if (newIndex === 0) {
+    imageData = currentDisplayedProject.mainImage;
+  } else {
+    const additionalImage = currentDisplayedProject.additionalImages[newIndex - 1];
+    // 배열 요소가 문자열인지 객체인지 확인
+    imageData = typeof additionalImage === 'string' ? additionalImage : additionalImage.imageData;
+  }
+  
+  console.log(`📷 이미지 전환: ${newIndex + 1}/${totalImages}, imageData length: ${imageData?.length || 0}`);
+  
+  displayImageOnMainGrid(imageData, newIndex);
+  updateImageIndexDisplay();
+}
+
+// 마우스 휠 이벤트 핸들러
+function handleImageWheel(e) {
+  // 관리자 창이 열려있으면 이미지 네비게이션 비활성화
+  if (isManagerOverlayOpen) return;
+  
+  // 이미지가 표시 중일 때만 작동
+  if (!currentDisplayedProject.iconId) return;
+  
+  // 휠 방향에 따라 이미지 전환
+  if (e.deltaY > 0) {
+    // 아래로 스크롤 = 다음 이미지
+    navigateImage(1);
+  } else {
+    // 위로 스크롤 = 이전 이미지
+    navigateImage(-1);
+  }
+  
+  e.preventDefault();
+}
+
+// ESC 키로 이미지 닫기 및 모드 복귀
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    console.log('⌨️ ESC 키 감지');
+    console.log('   - currentDisplayedProject.iconId:', currentDisplayedProject.iconId);
+    console.log('   - currentGridMode:', currentGridMode);
+    console.log('   - isGrid12ViewMode:', isGrid12ViewMode);
+    
+    if (currentDisplayedProject.iconId) {
+      console.log('🚪 ESC 키로 프로젝트 이미지 닫기');
+      clearMainGridImages();
+    } else if (currentGridMode !== 'main') {
+      console.log('🚪 ESC 키로 메인 모드 복귀');
+      returnToMainMode();
+    } else {
+      console.log('ℹ️ ESC 키 무시 (메인 모드이고 프로젝트 표시 안 됨)');
+    }
   }
 });
 
-// 스크린 최소화
-function minimizeScreen() {
-  const screenWidth = projectScreen.naturalWidth || SCREEN_DEFAULT_WIDTH;
-  const screenHeight = projectScreen.naturalHeight || SCREEN_DEFAULT_HEIGHT;
+// ==================== 메인 이미지 자동 루프 ====================
+
+// 메인 루프용 이미지 수집
+async function collectMainLoopImages() {
+  const mainIconIds = ['M00', 'M01', 'M02', 'M03', 'M04', 'M05', 'M06', 'M07',
+                       'M10', 'M11', 'M12', 'M13', 'M14', 'M15', 'M16', 'M17'];
   
-  // 10% 크기로 축소
-  const newWidth = screenWidth * 0.1;
-  const newHeight = screenHeight * 0.1;
+  const loopImages = [];
   
-  projectScreen.style.width = newWidth + 'px';
-  projectScreen.style.height = newHeight + 'px';
-  projectScreen.style.transition = 'all 0.3s ease';
-  
-  // 스크린 내부 요소 숨김
-  const screenTitle = document.getElementById('screenIconTitle');
-  const allWrappers = document.querySelectorAll('.screen-icon-wrapper');
-  const mainImageBg = document.getElementById('projectMainImageBg');
-  const designOverview = document.getElementById('projectDesignOverview');
-  const textOverlay = document.getElementById('projectTextOverlay');
-  const additionalImageDisplay = document.getElementById('additionalImageDisplay');
-  const arrowUp = document.getElementById('imageNavigatorArrowUp');
-  const arrowDown = document.getElementById('imageNavigatorArrowDown');
-  
-  if (screenTitle) screenTitle.style.display = 'none';
-  allWrappers.forEach(w => w.style.display = 'none');
-  if (mainImageBg) mainImageBg.style.display = 'none';
-  if (designOverview) designOverview.style.display = 'none';
-  if (textOverlay) textOverlay.style.display = 'none';
-  if (additionalImageDisplay) additionalImageDisplay.style.display = 'none';
-  if (arrowUp) arrowUp.style.display = 'none';
-  if (arrowDown) arrowDown.style.display = 'none';
-  
-  // 그리드 비활성화 (숨김)
-  const mainGridVisualization = document.getElementById('mainGridVisualization');
-  const screenGridVisualization = document.getElementById('screenGridVisualization');
-  if (mainGridVisualization) {
-    mainGridVisualization.style.display = 'none';
-    console.log('✅ 메인 그리드 비활성화됨');
-  }
-  if (screenGridVisualization) {
-    screenGridVisualization.style.display = 'none';
-    console.log('✅ 스크린 그리드 비활성화됨');
+  for (const iconId of mainIconIds) {
+    const storageKey = `projectData_${iconId}`;
+    const projectData = await loadProjectFromDB(storageKey);
+    
+    if (projectData && projectData.mainImage && projectData.useInMainLoop) {
+      loopImages.push({
+        iconId: iconId,
+        imageData: projectData.mainImage,
+        projectName: projectData.projectName?.text || iconId
+      });
+      console.log(`✅ 루프 이미지 추가: ${iconId} (${projectData.projectName?.text || ''})`);
+    }
   }
   
-  // 버튼 위치 업데이트 (최소화된 스크린 기준)
-  setTimeout(() => {
-    updateScreenMinimizeButtonPosition();
-  }, 350); // transition 완료 후
-  
-  // 버튼 텍스트 변경
-  screenMinimizeBtn.textContent = '최대화';
-  screenResetBtn.style.display = 'none'; // 초기화 버튼 숨김
-  
-  isScreenMinimized = true;
-  console.log('✅ 스크린 최소화됨 (10%)');
+  console.log(`📸 총 ${loopImages.length}개의 루프 이미지 수집됨`);
+  return loopImages;
 }
 
-// 스크린 최대화
-function maximizeScreen() {
-  const screenWidth = projectScreen.naturalWidth || SCREEN_DEFAULT_WIDTH;
-  const screenHeight = projectScreen.naturalHeight || SCREEN_DEFAULT_HEIGHT;
+// 메인 루프 시작
+async function startMainImageLoop() {
+  console.log('🔄 메인 이미지 루프 시작...');
   
-  // 원래 크기로 복원
-  projectScreen.style.width = screenWidth + 'px';
-  projectScreen.style.height = screenHeight + 'px';
-  projectScreen.style.transition = 'all 0.3s ease';
+  // 루프 이미지 수집
+  mainLoopImages = await collectMainLoopImages();
   
-  // 스크린 내부 요소 표시
-  const screenTitle = document.getElementById('screenIconTitle');
-  const allWrappers = document.querySelectorAll('.screen-icon-wrapper');
-  const mainImageBg = document.getElementById('projectMainImageBg');
-  const designOverview = document.getElementById('projectDesignOverview');
-  const textOverlay = document.getElementById('projectTextOverlay');
-  const additionalImageDisplay = document.getElementById('additionalImageDisplay');
-  const arrowUp = document.getElementById('imageNavigatorArrowUp');
-  const arrowDown = document.getElementById('imageNavigatorArrowDown');
-  
-  if (screenTitle) screenTitle.style.display = 'block';
-  allWrappers.forEach(w => w.style.display = 'flex');
-  if (mainImageBg) mainImageBg.style.display = 'flex';
-  if (designOverview) designOverview.style.display = 'block';
-  if (textOverlay) textOverlay.style.display = 'block';
-  if (additionalImageDisplay) additionalImageDisplay.style.display = 'flex';
-  if (arrowUp) arrowUp.style.display = 'block';
-  if (arrowDown) arrowDown.style.display = 'block';
-  
-  // 그리드 재활성화 (표시)
-  const mainGridVisualization = document.getElementById('mainGridVisualization');
-  const screenGridVisualization = document.getElementById('screenGridVisualization');
-  if (mainGridVisualization) {
-    mainGridVisualization.style.display = 'block';
-    console.log('✅ 메인 그리드 활성화됨');
-  }
-  if (screenGridVisualization) {
-    screenGridVisualization.style.display = 'block';
-    console.log('✅ 스크린 그리드 활성화됨');
+  if (mainLoopImages.length === 0) {
+    console.log('⚠️ 루프할 이미지가 없습니다.');
+    return;
   }
   
-  // 버튼 위치 업데이트
+  // 첫 번째 이미지 표시
+  currentLoopIndex = 0;
+  isLoopActive = true;
+  displayLoopImage(currentLoopIndex);
+  
+  // Several 버튼 표시
+  showSeveralButton();
+  
+  // 5초 + 0.3초(크로스 페이드) = 5.3초마다 이미지 전환
+  loopIntervalId = setInterval(() => {
+    if (isLoopActive && !currentDisplayedProject.iconId && !isGrid12ViewMode) {
+      // 사용자가 아이콘을 클릭하지 않았고, 12분할 뷰가 아닌 경우에만 루프
+      nextLoopImage();
+    }
+  }, 5300);
+  
+  console.log('✅ 메인 루프 활성화 (5.3초 간격)');
+}
+
+// 다음 루프 이미지로 전환
+function nextLoopImage() {
+  // 12분할 뷰 모드이거나 프로젝트 표시 중이면 실행하지 않음
+  if (isGrid12ViewMode || currentDisplayedProject.iconId) {
+    console.log('⏸️ nextLoopImage 중지 (12분할/프로젝트 모드)');
+    return;
+  }
+  
+  currentLoopIndex = (currentLoopIndex + 1) % mainLoopImages.length;
+  displayLoopImage(currentLoopIndex);
+}
+
+// 루프 이미지 표시 (크로스 페이드 방식)
+function displayLoopImage(index) {
+  // 12분할 뷰 모드이거나 프로젝트 표시 중이면 루프 중지
+  if (isGrid12ViewMode || currentDisplayedProject.iconId) {
+    console.log('⏸️ 루프 표시 중지 (12분할/프로젝트 모드)');
+    return;
+  }
+  
+  const loopImage = mainLoopImages[index];
+  if (!loopImage) return;
+  
+  console.log(`🖼️ 루프 이미지 표시: ${loopImage.iconId} (${index + 1}/${mainLoopImages.length})`);
+  
+  // 기존 이미지 확인
+  const existingImage = document.getElementById('mainLoopDisplayImage');
+  
+  if (existingImage) {
+    // 크로스 페이드: 새 이미지를 먼저 생성하고 동시에 페이드 진행
+    showNewLoopImage(loopImage, existingImage);
+  } else {
+    // 처음 표시
+    showNewLoopImage(loopImage, null);
+  }
+}
+
+// 새 루프 이미지 표시 (크로스 페이드)
+function showNewLoopImage(loopImage, existingImage = null) {
+  // 12분할 뷰 모드이거나 프로젝트 표시 중이면 표시하지 않음
+  if (isGrid12ViewMode || currentDisplayedProject.iconId) {
+    console.log('⏸️ 루프 이미지 표시 중지 (12분할/프로젝트 모드)');
+    if (existingImage) existingImage.remove();
+    return;
+  }
+  
+  // 그리드 6,1~17,6 영역 (1440x960)
+  const startGridX = 6;
+  const startGridY = 1;
+  const imageWidth = 1440;  // 12 그리드 * 120px (6~17 = 12칸)
+  const imageHeight = 960;  // 6 그리드 * 160px (1~6 = 6칸)
+  
+  const pixelX = GRID_START_X + (startGridX * GRID_X);
+  const pixelY = GRID_START_Y + (startGridY * GRID_Y);
+  
+  console.log(`🖼️ 새 루프 이미지 생성: ${loopImage.iconId}`);
+  
+  // 새 이미지 요소 생성
+  const img = document.createElement('img');
+  img.id = 'mainLoopDisplayImage';
+  img.src = loopImage.imageData;
+  img.dataset.iconId = loopImage.iconId;
+  img.style.cssText = `
+    position: absolute;
+    left: ${pixelX}px;
+    top: ${pixelY}px;
+    width: ${imageWidth}px;
+    height: ${imageHeight}px;
+    z-index: 450;
+    object-fit: cover;
+    border: 3px solid #fff;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    pointer-events: auto;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  `;
+  
+  // 클릭 이벤트 추가
+  img.onclick = () => {
+    console.log(`🖱️ 루프 이미지 클릭: ${loopImage.iconId}`);
+    showProjectImageOnMainGrid(loopImage.iconId);
+  };
+  
+  // 기존 이미지가 있으면 ID를 임시로 변경하여 중복 방지
+  if (existingImage) {
+    existingImage.id = 'mainLoopDisplayImage_old';
+    existingImage.style.zIndex = '449';  // 새 이미지보다 아래
+  }
+  
+  container.appendChild(img);
+  
+  // 이미지 로드 완료 후 크로스 페이드
+  img.onload = () => {
+    requestAnimationFrame(() => {
+      // 새 이미지 페이드인
+      img.style.opacity = '1';
+      
+      // 기존 이미지 페이드아웃 (동시에)
+      if (existingImage) {
+        existingImage.style.transition = 'opacity 0.3s ease';
+        existingImage.style.opacity = '0';
+        
+        // 300ms 후 기존 이미지 제거
   setTimeout(() => {
-    updateScreenResetButtonPosition();
-    updateScreenMinimizeButtonPosition();
-  }, 350); // transition 완료 후
+          if (existingImage.parentElement) {
+            existingImage.remove();
+          }
+        }, 300);
+      }
+    });
+  };
   
-  // 버튼 텍스트 변경
-  screenMinimizeBtn.textContent = '최소화';
-  screenResetBtn.style.display = 'block'; // 초기화 버튼 표시
+  // 5초는 interval이 처리하므로 별도 타이머 불필요
+  console.log('✅ 루프 이미지 표시 완료 (5초 후 자동 전환)');
+}
+
+// 루프 중지 (사용자가 아이콘 클릭 시)
+function stopMainImageLoop() {
+  console.log('⏹️ 루프 중지 시작...');
   
-  isScreenMinimized = false;
-  console.log('✅ 스크린 최대화됨');
+  // 루프 이미지 제거
+  const loopImage = document.getElementById('mainLoopDisplayImage');
+  if (loopImage) {
+    loopImage.style.transition = 'opacity 0.3s ease';
+    loopImage.style.opacity = '0';
+    setTimeout(() => loopImage.remove(), 300);
+  }
+  
+  // 이전 루프 이미지도 제거 (크로스 페이드 중일 수 있음)
+  const oldLoopImage = document.getElementById('mainLoopDisplayImage_old');
+  if (oldLoopImage) oldLoopImage.remove();
+  
+  // Several 버튼도 숨김
+  hideSeveralButton();
+}
+
+// 루프 재개 (ESC 키로 이미지 닫기 시)
+function resumeMainImageLoop() {
+  // 프로젝트가 표시 중이거나 12분할 뷰가 활성화된 경우 루프 재개하지 않음
+  if (currentDisplayedProject.iconId || isGrid12ViewMode) {
+    console.log('⏸️ 루프 재개 안 함 (프로젝트/12분할 뷰 활성)');
+    return;
+  }
+  
+  console.log('🔁 루프 재개 시작...');
+  
+  // 모든 프로젝트 이미지 즉시 제거 (ID 패턴 매칭)
+  const allProjectImages = document.querySelectorAll('[id^="mainGridDisplayImage"]');
+  allProjectImages.forEach(img => {
+    console.log('🗑️ 프로젝트 이미지 제거:', img.id);
+    img.remove();
+  });
+  
+  // z-index 499~501 범위의 이미지 제거
+  const container = document.querySelector('.container');
+  if (container) {
+    const allImages = container.querySelectorAll('img');
+    allImages.forEach(img => {
+      const zIndex = parseInt(img.style.zIndex) || 0;
+      if (zIndex >= 499 && zIndex <= 501) {
+        console.log('🗑️ 페이드 중인 이미지 제거 (z-index:', zIndex, ')');
+        img.remove();
+      }
+    });
+  }
+  
+  // 모든 텍스트 오버레이 즉시 제거
+  const allTextOverlays = document.querySelectorAll('[id^="mainGridTextOverlay"]');
+  allTextOverlays.forEach(txt => {
+    console.log('🗑️ 텍스트 오버레이 제거:', txt.id);
+    txt.remove();
+  });
+  
+  // z-index 550인 div 제거
+  if (container) {
+    const allDivs = container.querySelectorAll('div');
+    allDivs.forEach(div => {
+      const zIndex = parseInt(div.style.zIndex) || 0;
+      if (zIndex === 550) {
+        console.log('🗑️ 텍스트 오버레이 제거 (z-index: 550)');
+        div.remove();
+      }
+    });
+  }
+  
+  // 네비게이션 화살표 제거
+  hideImageNavigationArrows();
+  
+  // z-index 600~700 범위의 요소 제거
+  if (container) {
+    const allElements = container.querySelectorAll('*');
+    allElements.forEach(el => {
+      const zIndex = parseInt(el.style.zIndex) || 0;
+      if (zIndex >= 600 && zIndex <= 700) {
+        // Several 버튼은 제외 (루프 재개 시 다시 표시됨)
+        if (el.id !== 'severalButton') {
+          console.log('🗑️ UI 요소 제거 (z-index:', zIndex, ')');
+          el.remove();
+        }
+      }
+    });
+  }
+  
+  if (isLoopActive && mainLoopImages.length > 0) {
+    displayLoopImage(currentLoopIndex);
+    showSeveralButton();  // several 버튼 표시
+    
+    // 인터벌 재시작 (중지된 경우에만)
+    if (!loopIntervalId) {
+      loopIntervalId = setInterval(() => {
+        if (isLoopActive && !currentDisplayedProject.iconId && !isGrid12ViewMode) {
+          nextLoopImage();
+        }
+      }, 5300);
+      console.log('🔁 루프 인터벌 재시작 (5.3초 간격)');
+    }
+  }
+  
+  console.log('✅ 루프 재개 완료');
+}
+
+// ==================== Several/Piece 버튼 (12분할 전환) ====================
+
+let isGrid12ViewMode = false;  // 12분할 모드 상태
+
+// Several 버튼 표시 (루프 모드)
+function showSeveralButton() {
+  // 기존 버튼 제거
+  const existingBtn = document.getElementById('severalButton');
+  if (existingBtn) return;  // 이미 있으면 생략
+  
+  // 그리드 17,1의 우측상단 모서리 위치 계산
+  const grid17RightX = GRID_START_X + (17 * GRID_X) + GRID_X;  // 그리드 17의 우측 경계
+  const grid1Y = GRID_START_Y + (1 * GRID_Y);  // 그리드 1의 상단 경계
+  
+  console.log(`📍 그리드 17,1 우측상단: (${grid17RightX}, ${grid1Y})`);
+  
+  // 버튼 생성
+  const btn = document.createElement('img');
+  btn.id = 'severalButton';
+  btn.src = 'images/icon_several.png';
+  btn.style.cssText = `
+    position: absolute;
+    cursor: pointer;
+    z-index: 700;
+    transition: opacity 0.2s ease, transform 0.3s ease;
+    opacity: 0;
+  `;
+  
+  // 이미지 로드 후 위치 설정
+  btn.onload = function() {
+    const btnWidth = btn.naturalWidth;
+    const btnHeight = btn.naturalHeight;
+    
+    btn.style.width = btnWidth + 'px';
+    btn.style.height = btnHeight + 'px';
+    
+    // x: 그리드 17 우측끝 - 이미지 너비 - 5
+    // y: 그리드 1 상단 + 5
+    const finalX = grid17RightX - btnWidth - 5;
+    const finalY = grid1Y + 5;
+    
+    btn.style.left = finalX + 'px';
+    btn.style.top = finalY + 'px';
+    
+    // 페이드인
+    requestAnimationFrame(() => {
+      btn.style.opacity = '0.8';
+    });
+    
+    console.log(`📍 Several 버튼 최종 위치: (${finalX}, ${finalY}), 크기: ${btnWidth}x${btnHeight}`);
+  };
+  
+  btn.onmouseover = () => {
+    btn.style.opacity = '1';
+    btn.style.transform = 'scale(1.1)';
+  };
+  btn.onmouseout = () => {
+    btn.style.opacity = '0.8';
+    btn.style.transform = 'scale(1)';
+  };
+  
+  btn.onclick = () => {
+    console.log('🔲 12분할 뷰로 전환');
+    show12GridView();
+  };
+  
+  container.appendChild(btn);
+}
+
+// Several 버튼 숨김
+function hideSeveralButton() {
+  const btn = document.getElementById('severalButton');
+  if (btn) {
+    btn.style.opacity = '0';
+    setTimeout(() => btn.remove(), 200);
+  }
+}
+
+// Piece 버튼 표시 (12분할 모드)
+function showPieceButton() {
+  // 기존 버튼 제거
+  const existingBtn = document.getElementById('pieceButton');
+  if (existingBtn) return;
+  
+  // 그리드 17,1의 우측상단 모서리 위치 계산
+  const grid17RightX = GRID_START_X + (17 * GRID_X) + GRID_X;  // 그리드 17의 우측 경계
+  const grid1Y = GRID_START_Y + (1 * GRID_Y);  // 그리드 1의 상단 경계
+  
+  console.log(`📍 그리드 17,1 우측상단: (${grid17RightX}, ${grid1Y})`);
+  
+  // 버튼 생성
+  const btn = document.createElement('img');
+  btn.id = 'pieceButton';
+  btn.src = 'images/icon_piece.png';
+  btn.style.cssText = `
+    position: absolute;
+    cursor: pointer;
+    z-index: 700;
+    transition: opacity 0.2s ease, transform 0.3s ease;
+    opacity: 0;
+  `;
+  
+  // 이미지 로드 후 위치 설정
+  btn.onload = function() {
+    const btnWidth = btn.naturalWidth;
+    const btnHeight = btn.naturalHeight;
+    
+    btn.style.width = btnWidth + 'px';
+    btn.style.height = btnHeight + 'px';
+    
+    // x: 그리드 17 우측끝 - 이미지 너비 - 5
+    // y: 그리드 1 상단 + 5
+    const finalX = grid17RightX - btnWidth - 5;
+    const finalY = grid1Y + 5;
+    
+    btn.style.left = finalX + 'px';
+    btn.style.top = finalY + 'px';
+    
+    // 페이드인
+    requestAnimationFrame(() => {
+      btn.style.opacity = '0.8';
+    });
+    
+    console.log(`📍 Piece 버튼 최종 위치: (${finalX}, ${finalY}), 크기: ${btnWidth}x${btnHeight}`);
+  };
+  
+  btn.onmouseover = () => {
+    btn.style.opacity = '1';
+    btn.style.transform = 'scale(1.1)';
+  };
+  btn.onmouseout = () => {
+    btn.style.opacity = '0.8';
+    btn.style.transform = 'scale(1)';
+  };
+  
+  btn.onclick = () => {
+    console.log('🔄 루프 모드로 복귀');
+    
+    // 12분할 뷰 즉시 제거
+    const gridView = document.getElementById('grid12View');
+    if (gridView) gridView.remove();
+    hide12GridArrows();
+    isGrid12ViewMode = false;
+    
+    // Piece 버튼도 제거
+    btn.remove();
+    
+    // 루프 재개
+    resumeMainImageLoop();
+  };
+  
+  container.appendChild(btn);
+}
+
+// Piece 버튼 숨김
+function hidePieceButton() {
+  const btn = document.getElementById('pieceButton');
+  if (btn) {
+    btn.style.opacity = '0';
+    setTimeout(() => btn.remove(), 200);
+  }
+}
+
+// ==================== 12분할 그리드 뷰 ====================
+
+let grid12ViewScrollOffset = 0;  // 스크롤 오프셋
+
+// 12분할 뷰 표시
+function show12GridView() {
+  console.log('🔲 12분할 뷰 표시 시작...');
+  console.log(`   - 현재 isGrid12ViewMode: ${isGrid12ViewMode}`);
+  console.log(`   - 현재 loopIntervalId: ${loopIntervalId}`);
+  
+  // 먼저 12분할 모드 플래그 설정 (루프 중지용) - 최우선!
+  isGrid12ViewMode = true;
+  
+  // 루프 인터벌 완전 중지 (즉시!)
+  if (loopIntervalId) {
+    clearInterval(loopIntervalId);
+    loopIntervalId = null;
+    console.log('⏹️ 루프 인터벌 중지됨');
+  }
+  
+  // 루프 이미지 즉시 제거 (페이드아웃 없이)
+  const loopImage = document.getElementById('mainLoopDisplayImage');
+  if (loopImage) {
+    console.log('🗑️ 루프 이미지 즉시 제거');
+    loopImage.remove();
+  }
+  
+  // 이전 루프 이미지도 제거 (크로스 페이드 중일 수 있음)
+  const oldLoopImage = document.getElementById('mainLoopDisplayImage_old');
+  if (oldLoopImage) {
+    console.log('🗑️ 이전 루프 이미지 즉시 제거');
+    oldLoopImage.remove();
+  }
+  
+  // 프로젝트 이미지 즉시 제거 (있다면)
+  const projectImage = document.getElementById('mainGridDisplayImage');
+  if (projectImage) {
+    console.log('🗑️ 프로젝트 이미지 즉시 제거');
+    projectImage.remove();
+  }
+  
+  // 텍스트 오버레이 즉시 제거 (있다면)
+  const textOverlay = document.getElementById('mainGridTextOverlay');
+  if (textOverlay) {
+    console.log('🗑️ 텍스트 오버레이 즉시 제거');
+    textOverlay.remove();
+  }
+  
+  // 네비게이션 화살표 제거
+  hideImageNavigationArrows();
+  
+  // 현재 프로젝트 정보 초기화
+  currentDisplayedProject = {
+    iconId: null,
+    mainImage: null,
+    additionalImages: [],
+    currentImageIndex: 0
+  };
+  
+  // Several 버튼 숨김
+  hideSeveralButton();
+  
+  // 12분할 뷰 컨테이너 생성
+  const gridView = document.createElement('div');
+  gridView.id = 'grid12View';
+  gridView.style.cssText = `
+    position: absolute;
+    left: ${GRID_START_X + (6 * GRID_X)}px;
+    top: ${GRID_START_Y + (1 * GRID_Y)}px;
+    width: 1440px;
+    height: 960px;
+    z-index: 450;
+    overflow: hidden;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  `;
+  
+  // 스크롤 컨테이너
+  const scrollContainer = document.createElement('div');
+  scrollContainer.id = 'grid12ScrollContainer';
+  scrollContainer.style.cssText = `
+    position: relative;
+    width: 100%;
+    height: 100%;
+    transition: transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  `;
+  
+  // 4x3 그리드로 배치 (각 칸 360x320)
+  const gridCols = 4;
+  const gridRows = 3;
+  const cellWidth = 1440 / gridCols;  // 360px
+  const cellHeight = 960 / gridRows;  // 320px
+  
+  mainLoopImages.forEach((loopImage, index) => {
+    const row = Math.floor(index / gridCols);
+    const col = index % gridCols;
+    
+    const cell = document.createElement('div');
+    cell.style.cssText = `
+      position: absolute;
+      left: ${col * cellWidth}px;
+      top: ${row * cellHeight}px;
+      width: ${cellWidth}px;
+      height: ${cellHeight}px;
+      border: 2px solid #fff;
+      box-sizing: border-box;
+      cursor: pointer;
+      overflow: hidden;
+    `;
+    
+    const img = document.createElement('img');
+    img.src = loopImage.imageData;
+    img.dataset.iconId = loopImage.iconId;
+    img.style.cssText = `
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    `;
+    
+    // 클릭 시 해당 프로젝트 표시
+    cell.onclick = () => {
+      console.log(`🖱️ 12분할 셀 클릭: ${loopImage.iconId}`);
+      
+      // 12분할 뷰 즉시 제거
+      const currentGridView = document.getElementById('grid12View');
+      if (currentGridView) currentGridView.remove();
+      hide12GridArrows();
+      const currentPieceBtn = document.getElementById('pieceButton');
+      if (currentPieceBtn) currentPieceBtn.remove();
+      isGrid12ViewMode = false;
+      
+      // 프로젝트 표시
+      showProjectImageOnMainGrid(loopImage.iconId);
+    };
+    
+    cell.appendChild(img);
+    scrollContainer.appendChild(cell);
+  });
+  
+  gridView.appendChild(scrollContainer);
+  container.appendChild(gridView);
+  
+  // 페이드인 효과
+  requestAnimationFrame(() => {
+    gridView.style.opacity = '1';
+  });
+  
+  // 마우스 휠 이벤트 리스너 추가
+  gridView.addEventListener('wheel', handle12GridWheel, { passive: false });
+  
+  // Piece 버튼 표시
+  showPieceButton();
+  
+  // 12개 이상이면 화살표 표시
+  if (mainLoopImages.length > 12) {
+    show12GridArrows();
+  }
+  
+  // 이미 위에서 설정했지만 명확성을 위해 유지
+  // isGrid12ViewMode = true;  (이미 설정됨)
+  grid12ViewScrollOffset = 0;
+  grid12ScrollPosition = 0;  // 픽셀 스크롤 위치도 초기화
+  
+  console.log(`✅ 12분할 뷰 표시 완료 (${mainLoopImages.length}개 이미지)`);
+  console.log(`🔲 12분할 모드: ${isGrid12ViewMode}`);
+}
+
+// 12분할 뷰 숨김
+function hide12GridView() {
+  console.log('🗑️ 12분할 뷰 제거 시작...');
+  
+  // 먼저 플래그 해제
+  isGrid12ViewMode = false;
+  
+  const gridView = document.getElementById('grid12View');
+  if (gridView) {
+    // 즉시 제거 (페이드아웃 없이)
+    gridView.remove();
+    console.log('✅ 12분할 뷰 제거 완료');
+  }
+  
+  // 화살표 즉시 제거
+  hide12GridArrows();
+  
+  // Piece 버튼 즉시 제거
+  const pieceBtn = document.getElementById('pieceButton');
+  if (pieceBtn) pieceBtn.remove();
+  
+  grid12ViewScrollOffset = 0;
+  grid12ScrollPosition = 0;  // 픽셀 스크롤 위치도 초기화
+  
+  console.log('✅ 12분할 모드 완전 해제');
+}
+
+// 12분할 뷰 화살표 표시
+function show12GridArrows() {
+  const imageAreaStartX = GRID_START_X + (6 * GRID_X);
+  const imageAreaStartY = GRID_START_Y + (1 * GRID_Y);
+  const imageAreaWidth = 1440;
+  const imageAreaHeight = 960;
+  const imageAreaCenterX = imageAreaStartX + (imageAreaWidth / 2);
+  
+  // 위쪽 화살표
+  const upArrow = document.createElement('img');
+  upArrow.id = 'grid12UpArrow';
+  upArrow.src = 'images/icon_arrow1.png';
+  upArrow.style.cssText = `
+    position: absolute;
+    cursor: pointer;
+    z-index: 650;
+    transition: opacity 0.2s ease, transform 0.3s ease;
+    opacity: 0;
+  `;
+  
+  upArrow.onload = function() {
+    const arrowWidth = upArrow.naturalWidth;
+    const arrowHeight = upArrow.naturalHeight;
+    
+    upArrow.style.width = arrowWidth + 'px';
+    upArrow.style.height = arrowHeight + 'px';
+    upArrow.style.left = (imageAreaCenterX - arrowWidth / 2) + 'px';
+    upArrow.style.top = (imageAreaStartY - arrowHeight - 30) + 'px';
+    
+    requestAnimationFrame(() => {
+      upArrow.style.opacity = '0.8';
+    });
+  };
+  
+  upArrow.onclick = () => scroll12GridView(-1);
+  upArrow.onmouseover = () => {
+    upArrow.style.opacity = '1';
+    upArrow.style.transform = 'scale(1.1)';
+  };
+  upArrow.onmouseout = () => {
+    upArrow.style.opacity = '0.8';
+    upArrow.style.transform = 'scale(1)';
+  };
+  
+  // 아래쪽 화살표
+  const downArrow = document.createElement('img');
+  downArrow.id = 'grid12DownArrow';
+  downArrow.src = 'images/icon_arrow2.png';
+  downArrow.style.cssText = `
+    position: absolute;
+    cursor: pointer;
+    z-index: 650;
+    transition: opacity 0.2s ease, transform 0.3s ease;
+    opacity: 0;
+  `;
+  
+  downArrow.onload = function() {
+    const arrowWidth = downArrow.naturalWidth;
+    const arrowHeight = downArrow.naturalHeight;
+    
+    downArrow.style.width = arrowWidth + 'px';
+    downArrow.style.height = arrowHeight + 'px';
+    downArrow.style.left = (imageAreaCenterX - arrowWidth / 2) + 'px';
+    downArrow.style.top = (imageAreaStartY + imageAreaHeight + 30) + 'px';
+    
+    requestAnimationFrame(() => {
+      downArrow.style.opacity = '0.8';
+    });
+  };
+  
+  downArrow.onclick = () => scroll12GridView(1);
+  downArrow.onmouseover = () => {
+    downArrow.style.opacity = '1';
+    downArrow.style.transform = 'scale(1.1)';
+  };
+  downArrow.onmouseout = () => {
+    downArrow.style.opacity = '0.8';
+    downArrow.style.transform = 'scale(1)';
+  };
+  
+  container.appendChild(upArrow);
+  container.appendChild(downArrow);
+}
+
+// 12분할 뷰 화살표 숨김
+function hide12GridArrows() {
+  const upArrow = document.getElementById('grid12UpArrow');
+  const downArrow = document.getElementById('grid12DownArrow');
+  if (upArrow) upArrow.remove();
+  if (downArrow) downArrow.remove();
+}
+
+// 12분할 뷰 스크롤 (부드러운 루프 방식)
+let grid12ScrollPosition = 0;  // 픽셀 단위 스크롤 위치
+let isGrid12Scrolling = false;  // 스크롤 중 플래그
+
+function scroll12GridView(direction) {
+  const scrollContainer = document.getElementById('grid12ScrollContainer');
+  if (!scrollContainer) return;
+  
+  if (isGrid12Scrolling) return;  // 스크롤 중이면 무시
+  
+  const totalRows = Math.ceil(mainLoopImages.length / 4);  // 4x3 배치
+  const cellHeight = 320;  // 960 / 3 = 320px
+  const maxScrollPosition = (totalRows - 3) * cellHeight;  // 최대 스크롤 위치 (픽셀)
+  
+  isGrid12Scrolling = true;
+  
+  // 행 단위로 스크롤 (320px씩)
+  grid12ScrollPosition += direction * cellHeight;
+  
+  // 루프 처리
+  if (grid12ScrollPosition < 0) {
+    // 맨 위에서 위로 → 맨 아래로 점프
+    scrollContainer.style.transition = 'none';  // 즉시 점프
+    grid12ScrollPosition = maxScrollPosition;
+    scrollContainer.style.transform = `translateY(-${grid12ScrollPosition}px)`;
+    
+    // 다음 프레임에서 transition 재활성화
+    requestAnimationFrame(() => {
+      scrollContainer.style.transition = 'transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+    });
+  } else if (grid12ScrollPosition > maxScrollPosition) {
+    // 맨 아래에서 아래로 → 맨 위로 점프
+    scrollContainer.style.transition = 'none';  // 즉시 점프
+    grid12ScrollPosition = 0;
+    scrollContainer.style.transform = `translateY(0px)`;
+    
+    // 다음 프레임에서 transition 재활성화
+    requestAnimationFrame(() => {
+      scrollContainer.style.transition = 'transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+    });
+  } else {
+    // 일반 스크롤 (기본 transition 사용)
+    scrollContainer.style.transform = `translateY(-${grid12ScrollPosition}px)`;
+  }
+  
+  const currentRow = Math.round(grid12ScrollPosition / cellHeight);
+  console.log(`📜 12분할 뷰 스크롤: 행 ${currentRow}/${totalRows - 3} (${grid12ScrollPosition}px)`);
+  
+  // 0.6초 후 스크롤 가능하도록 (transition과 동일)
+  setTimeout(() => {
+    isGrid12Scrolling = false;
+  }, 600);
+}
+
+// 12분할 뷰 마우스 휠 이벤트 (부드러운 스크롤)
+let wheelTimeout = null;
+let wheelDelta = 0;
+
+function handle12GridWheel(e) {
+  if (!isGrid12ViewMode) return;
+  
+  e.preventDefault();
+  
+  // 휠 델타 누적
+  wheelDelta += e.deltaY;
+  
+  // 타임아웃 클리어
+  if (wheelTimeout) {
+    clearTimeout(wheelTimeout);
+  }
+  
+  // 150ms 후 스크롤 실행 (부드러운 스크롤)
+  wheelTimeout = setTimeout(() => {
+    if (Math.abs(wheelDelta) > 30) {
+      if (wheelDelta > 0) {
+        scroll12GridView(1);  // 아래로
+      } else {
+        scroll12GridView(-1);  // 위로
+      }
+    }
+    wheelDelta = 0;
+  }, 150);
+}
+
+// ==================== 캐비넷/장독대 그리드 아이콘 ====================
+
+let currentGridMode = 'main';  // 'main', 'cabinet', 'trash'
+let generatedGridIcons = [];  // 생성된 그리드 아이콘 배열
+
+// 전광판 관련 변수
+let marqueeText = "저희가 참여한 프로젝트의 이미지를 사용할 수 있게 허락해주신 선,후배 건축사님들께 감사의 말을 전합니다.  덕분에 홈페이지가 풍성해질 수 있었습니다 : )";
+let marqueeAnimationId = null;
+
+// 캐비넷/장독대 아이콘 클릭 이벤트 (페이지 로드 후 등록)
+function initializeCabinetTrashIcons() {
+  const cabinetIcon = document.querySelector('.icon-wrapper[data-id="cabinet"]');
+  const trashIcon = document.querySelector('.icon-wrapper[data-id="trash"]');
+
+  if (cabinetIcon) {
+    cabinetIcon.addEventListener('click', () => {
+      console.log('📁 캐비넷 아이콘 클릭');
+      showGridIcons('cabinet');
+    });
+    console.log('✅ 캐비넷 아이콘 이벤트 등록됨');
+  } else {
+    console.error('❌ 캐비넷 아이콘을 찾을 수 없음');
+  }
+
+  if (trashIcon) {
+    trashIcon.addEventListener('click', () => {
+      console.log('🗑️ 장독대 아이콘 클릭');
+      showGridIcons('trash');
+    });
+    console.log('✅ 장독대 아이콘 이벤트 등록됨');
+  } else {
+    console.error('❌ 장독대 아이콘을 찾을 수 없음');
+  }
+}
+
+// 그리드 아이콘 표시 (캐비넷/장독대)
+function showGridIcons(mode) {
+  console.log(`🔄 ${mode} 모드로 전환 시작...`);
+  console.log(`   - 현재 모드: ${currentGridMode} → ${mode}`);
+  
+  // 먼저 모드 플래그 변경 (루프 재개 방지)
+  currentGridMode = mode;
+  
+  // 1. 루프 완전 중지
+  if (loopIntervalId) {
+    clearInterval(loopIntervalId);
+    loopIntervalId = null;
+    console.log('⏹️ 루프 인터벌 중지');
+  }
+  
+  // 2. 루프 이미지 즉시 제거
+  const loopImage = document.getElementById('mainLoopDisplayImage');
+  if (loopImage) {
+    console.log('🗑️ 루프 이미지 제거');
+    loopImage.remove();
+  }
+  const oldLoopImage = document.getElementById('mainLoopDisplayImage_old');
+  if (oldLoopImage) oldLoopImage.remove();
+  
+  // 3. 12분할 뷰 제거
+  const gridView = document.getElementById('grid12View');
+  if (gridView) gridView.remove();
+  hide12GridArrows();
+  const pieceBtn = document.getElementById('pieceButton');
+  if (pieceBtn) pieceBtn.remove();
+  isGrid12ViewMode = false;
+  
+  // 4. 프로젝트 이미지/텍스트 제거 (모든 인스턴스, 페이드 중인 이미지 포함)
+  // ID로 찾기
+  const projectImages = document.querySelectorAll('[id^="mainGridDisplayImage"]');
+  projectImages.forEach(img => {
+    console.log('🗑️ 프로젝트 이미지 제거:', img.id);
+    img.remove();
+  });
+  
+  // z-index가 499~501 범위의 이미지도 찾아서 제거 (크로스페이드 중인 이미지)
+  const allImages = document.querySelectorAll('.container img');
+  allImages.forEach(img => {
+    const zIndex = parseInt(img.style.zIndex) || 0;
+    if (zIndex >= 499 && zIndex <= 501) {
+      console.log('🗑️ 페이드 중인 이미지 제거 (z-index:', zIndex, ')');
+      img.remove();
+    }
+  });
+  
+  // 텍스트 오버레이 제거
+  const textOverlays = document.querySelectorAll('[id^="mainGridTextOverlay"]');
+  textOverlays.forEach(txt => {
+    console.log('🗑️ 텍스트 오버레이 제거:', txt.id);
+    txt.remove();
+  });
+  
+  // z-index가 550인 div도 제거 (텍스트 오버레이)
+  const allDivs = document.querySelectorAll('.container div');
+  allDivs.forEach(div => {
+    const zIndex = parseInt(div.style.zIndex) || 0;
+    if (zIndex === 550) {
+      console.log('🗑️ 텍스트 오버레이 제거 (z-index: 550)');
+      div.remove();
+    }
+  });
+  
+  // z-index가 600~700 범위의 요소도 제거 (네비게이션 화살표, Several/Piece 버튼 등)
+  const allElements = document.querySelectorAll('.container *');
+  allElements.forEach(el => {
+    const zIndex = parseInt(el.style.zIndex) || 0;
+    if (zIndex >= 600 && zIndex <= 700) {
+      console.log('🗑️ UI 요소 제거 (z-index:', zIndex, ')');
+      el.remove();
+    }
+  });
+  
+  hideImageNavigationArrows();
+  
+  // 5. Several 버튼 제거
+  hideSeveralButton();
+  
+  // 6. 현재 프로젝트 정보 초기화
+  currentDisplayedProject = {
+    iconId: null,
+    mainImage: null,
+    additionalImages: [],
+    currentImageIndex: 0
+  };
+  
+  // 7. 메인화면00~16 아이콘 숨김
+  const mainIconIds = ['M00', 'M01', 'M02', 'M03', 'M04', 'M05', 'M06', 'M07',
+                       'M10', 'M11', 'M12', 'M13', 'M14', 'M15', 'M16', 'M17'];
+  mainIconIds.forEach(iconId => {
+    const iconWrapper = document.querySelector(`.icon-wrapper[data-id="${iconId}"]`);
+    if (iconWrapper) {
+      iconWrapper.style.opacity = '0';
+      setTimeout(() => {
+        iconWrapper.style.display = 'none';
+      }, 300);
+    }
+  });
+  
+  // 8. 기존 그리드 아이콘 제거
+  removeGeneratedGridIcons();
+  
+  // 9. 새 그리드 아이콘 생성 (0,0~2,7)
+  generatedGridIcons = [];
+  
+  setTimeout(() => {
+    for (let col = 0; col < 3; col++) {
+      for (let row = 0; row < 8; row++) {
+        const iconId = `${mode.toUpperCase()}${col}${row}`;
+        const gridPos = gridToPixel(col, row, 60, 60);
+        
+        console.log(`생성 중: ${iconId}, 그리드(${col},${row}) → 픽셀(${gridPos.x}, ${gridPos.y})`);
+        
+        const iconWrapper = document.createElement('div');
+        iconWrapper.className = 'icon-wrapper icon generated-grid-icon';
+        iconWrapper.dataset.id = iconId;
+        iconWrapper.dataset.mode = mode;
+        iconWrapper.style.cssText = `
+          position: absolute;
+          left: ${gridPos.x}px;
+          top: ${gridPos.y}px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 4px;
+          opacity: 0;
+          transition: opacity 0.3s ease;
+        `;
+        
+        const img = document.createElement('img');
+        img.src = 'images/icon.png';
+        img.className = 'icon-image';
+        img.style.cssText = `
+          width: 60px;
+          height: 60px;
+          object-fit: contain;
+        `;
+        
+        const label = document.createElement('div');
+        label.className = 'icon-label';
+        
+        // 모드에 따라 한글 이름 설정
+        const modeNameKr = mode === 'cabinet' ? '캐비넷' : mode === 'trash' ? '장독대' : mode;
+        label.textContent = `${modeNameKr}${col}${row}`;
+        label.style.cssText = `
+          font-size: 10px;
+          color: white;
+          text-align: center;
+          text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+        `;
+        
+        // 클릭 이벤트 추가 (나중에 프로젝트 표시용)
+        iconWrapper.addEventListener('click', () => {
+          console.log(`🖱️ ${iconId} 아이콘 클릭`);
+          // 추후 프로젝트 이미지 표시 구현 예정
+        });
+        
+        iconWrapper.appendChild(img);
+        iconWrapper.appendChild(label);
+        container.appendChild(iconWrapper);
+        
+        generatedGridIcons.push(iconWrapper);
+        
+        // 페이드인 효과 (순차적)
+        setTimeout(() => {
+          if (iconWrapper.parentElement) {
+            iconWrapper.style.opacity = '1';
+          }
+        }, (col * 8 + row) * 30);  // 순차적으로 나타남
+      }
+    }
+    
+    console.log(`✅ ${mode} 모드: ${generatedGridIcons.length}개 아이콘 생성 완료`);
+    console.log(`📋 생성된 아이콘 ID:`, generatedGridIcons.map(icon => icon.dataset.id));
+    
+    // 안내 메시지 표시
+    showModeGuideMessage();
+  }, 350);  // 메인 아이콘 페이드아웃 후 생성
+}
+
+// 모드 안내 메시지 표시
+function showModeGuideMessage() {
+  // 기존 메시지 제거
+  const existingMsg = document.getElementById('modeGuideMessage');
+  if (existingMsg) existingMsg.remove();
+  
+  // 안내 메시지 생성
+  const guideMsg = document.createElement('div');
+  guideMsg.id = 'modeGuideMessage';
+  guideMsg.textContent = '홈으로 이동하려면 ESC키를 누르시오';
+  guideMsg.style.cssText = `
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-size: 20px;
+    font-weight: bold;
+    text-align: center;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+    z-index: 1000;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+    font-family: 'WAGURI', sans-serif;
+  `;
+  
+  container.appendChild(guideMsg);
+  
+  // 페이드인
+  requestAnimationFrame(() => {
+    guideMsg.style.opacity = '1';
+  });
+  
+  console.log('✅ 안내 메시지 표시');
+}
+
+// 모드 안내 메시지 제거
+function hideModeGuideMessage() {
+  const guideMsg = document.getElementById('modeGuideMessage');
+  if (guideMsg) {
+    guideMsg.style.opacity = '0';
+    setTimeout(() => guideMsg.remove(), 300);
+  }
+}
+
+// 생성된 그리드 아이콘 제거
+function removeGeneratedGridIcons() {
+  generatedGridIcons.forEach(icon => {
+    if (icon.parentElement) {
+      icon.remove();
+    }
+  });
+  generatedGridIcons = [];
+  console.log('🗑️ 생성된 그리드 아이콘 모두 제거');
+}
+
+// 메인 모드로 복귀
+function returnToMainMode() {
+  console.log('🔙 메인 모드로 복귀...');
+  
+  // 안내 메시지 제거
+  hideModeGuideMessage();
+  
+  // 생성된 그리드 아이콘 페이드아웃 후 제거
+  generatedGridIcons.forEach((icon, index) => {
+    if (icon.parentElement) {
+      icon.style.transition = 'opacity 0.3s ease';
+      icon.style.opacity = '0';
+      setTimeout(() => {
+        icon.remove();
+      }, 300);
+    }
+  });
+  generatedGridIcons = [];
+  
+  // 메인화면00~16 아이콘 다시 표시 (페이드인)
+  setTimeout(() => {
+    const mainIconIds = ['M00', 'M01', 'M02', 'M03', 'M04', 'M05', 'M06', 'M07',
+                         'M10', 'M11', 'M12', 'M13', 'M14', 'M15', 'M16', 'M17'];
+    mainIconIds.forEach(iconId => {
+      const iconWrapper = document.querySelector(`.icon-wrapper[data-id="${iconId}"]`);
+      if (iconWrapper) {
+        iconWrapper.style.display = 'flex';
+        iconWrapper.style.opacity = '0';
+        requestAnimationFrame(() => {
+          iconWrapper.style.transition = 'opacity 0.3s ease';
+          iconWrapper.style.opacity = '1';
+        });
+      }
+    });
+    
+    // 모드 초기화
+    currentGridMode = 'main';
+    
+    // 메인 아이콘 이미지 업데이트 (프로젝트 데이터 기반 표시/숨김)
+    updateAllMainIconImages();
+    
+    // 루프 재시작
+    setTimeout(() => {
+      resumeMainImageLoop();
+    }, 100);
+    
+    console.log('✅ 메인 모드로 복귀 완료');
+  }, 300);
+}
+
+// ==================== 전광판 ====================
+
+// 전광판 텍스트 불러오기
+function loadMarqueeText() {
+  const savedText = localStorage.getItem('marqueeText');
+  if (savedText) {
+    marqueeText = savedText;
+  }
+  console.log('📰 전광판 텍스트 불러옴:', marqueeText);
+}
+
+// 전광판 초기화
+function initMarquee() {
+  const container = document.querySelector('.container');
+  if (!container) return;
+  
+  // 기존 전광판 제거
+  const existingMarquee = document.getElementById('marqueeContainer');
+  if (existingMarquee) existingMarquee.remove();
+  
+  // 전광판 영역 계산
+  // 그리드 5.0 x=0부터 그리드 14.0 x=120까지
+  const startX = GRID_START_X + (5 * GRID_X);  // 680
+  const endX = GRID_START_X + (14 * GRID_X) + 120;  // 1880
+  const width = endX - startX;  // 1200px
+  const y = GRID_START_Y - 50;  // 그리드 0 라인보다 약간 위 (50px)
+  const height = 40;
+  
+  // 전광판 컨테이너
+  const marqueeContainer = document.createElement('div');
+  marqueeContainer.id = 'marqueeContainer';
+  marqueeContainer.style.cssText = `
+    position: absolute;
+    left: ${startX}px;
+    top: ${y}px;
+    width: ${width}px;
+    height: ${height}px;
+    overflow: hidden;
+    z-index: 100;
+    pointer-events: none;
+  `;
+  
+  // 전광판 텍스트
+  const marqueeText_el = document.createElement('div');
+  marqueeText_el.id = 'marqueeText';
+  marqueeText_el.textContent = marqueeText;
+  marqueeText_el.style.cssText = `
+    position: absolute;
+    white-space: nowrap;
+    font-size: 25px;
+    font-weight: bold;
+    color: #ffffff;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+    font-family: 'WAGURI', sans-serif;
+    left: ${width}px;
+    top: 50%;
+    transform: translateY(-50%);
+  `;
+  
+  marqueeContainer.appendChild(marqueeText_el);
+  container.appendChild(marqueeContainer);
+  
+  console.log('📰 전광판 생성됨:', { startX, y, width, height });
+  
+  // 애니메이션 시작
+  startMarqueeAnimation();
+}
+
+// 전광판 애니메이션 시작
+function startMarqueeAnimation() {
+  if (marqueeAnimationId) {
+    cancelAnimationFrame(marqueeAnimationId);
+  }
+  
+  const marqueeContainer = document.getElementById('marqueeContainer');
+  const marqueeText_el = document.getElementById('marqueeText');
+  
+  if (!marqueeContainer || !marqueeText_el) return;
+  
+  const containerWidth = marqueeContainer.offsetWidth;
+  const textWidth = marqueeText_el.offsetWidth;
+  
+  let position = containerWidth;
+  const speed = 2;  // 픽셀/프레임
+  
+  function animate() {
+    position -= speed;
+    
+    // 텍스트가 완전히 왼쪽으로 사라지면 다시 오른쪽에서 시작
+    if (position < -textWidth) {
+      position = containerWidth;
+    }
+    
+    marqueeText_el.style.left = `${position}px`;
+    marqueeAnimationId = requestAnimationFrame(animate);
+  }
+  
+  animate();
+  console.log('📰 전광판 애니메이션 시작');
+}
+
+// 전광판 텍스트 업데이트 (관리자 모드에서 호출)
+function updateMarqueeText(newText) {
+  marqueeText = newText;
+  localStorage.setItem('marqueeText', newText);
+  
+  console.log('📰 전광판 텍스트 저장됨:', newText);
+  console.log('📰 localStorage 확인:', localStorage.getItem('marqueeText'));
+  
+  // 전광판 제거 후 재생성
+  const existingMarquee = document.getElementById('marqueeContainer');
+  if (existingMarquee) {
+    existingMarquee.remove();
+    console.log('📰 기존 전광판 제거됨');
+  }
+  
+  // 애니메이션 중지
+  if (marqueeAnimationId) {
+    cancelAnimationFrame(marqueeAnimationId);
+    marqueeAnimationId = null;
+    console.log('📰 애니메이션 중지됨');
+  }
+  
+  // 전광판 재생성
+  initMarquee();
+  console.log('📰 전광판 재생성 완료');
 }
 
 // 콘솔 안내 메시지
 console.log('%c그리드 시스템이 활성화되었습니다!', 'color: #00ff00; font-size: 14px; font-weight: bold;');
 console.log('%c사용 가능한 명령어:', 'color: #ffff00; font-size: 12px;');
 console.log('  toggleMainGrid() - 메인 그리드 표시/숨김');
-console.log('  toggleScreenGrid() - 스크린 그리드 표시/숨김');
-console.log('  toggleAllGrids() - 모든 그리드 표시/숨김');
-console.log('  getScreenGridInfo() - 스크린 그리드 정보 출력');
-console.log('  checkScreenIcons() - 스크린 아이콘 상태 확인');
 console.log('  resetM00Position() - M00 아이콘 위치 초기화');
 console.log('  resetAllPositions() - 모든 아이콘 위치 초기화');

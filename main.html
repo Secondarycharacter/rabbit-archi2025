@@ -8,14 +8,14 @@
 
 <!-- 모니터 켜지는 효과 스타일 -->
 <style>
-  /* 초기 로드 시 화면 전체를 검은색 오버레이로 덮음 */
+  /* 초기 로드 시 workpad 마진 안쪽만 검은색 오버레이로 덮음 */
   #monitorOverlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    background: #000;
+    position: absolute;
+    left: 80px;
+    top: 80px;
+    width: calc(100% - 160px);
+    height: calc(100% - 160px);
+    background: rgba(0, 0, 0, 0.5);
     z-index: 99999;
     opacity: 1;
     pointer-events: none;
@@ -34,9 +34,9 @@
     height: 2px;
     background: linear-gradient(90deg, 
       transparent 0%, 
-      rgba(255, 255, 255, 0.3) 20%, 
-      rgba(255, 255, 255, 0.9) 50%, 
-      rgba(255, 255, 255, 0.3) 80%, 
+      rgba(255, 255, 255, 0.15) 20%, 
+      rgba(255, 255, 255, 0.45) 50%, 
+      rgba(255, 255, 255, 0.15) 80%, 
       transparent 100%);
     transform: translateY(-50%);
     opacity: 0;
@@ -51,37 +51,37 @@
     animation: monitorPowerOn 1.5s ease forwards;
   }
   
-  /* 흰색 라인이 위아래로 갈라지는 애니메이션 */
+  /* 흰색 라인이 위아래로 갈라지는 애니메이션 (마진 안쪽에서만) */
   @keyframes whiteLine {
     0% {
       opacity: 0;
       height: 2px;
     }
     20% {
-      opacity: 1;
+      opacity: 0.5;
       height: 2px;
     }
     50% {
-      opacity: 0.8;
-      height: 100vh;
+      opacity: 0.4;
+      height: 100%;
     }
     100% {
       opacity: 0;
-      height: 100vh;
+      height: 100%;
     }
   }
   
-  /* 화면 전체가 밝아지는 애니메이션 */
+  /* 화면이 밝아지는 애니메이션 (50% 투명도) */
   @keyframes monitorPowerOn {
     0% {
-      opacity: 1;
+      opacity: 0.5;
     }
     40% {
-      opacity: 1;
+      opacity: 0.5;
     }
     70% {
-      opacity: 0.5;
-      background: radial-gradient(ellipse at center, rgba(255,255,255,0.2) 0%, rgba(0,0,0,0.8) 60%, #000 100%);
+      opacity: 0.25;
+      background: radial-gradient(ellipse at center, rgba(255,255,255,0.1) 0%, rgba(0,0,0,0.4) 60%, rgba(0,0,0,0.5) 100%);
     }
     100% {
       opacity: 0;
@@ -208,15 +208,6 @@
   <div class="icon-label">메인화면17</div>
 </div>
 
-<!-- 중앙 프로젝트 스크린 -->
-<img src="images/project_screen.png" class="icon project-screen" data-id="project" style="left: 440px; top: 80px;">
-
-<!-- 스크린 내부 초기화 버튼 -->
-<div class="screen-reset-btn" id="screenResetBtn">초기화</div>
-
-<!-- 스크린 최소화/최대화 버튼 -->
-<div class="screen-minimize-btn" id="screenMinimizeBtn">최소화</div>
-
 <!-- 화살표 1 (icon_arrow1) - 위쪽에서 내려오는 용도 -->
 <img src="images/icon_arrow1.png" id="arrowTop" class="arrow arrow-top">
 
@@ -248,6 +239,12 @@
   <img src="images/icon_jang.png?v=2" class="icon-image">
   <div class="icon-label">장독대</div>
 </div>
+
+<!-- workpad 마진 영역 마스크 (애니메이션 클리핑) -->
+<div class="workpad-mask top"></div>
+<div class="workpad-mask bottom"></div>
+<div class="workpad-mask left"></div>
+<div class="workpad-mask right"></div>
 </div>
 
 <!-- JavaScript 모듈 로드 -->
