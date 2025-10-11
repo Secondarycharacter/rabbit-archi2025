@@ -637,7 +637,7 @@ async function autoLoadProjectsDataJSON() {
   let progressUI = null;
   
   try {
-    const response = await fetch('projectsData.json');
+    const response = await fetch('projectsData.json?v=' + Date.now());
     
     if (!response.ok) {
       console.log('⚠️ projectsData.json 파일이 없습니다. (첫 방문자 또는 아직 내보내기 안 함)');
