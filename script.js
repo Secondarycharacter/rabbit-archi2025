@@ -608,10 +608,103 @@ function updateContainerScale() {
 }
 
 // 페이지가 완전히 로드된 후 초기 위치 불러오기, 저장 및 이미지 위치 계산
-// JSON 파일 자동 로드 함수
+// 로딩 프로그레스 바 생성
+function createLoadingProgressBar() {
+  const overlay = document.createElement('div');
+  overlay.id = 'jsonLoadingOverlay';
+  overlay.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    color: white;
+    font-family: Arial, sans-serif;
+  `;
+  
+  const container = document.createElement('div');
+  container.style.cssText = `
+    background: rgba(255, 255, 255, 0.1);
+    padding: 30px 40px;
+    border-radius: 10px;
+    text-align: center;
+    backdrop-filter: blur(10px);
+  `;
+  
+  const title = document.createElement('div');
+  title.textContent = '📂 프로젝트 데이터 로딩중...';
+  title.style.cssText = `
+    font-size: 20px;
+    margin-bottom: 20px;
+    font-weight: bold;
+  `;
+  
+  const progressBarBg = document.createElement('div');
+  progressBarBg.style.cssText = `
+    width: 400px;
+    height: 30px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 15px;
+    overflow: hidden;
+    margin-bottom: 15px;
+  `;
+  
+  const progressBar = document.createElement('div');
+  progressBar.id = 'jsonLoadingProgress';
+  progressBar.style.cssText = `
+    width: 0%;
+    height: 100%;
+    background: linear-gradient(90deg, #4CAF50, #8BC34A);
+    transition: width 0.3s ease;
+    border-radius: 15px;
+  `;
+  
+  const progressText = document.createElement('div');
+  progressText.id = 'jsonLoadingText';
+  progressText.textContent = '0 / 0 (0%)';
+  progressText.style.cssText = `
+    font-size: 16px;
+    color: rgba(255, 255, 255, 0.9);
+  `;
+  
+  progressBarBg.appendChild(progressBar);
+  container.appendChild(title);
+  container.appendChild(progressBarBg);
+  container.appendChild(progressText);
+  overlay.appendChild(container);
+  document.body.appendChild(overlay);
+  
+  return {
+    overlay,
+    progressBar,
+    progressText,
+    update: (current, total) => {
+      const percent = Math.round((current / total) * 100);
+      progressBar.style.width = `${percent}%`;
+      progressText.textContent = `${current} / ${total} (${percent}%)`;
+    },
+    remove: () => {
+      setTimeout(() => {
+        overlay.style.opacity = '0';
+        overlay.style.transition = 'opacity 0.3s ease';
+        setTimeout(() => overlay.remove(), 300);
+      }, 500);
+    }
+  };
+}
+
+// JSON 파일 자동 로드 함수 (대용량 데이터 최적화)
 async function autoLoadProjectsDataJSON() {
   console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log('📂 projectsData.json 자동 로드 시작...');
+  
+  let progressUI = null;
   
   try {
     const response = await fetch('projectsData.json');
@@ -622,38 +715,93 @@ async function autoLoadProjectsDataJSON() {
       return;
     }
     
+    // 파일 크기 확인
+    const contentLength = response.headers.get('content-length');
+    const fileSize = contentLength ? parseInt(contentLength) : 0;
+    const fileSizeMB = (fileSize / (1024 * 1024)).toFixed(2);
+    
+    console.log(`📊 파일 크기: ${fileSizeMB} MB`);
+    
     const projectsData = await response.json();
+    const totalProjects = Object.keys(projectsData).length;
     console.log('✅ JSON 파일 로드 성공');
-    console.log(`   발견된 프로젝트: ${Object.keys(projectsData).length}개`);
+    console.log(`   발견된 프로젝트: ${totalProjects}개`);
+    
+    // 대용량 데이터인 경우 Progress UI 표시 (100개 이상)
+    if (totalProjects > 100) {
+      progressUI = createLoadingProgressBar();
+    }
     
     let savedCount = 0;
     let mainCount = 0, cabinetCount = 0, trashCount = 0;
+    const CHUNK_SIZE = 10; // 10개씩 청크 단위로 처리
+    const entries = Object.entries(projectsData);
     
-    // IndexedDB에 저장
-    for (const [iconId, projectData] of Object.entries(projectsData)) {
-      const storageKey = `projectData_${iconId}`;
+    // 청크 단위로 처리하여 UI 블로킹 방지
+    for (let i = 0; i < entries.length; i += CHUNK_SIZE) {
+      const chunk = entries.slice(i, Math.min(i + CHUNK_SIZE, entries.length));
       
-      if (typeof saveProjectToDB === 'function') {
-        await saveProjectToDB(storageKey, projectData);
-        savedCount++;
+      // 청크 내 데이터 처리
+      for (const [iconId, projectData] of chunk) {
+        const storageKey = `projectData_${iconId}`;
         
-        if (iconId.startsWith('M')) mainCount++;
-        else if (iconId.startsWith('C')) cabinetCount++;
-        else if (iconId.startsWith('T')) trashCount++;
-        
-        const type = iconId.startsWith('M') ? '메인' : iconId.startsWith('C') ? '캐비넷' : '꿀단지';
-        console.log(`  ✅ ${iconId} (${type}): ${projectData.projectName?.text || iconId} → IndexedDB 저장`);
+        if (typeof saveProjectToDB === 'function') {
+          try {
+            await saveProjectToDB(storageKey, projectData);
+            savedCount++;
+            
+            if (iconId.startsWith('M')) mainCount++;
+            else if (iconId.startsWith('C')) cabinetCount++;
+            else if (iconId.startsWith('T')) trashCount++;
+            
+            // Progress UI 업데이트
+            if (progressUI) {
+              progressUI.update(savedCount, totalProjects);
+            }
+            
+            // 콘솔 로그 (100개 이상일 때는 10개마다만 출력)
+            if (totalProjects < 100 || savedCount % 10 === 0 || savedCount === totalProjects) {
+              const type = iconId.startsWith('M') ? '메인' : iconId.startsWith('C') ? '캐비넷' : '꿀단지';
+              console.log(`  ✅ ${iconId} (${type}): ${projectData.projectName?.text || iconId} → IndexedDB 저장`);
+            }
+          } catch (error) {
+            console.error(`❌ ${iconId} 저장 실패:`, error);
+          }
+        }
+      }
+      
+      // UI 업데이트를 위한 짧은 대기 (브라우저가 숨 쉴 시간)
+      if (i + CHUNK_SIZE < entries.length) {
+        await new Promise(resolve => setTimeout(resolve, 10));
       }
     }
     
     console.log('\n✅ 자동 로드 완료!');
     console.log(`   메인: ${mainCount}개 / 캐비넷: ${cabinetCount}개 / 꿀단지: ${trashCount}개`);
     console.log(`   총 ${savedCount}개 프로젝트가 IndexedDB에 저장되었습니다.`);
+    console.log(`   처리 시간: 대용량 데이터 최적화 적용`);
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+    
+    // Progress UI 제거
+    if (progressUI) {
+      progressUI.remove();
+    }
     
   } catch (error) {
     console.error('❌ JSON 자동 로드 실패:', error);
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+    
+    // Progress UI 제거
+    if (progressUI) {
+      progressUI.remove();
+    }
+    
+    // 사용자에게 알림
+    if (error.name === 'QuotaExceededError') {
+      alert('❌ 저장 공간이 부족합니다.\n브라우저 캐시를 정리하고 다시 시도해주세요.');
+    } else {
+      alert('❌ 프로젝트 데이터 로드 실패\n콘솔을 확인해주세요.');
+    }
   }
 }
 
