@@ -1447,7 +1447,6 @@ function checkFirstIconPosition() {
 // 이벤트 리스너 등록
 window.addEventListener("resize", () => {
   updateContainerScale();
-  checkProjectScreenPosition();
 });
 
 // 메인 컨테이너 그리드 시각화 (디버그용)
