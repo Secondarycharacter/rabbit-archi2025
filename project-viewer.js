@@ -526,7 +526,7 @@ function showAdditionalImage(imageData, index) {
   console.log(`추가 이미지 ${index} 표시:`, imageData);
   
   // 기존 추가 이미지가 있으면 재사용, 없으면 생성
-  let existingImage = document.getElementById('additionalImageDisplay');
+  const existingImage = document.getElementById('additionalImageDisplay');
   if (existingImage) {
     // 현재 스크린 위치 가져오기
     const screenLeft = projectScreen.style.left;

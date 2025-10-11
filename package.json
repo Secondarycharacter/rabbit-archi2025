@@ -1,0 +1,26 @@
+{
+  "name": "homepage_project",
+  "version": "1.0.0",
+  "description": "",
+  "main": "script.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "lint": "eslint *.js",
+    "lint:fix": "eslint *.js --fix",
+    "start": "npx http-server -p 8080 -o main.html"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Secondarycharacter/architectuer.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Secondarycharacter/architectuer/issues"
+  },
+  "homepage": "https://github.com/Secondarycharacter/architectuer#readme",
+  "devDependencies": {
+    "eslint": "^9.37.0"
+  }
+}

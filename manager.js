@@ -40,20 +40,29 @@ function createPopupContainer(width = '600px') {
 
 // 관리자 모드 메인 UI
 function showManagerUI() {
-  console.log('관리자 모드 UI 표시');
+  console.log('🎯 showManagerUI 함수 호출됨!');
+  console.log('📋 관리자 모드 UI 표시 시작...');
   
   // 관리자 오버레이 열림 플래그 설정
   if (typeof isManagerOverlayOpen !== 'undefined') {
     isManagerOverlayOpen = true;
+    console.log('✅ isManagerOverlayOpen = true');
+  } else {
+    console.warn('⚠️ isManagerOverlayOpen 변수가 정의되지 않음');
   }
   
   // 기존 오버레이 제거
   const existingOverlay = document.getElementById('managerOverlay');
-  if (existingOverlay) existingOverlay.remove();
+  if (existingOverlay) {
+    existingOverlay.remove();
+    console.log('🗑️ 기존 오버레이 제거됨');
+  }
   
+  console.log('🏗️ 새 오버레이 생성 중...');
   // 오버레이 생성
   const overlay = createOverlay();
   const container = createPopupContainer('600px');
+  console.log('✅ 오버레이와 컨테이너 생성 완료');
   
   // 헤더
   const header = document.createElement('div');
@@ -64,16 +73,17 @@ function showManagerUI() {
     <p style="color: #7f8c8d; font-size: 16px; margin-top: 10px;">홈페이지의 콘텐츠를 생성, 수정, 삭제할 수 있습니다.</p>
   `;
   
-  // 버튼 그리드 (2x2 레이아웃)
+  // 버튼 그리드 (3x3 레이아웃)
   const buttonGrid = document.createElement('div');
-  buttonGrid.style.cssText = 'display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 20px;';
+  buttonGrid.style.cssText = 'display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px;';
   
   const actions = [
-    { text: '생성하기', action: 'create', icon: '➕', color: '#667eea', desc: '새 프로젝트 추가' },
-    { text: '수정하기', action: 'edit', icon: '✏️', color: '#f093fb', desc: '프로젝트 편집' },
+    { text: '생성/수정하기', action: 'create', icon: '➕', color: '#667eea', desc: '프로젝트 생성 및 수정' },
+    { text: '이동하기', action: 'move', icon: '🔄', color: '#f093fb', desc: '프로젝트를 다른 위치로 이동' },
     { text: '삭제하기', action: 'delete', icon: '🗑️', color: '#fa709a', desc: '프로젝트 제거' },
+    { text: '데이터 확인', action: 'view_data', icon: '🔍', color: '#26a69a', desc: '저장된 프로젝트 목록 확인' },
     { text: '전광판', action: 'marquee', icon: '📰', color: '#4ecdc4', desc: '전광판 텍스트 수정' },
-    { text: '폴더연동', action: 'sync', icon: '🔗', color: '#ff6b6b', desc: 'Projects 폴더 자동 연동' }
+    { text: '내보내기', action: 'export', icon: '📥', color: '#9b59b6', desc: 'projectsData.json 생성' }
   ];
   
   actions.forEach(actionInfo => {
@@ -107,13 +117,19 @@ function showManagerUI() {
     btn.onclick = () => {
       currentAction = actionInfo.action;
       
-      // 전광판과 폴더연동은 위치 선택 불필요
+      // 전광판, 내보내기, 데이터 확인, 이동하기는 위치 선택 불필요
       if (actionInfo.action === 'marquee') {
         overlay.remove();
         showMarqueeEditUI();
-      } else if (actionInfo.action === 'sync') {
+      } else if (actionInfo.action === 'export') {
         overlay.remove();
-        showProjectFolderSyncUI();
+        exportProjectsDataJSON();
+      } else if (actionInfo.action === 'view_data') {
+        overlay.remove();
+        showProjectDataViewer();
+      } else if (actionInfo.action === 'move') {
+        overlay.remove();
+        showProjectMoveUI();
       } else {
         showLocationSelectUI(actionInfo.action, actionInfo.text);
       }
@@ -196,7 +212,7 @@ function showLocationSelectUI(action, actionText) {
     { text: '즐겨찾기', id: 'favorites', icon: '⭐', color: '#f39c12' },
     { text: '용', id: 'yong', icon: '🐉', color: '#e74c3c' },
     { text: '공원', id: 'park', icon: '🌳', color: '#27ae60' },
-    { text: '장독대', id: 'trash', icon: '🗑️', color: '#95a5a6' }
+    { text: '꿀단지', id: 'trash', icon: '🗑️', color: '#95a5a6' }
   ];
   
   const locationGrid = document.createElement('div');
@@ -238,6 +254,52 @@ function showLocationSelectUI(action, actionText) {
           showMainScreenDeleteUI();
         } else {
           showMainScreenForm(action);
+        }
+      } else if (loc.id === 'cabinet') {
+        overlay.remove();
+        
+        // 캐비넷 폼 표시
+        if (action === 'create') {
+          console.log('🔍 window.showCabinetForm:', typeof window.showCabinetForm);
+          
+          if (typeof window.showCabinetForm === 'function') {
+            window.showCabinetForm(action);
+          } else {
+            alert('❌ 캐비넷 모듈이 로드되지 않았습니다.\n\n다음을 시도해주세요:\n1. Ctrl + Shift + R (강력 새로고침)\n2. F12 → Network 탭 → Disable cache 체크 후 새로고침');
+            console.error('❌ showCabinetForm 함수를 찾을 수 없습니다.');
+            console.error('manager-cabinet.js가 로드되지 않았을 수 있습니다.');
+          }
+        } else if (action === 'delete') {
+          if (typeof showMainScreenDeleteUI === 'function') {
+            showMainScreenDeleteUI('cabinet');
+          } else {
+            alert('삭제 기능을 찾을 수 없습니다.');
+          }
+        } else {
+          alert(`${loc.text} ${actionText} 기능은 준비 중입니다.`);
+        }
+      } else if (loc.id === 'trash') {
+        overlay.remove();
+        
+        // 꿀단지 폼 표시
+        if (action === 'create') {
+          console.log('🔍 window.showTrashForm:', typeof window.showTrashForm);
+          
+          if (typeof window.showTrashForm === 'function') {
+            window.showTrashForm(action);
+          } else {
+            alert('❌ 꿀단지 모듈이 로드되지 않았습니다.\n\n다음을 시도해주세요:\n1. Ctrl + Shift + R (강력 새로고침)\n2. F12 → Network 탭 → Disable cache 체크 후 새로고침');
+            console.error('❌ showTrashForm 함수를 찾을 수 없습니다.');
+            console.error('manager-trash.js가 로드되지 않았을 수 있습니다.');
+          }
+        } else if (action === 'delete') {
+          if (typeof showMainScreenDeleteUI === 'function') {
+            showMainScreenDeleteUI('trash');
+          } else {
+            alert('삭제 기능을 찾을 수 없습니다.');
+          }
+        } else {
+          alert(`${loc.text} ${actionText} 기능은 준비 중입니다.`);
         }
       } else if (loc.id === 'favorites') {
         overlay.remove();
@@ -327,7 +389,7 @@ function showMainScreenDeleteUI() {
   
   // 오버레이 생성
   const overlay = createOverlay();
-  const container = createPopupContainer('500px');
+  const container = createPopupContainer('550px');
   
   // 헤더
   const header = document.createElement('div');
@@ -335,7 +397,7 @@ function showMainScreenDeleteUI() {
   header.innerHTML = `
     <div style="font-size: 48px; margin-bottom: 10px;">🗑️</div>
     <h2 style="margin: 0; font-size: 28px; font-weight: 700; color: #2c3e50;">프로젝트 삭제하기</h2>
-    <p style="color: #7f8c8d; font-size: 14px; margin-top: 10px;">삭제할 프로젝트의 생성 위치를 선택하세요</p>
+    <p style="color: #7f8c8d; font-size: 14px; margin-top: 10px;">삭제할 프로젝트의 위치를 선택하세요</p>
   `;
   
   // 생성 위치 입력 섹션
@@ -344,7 +406,28 @@ function showMainScreenDeleteUI() {
   
   const positionLabel = document.createElement('div');
   positionLabel.style.cssText = 'font-size: 18px; font-weight: 600; margin-bottom: 15px; color: #2c3e50;';
-  positionLabel.textContent = '생성 위치';
+  positionLabel.textContent = '삭제 위치';
+  
+  // 위치 선택 드롭다운 추가
+  const locationSelect = document.createElement('div');
+  locationSelect.style.cssText = 'margin-bottom: 15px;';
+  locationSelect.innerHTML = `
+    <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px; color: #555;">저장 위치</label>
+    <select id="deleteLocation" style="
+      width: 100%;
+      padding: 12px;
+      font-size: 16px;
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      font-family: 'WAGURI', sans-serif;
+      background: white;
+      font-weight: 600;
+    ">
+      <option value="main">메인화면</option>
+      <option value="cabinet">캐비넷</option>
+      <option value="trash">꿀단지</option>
+    </select>
+  `;
   
   const positionInputs = document.createElement('div');
   positionInputs.style.cssText = 'display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;';
@@ -366,8 +449,8 @@ function showMainScreenDeleteUI() {
         ">
     </div>
     <div>
-      <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px; color: #555;">열 (0-1)</label>
-      <input id="deleteGridCol" type="number" min="0" max="1" value="0"
+      <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px; color: #555;">열 (0-2)</label>
+      <input id="deleteGridCol" type="number" min="0" max="2" value="0"
         style="
           width: 100%;
           padding: 12px;
@@ -395,25 +478,34 @@ function showMainScreenDeleteUI() {
     font-weight: 600;
     color: #fa709a;
   `;
-  preview.textContent = '선택된 위치: 메인화면0,0';
+  preview.textContent = '선택된 위치: 메인화면00 (M00)';
   
   // 행/열 변경 시 미리보기 업데이트
   const updateDeletePreview = () => {
+    const locationSelect = document.getElementById('deleteLocation');
     const rowInput = document.getElementById('deleteGridRow');
     const colInput = document.getElementById('deleteGridCol');
+    const location = locationSelect ? locationSelect.value : 'main';
     const row = parseInt(rowInput.value) || 0;
     const col = parseInt(colInput.value) || 0;
-    preview.textContent = `선택된 위치: 메인화면${col},${row}`;
+    
+    const locationNames = { main: '메인화면', cabinet: '캐비넷', trash: '꿀단지' };
+    const locationPrefixes = { main: 'M', cabinet: 'C', trash: 'T' };
+    
+    preview.textContent = `선택된 위치: ${locationNames[location]}${col}${row} (${locationPrefixes[location]}${col}${row})`;
   };
   
   positionSection.appendChild(positionLabel);
+  positionSection.appendChild(locationSelect);
   positionSection.appendChild(positionInputs);
   positionSection.appendChild(preview);
   
   // 이벤트 리스너
   setTimeout(() => {
+    document.getElementById('deleteLocation').addEventListener('change', updateDeletePreview);
     document.getElementById('deleteGridRow').addEventListener('input', updateDeletePreview);
     document.getElementById('deleteGridCol').addEventListener('input', updateDeletePreview);
+    updateDeletePreview(); // 초기 미리보기
   }, 100);
   
   // 버튼
@@ -460,13 +552,15 @@ function showMainScreenDeleteUI() {
   deleteBtn.onmouseenter = () => { deleteBtn.style.background = '#c0392b'; };
   deleteBtn.onmouseleave = () => { deleteBtn.style.background = '#e74c3c'; };
   deleteBtn.onclick = async () => {
+    const locationSelect = document.getElementById('deleteLocation');
     const rowInput = document.getElementById('deleteGridRow');
     const colInput = document.getElementById('deleteGridCol');
+    const location = locationSelect.value;
     const row = parseInt(rowInput.value) || 0;
     const col = parseInt(colInput.value) || 0;
     
     // 확인 대화상자 (비동기)
-    await showDeleteConfirmation(row, col, overlay);
+    await showDeleteConfirmation(location, row, col, overlay);
   };
   
   buttonGroup.appendChild(cancelBtn);
@@ -480,11 +574,16 @@ function showMainScreenDeleteUI() {
 }
 
 // 삭제 확인 대화상자
-async function showDeleteConfirmation(row, col, parentOverlay) {
-  const iconId = `M${col}${row}`;
+async function showDeleteConfirmation(location, row, col, parentOverlay) {
+  const locationPrefixes = { main: 'M', cabinet: 'C', trash: 'T' };
+  const locationNames = { main: '메인화면', cabinet: '캐비넷', trash: '꿀단지' };
+  const prefix = locationPrefixes[location];
+  const locationName = locationNames[location];
+  
+  const iconId = `${prefix}${col}${row}`;
   const storageKey = `projectData_${iconId}`;
   
-  console.log(`🗑️ 삭제 시도: row=${row}, col=${col}, iconId=${iconId}, key=${storageKey}`);
+  console.log(`🗑️ 삭제 시도: location=${location}, row=${row}, col=${col}, iconId=${iconId}, key=${storageKey}`);
   
   // IndexedDB에서 프로젝트 데이터 확인
   const projectData = await loadProjectFromDB(storageKey);
@@ -492,7 +591,7 @@ async function showDeleteConfirmation(row, col, parentOverlay) {
   console.log(`📦 프로젝트 데이터 확인:`, projectData ? '있음' : '없음');
   
   if (!projectData) {
-    alert(`메인화면${col},${row} (${iconId})에 저장된 프로젝트가 없습니다.`);
+    alert(`${locationName}${col}${row} (${iconId})에 저장된 프로젝트가 없습니다.`);
     return;
   }
   
@@ -525,7 +624,7 @@ async function showDeleteConfirmation(row, col, parentOverlay) {
     <div style="font-size: 64px; margin-bottom: 15px;">⚠️</div>
     <h2 style="margin: 0 0 15px 0; font-size: 24px; font-weight: 700; color: #2c3e50;">정말로 삭제할까요?</h2>
     <p style="color: #7f8c8d; font-size: 16px; margin-bottom: 25px;">
-      <strong style="color: #e74c3c;">메인화면${col},${row}</strong>의 프로젝트 데이터가<br>
+      <strong style="color: #e74c3c;">${locationName}${col}${row}</strong>의 프로젝트 데이터가<br>
       영구적으로 삭제됩니다.
     </p>
   `;
@@ -601,7 +700,7 @@ async function showDeleteConfirmation(row, col, parentOverlay) {
       <div style="font-size: 64px; margin-bottom: 15px;">✅</div>
       <h2 style="margin: 0 0 15px 0; font-size: 24px; font-weight: 700; color: #27ae60;">삭제 완료</h2>
       <p style="color: #7f8c8d; font-size: 16px; margin-bottom: 25px;">
-        <strong style="color: #27ae60;">메인화면${col},${row}</strong>의 프로젝트가<br>
+        <strong style="color: #27ae60;">${locationName}${col}${row}</strong>의 프로젝트가<br>
         성공적으로 삭제되었습니다.
       </p>
     `;
@@ -636,7 +735,7 @@ async function showDeleteConfirmation(row, col, parentOverlay) {
         
         // 레이블 초기화
         if (iconLabel) {
-          iconLabel.textContent = `메인화면${iconId.substring(1)}`;
+          iconLabel.textContent = `${locationName}${iconId.substring(1)}`;
           console.log(`✅ ${iconId} 레이블 초기화됨`);
         }
         
@@ -797,6 +896,93 @@ function showFavoritesForm(action) {
   container.appendChild(btnGroup);
   overlay.appendChild(container);
   document.body.appendChild(overlay);
+  
+  // 수정 모드일 때 기존 데이터 로드
+  if (action === 'edit') {
+    setTimeout(() => {
+      loadFavoritesData();
+    }, 200);
+  }
+}
+
+// 즐겨찾기 데이터 로드
+function loadFavoritesData() {
+  console.log('📂 즐겨찾기 데이터 로드 시작...');
+  
+  const storageKey = 'favoritesData';
+  const savedData = localStorage.getItem(storageKey);
+  
+  if (!savedData) {
+    console.log('저장된 즐겨찾기 데이터 없음');
+    return;
+  }
+  
+  const favoritesData = JSON.parse(savedData);
+  console.log('불러온 즐겨찾기 데이터:', favoritesData);
+  
+  // 각 섹션별로 데이터 복원
+  const sections = ['architects', 'planning', 'others'];
+  const sectionTitles = {
+    'architects': '건축사사무소',
+    'planning': '건축계획 참고사이트',
+    'others': '기타 참고사이트'
+  };
+  
+  sections.forEach(sectionId => {
+    const items = favoritesData[sectionId] || [];
+    const container = document.getElementById(`${sectionId}Container`);
+    
+    if (container && items.length > 0) {
+      container.innerHTML = ''; // 기존 항목 제거
+      
+      items.forEach((itemData, index) => {
+        addFavoriteItem(sectionId, sectionTitles[sectionId], index === 0);
+        
+        // 데이터 복원
+        const itemElements = container.querySelectorAll('.favorite-item');
+        const currentItem = itemElements[itemElements.length - 1];
+        
+        if (currentItem) {
+          const imagePreview = currentItem.querySelector('.favorite-image-preview');
+          const nameInput = currentItem.querySelector('.favorite-name');
+          const urlInput = currentItem.querySelector('.favorite-url');
+          const descInput = currentItem.querySelector('.favorite-description');
+          
+          // 이미지 복원
+          if (itemData.imageData && imagePreview) {
+            imagePreview.innerHTML = '';
+            const img = document.createElement('img');
+            img.src = itemData.imageData;
+            img.style.cssText = 'width: 100%; height: 100%; object-fit: cover;';
+            imagePreview.appendChild(img);
+            imagePreview.dataset.imageData = itemData.imageData;
+            if (itemData.imagePath) {
+              imagePreview.dataset.imagePath = itemData.imagePath;
+            }
+          }
+          
+          // 이름 복원
+          if (nameInput && itemData.name) {
+            nameInput.value = itemData.name;
+          }
+          
+          // URL 복원
+          if (urlInput && itemData.url) {
+            urlInput.value = itemData.url;
+          }
+          
+          // 설명 복원
+          if (descInput && itemData.description) {
+            descInput.value = itemData.description;
+          }
+        }
+      });
+      
+      console.log(`✅ ${sectionId} 데이터 복원 완료: ${items.length}개`);
+    }
+  });
+  
+  console.log('✅ 즐겨찾기 데이터 로드 완료');
 }
 
 // 즐겨찾기 항목 추가
@@ -822,9 +1008,9 @@ function addFavoriteItem(sectionId, sectionTitle, isFirst = false) {
     border-radius: 8px;
   `;
   
-  // 이미지 업로드 영역
+  // 이미지 업로드 영역 (90x90, 크롭 지원)
   const imageArea = document.createElement('div');
-  imageArea.style.cssText = 'flex-shrink: 0;';
+  imageArea.style.cssText = 'flex-shrink: 0; display: flex; flex-direction: column; gap: 8px;';
   
   const imageInput = document.createElement('input');
   imageInput.type = 'file';
@@ -835,8 +1021,8 @@ function addFavoriteItem(sectionId, sectionTitle, isFirst = false) {
   const imagePreview = document.createElement('div');
   imagePreview.className = 'favorite-image-preview';
   imagePreview.style.cssText = `
-    width: 60px;
-    height: 60px;
+    width: 90px;
+    height: 90px;
     border: 2px dashed #ccc;
     border-radius: 8px;
     background: #f0f0f0;
@@ -848,28 +1034,60 @@ function addFavoriteItem(sectionId, sectionTitle, isFirst = false) {
     color: #999;
     text-align: center;
     overflow: hidden;
+    position: relative;
   `;
   imagePreview.textContent = '이미지';
   imagePreview.onclick = () => imageInput.click();
   
-  imageInput.onchange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        imagePreview.innerHTML = '';
-        const img = document.createElement('img');
-        img.src = event.target.result;
-        img.style.cssText = 'width: 100%; height: 100%; object-fit: cover;';
-        imagePreview.appendChild(img);
-        imagePreview.dataset.imageData = event.target.result;
-      };
-      reader.readAsDataURL(file);
+  // 드래그앤드랍 지원
+  imagePreview.ondragover = (e) => {
+    e.preventDefault();
+    imagePreview.style.borderColor = '#4CAF50';
+    imagePreview.style.background = '#e8f5e9';
+  };
+  
+  imagePreview.ondragleave = (e) => {
+    e.preventDefault();
+    imagePreview.style.borderColor = '#ccc';
+    imagePreview.style.background = '#f0f0f0';
+  };
+  
+  imagePreview.ondrop = (e) => {
+    e.preventDefault();
+    imagePreview.style.borderColor = '#ccc';
+    imagePreview.style.background = '#f0f0f0';
+    
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith('image/')) {
+      handleFavoriteImageUpload(file, imagePreview, sectionId);
     }
   };
   
+  imageInput.onchange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      handleFavoriteImageUpload(file, imagePreview, sectionId);
+    }
+  };
+  
+  // 이름 입력 필드
+  const nameInput = document.createElement('input');
+  nameInput.type = 'text';
+  nameInput.className = 'favorite-name';
+  nameInput.placeholder = '이름';
+  nameInput.style.cssText = `
+    width: 90px;
+    padding: 6px;
+    font-size: 12px;
+    border: 2px solid #ddd;
+    border-radius: 6px;
+    font-family: 'WAGURI', sans-serif;
+    text-align: center;
+  `;
+  
   imageArea.appendChild(imageInput);
   imageArea.appendChild(imagePreview);
+  imageArea.appendChild(nameInput);
   
   // 입력 필드 영역
   const inputsArea = document.createElement('div');
@@ -963,6 +1181,42 @@ function saveFavoritesData() {
   }
 }
 
+// 즐겨찾기 이미지 업로드 핸들러
+function handleFavoriteImageUpload(file, imagePreview, sectionId) {
+  console.log('📷 즐겨찾기 이미지 업로드:', file.name);
+  
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    const imageData = event.target.result;
+    
+    // 크롭 에디터 표시
+    if (typeof showImageCropEditor === 'function') {
+      showImageCropEditor(imageData, file.name, (croppedData) => {
+        // 크롭된 이미지 미리보기에 표시
+        imagePreview.innerHTML = '';
+        const img = document.createElement('img');
+        img.src = croppedData;
+        img.style.cssText = 'width: 100%; height: 100%; object-fit: cover;';
+        imagePreview.appendChild(img);
+        imagePreview.dataset.imageData = croppedData;
+        imagePreview.dataset.imagePath = `favorites/${file.name}`;
+        
+        console.log('✅ 즐겨찾기 이미지 크롭 완료');
+      }, 90, 90); // 90x90 크기
+    } else {
+      // 크롭 에디터 없으면 그냥 표시
+      imagePreview.innerHTML = '';
+      const img = document.createElement('img');
+      img.src = imageData;
+      img.style.cssText = 'width: 100%; height: 100%; object-fit: cover;';
+      imagePreview.appendChild(img);
+      imagePreview.dataset.imageData = imageData;
+      imagePreview.dataset.imagePath = `favorites/${file.name}`;
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
 // 즐겨찾기 항목 수집
 function collectFavoriteItems(sectionId) {
   const items = [];
@@ -971,15 +1225,24 @@ function collectFavoriteItems(sectionId) {
   
   container.querySelectorAll('.favorite-item').forEach(item => {
     const imagePreview = item.querySelector('.favorite-image-preview');
+    const nameInput = item.querySelector('.favorite-name');
     const urlInput = item.querySelector('.favorite-url');
     const descInput = item.querySelector('.favorite-description');
     
     const imageData = imagePreview?.dataset?.imageData || null;
+    const imagePath = imagePreview?.dataset?.imagePath || null;
+    const name = nameInput?.value || '';
     const url = urlInput?.value || '';
     const description = descInput?.value || '';
     
-    if (url || description || imageData) {
-      items.push({ imageData, url, description });
+    if (url || description || imageData || name) {
+      items.push({ 
+        imageData, 
+        imagePath, 
+        name, 
+        url, 
+        description 
+      });
     }
   });
   
@@ -987,236 +1250,103 @@ function collectFavoriteItems(sectionId) {
   return items;
 }
 
-// ==================== 프로젝트 폴더 자동 연동 UI ====================
+// ==================== 데이터 내보내기 ====================
 
-function showProjectFolderSyncUI() {
-  console.log('🔗 프로젝트 폴더 자동 연동 시작');
+// IndexedDB 데이터를 projectsData.json으로 내보내기
+async function exportProjectsDataJSON() {
+  console.log('📥 projectsData.json 내보내기 시작...');
   
   // 관리자 오버레이 열림 플래그 설정
   if (typeof isManagerOverlayOpen !== 'undefined') {
     isManagerOverlayOpen = true;
   }
   
-  // 폴더 선택 다이얼로그 바로 열기
-  const folderInput = document.createElement('input');
-  folderInput.type = 'file';
-  folderInput.webkitdirectory = true;
-  folderInput.directory = true;
-  folderInput.multiple = true;
-  
-  folderInput.onchange = async () => {
-    const files = Array.from(folderInput.files);
-    console.log('📂 선택된 파일 개수:', files.length);
+  try {
+    // 메인, 캐비넷, 꿀단지 모든 아이콘 포함
+    const mainIconIds = ['M00', 'M01', 'M02', 'M03', 'M04', 'M05', 'M06', 'M07',
+                         'M10', 'M11', 'M12', 'M13', 'M14', 'M15', 'M16', 'M17'];
+    const cabinetIconIds = ['C00', 'C01', 'C02', 'C03', 'C04', 'C05', 'C06', 'C07',
+                            'C10', 'C11', 'C12', 'C13', 'C14', 'C15', 'C16', 'C17',
+                            'C20', 'C21', 'C22', 'C23', 'C24', 'C25', 'C26', 'C27'];
+    const trashIconIds = ['T00', 'T01', 'T02', 'T03', 'T04', 'T05', 'T06', 'T07',
+                          'T10', 'T11', 'T12', 'T13', 'T14', 'T15', 'T16', 'T17',
+                          'T20', 'T21', 'T22', 'T23', 'T24', 'T25', 'T26', 'T27'];
     
-    if (files.length === 0) {
-      alert('❌ 파일이 선택되지 않았습니다.');
+    const allIconIds = [...mainIconIds, ...cabinetIconIds, ...trashIconIds];
+    
+    const projectsDataJSON = {};
+    let exportCount = 0;
+    let mainCount = 0, cabinetCount = 0, trashCount = 0;
+    
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    
+    // 모든 프로젝트 데이터 수집
+    for (const iconId of allIconIds) {
+      const storageKey = `projectData_${iconId}`;
+      
+      if (typeof loadProjectFromDB === 'function') {
+        const projectData = await loadProjectFromDB(storageKey);
+        
+        if (projectData) {
+          projectsDataJSON[iconId] = projectData;
+          exportCount++;
+          
+          // 타입별 카운트
+          if (iconId.startsWith('M')) mainCount++;
+          else if (iconId.startsWith('C')) cabinetCount++;
+          else if (iconId.startsWith('T')) trashCount++;
+          
+          const type = iconId.startsWith('M') ? '메인' : iconId.startsWith('C') ? '캐비넷' : '꿀단지';
+          console.log(`✅ ${iconId} (${type}): ${projectData.projectName?.text || iconId} 추출됨`);
+          console.log(`   - Base64: ${projectData.mainImage ? '✅' : '❌'} / 경로: ${projectData.mainImagePath || '(없음)'}`);
+          console.log(`   - 추가 이미지: ${projectData.additionalImages?.length || 0}개`);
+        }
+      }
+    }
+    
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    
+    if (exportCount === 0) {
+      alert('❌ 내보낼 프로젝트 데이터가 없습니다.');
       if (typeof isManagerOverlayOpen !== 'undefined') {
         isManagerOverlayOpen = false;
       }
       return;
     }
     
-    // 로딩 오버레이 표시
-    const loadingOverlay = createOverlay();
-    const loadingBox = document.createElement('div');
-    loadingBox.style.cssText = `
-      background: white;
-      border-radius: 15px;
-      padding: 40px;
-      text-align: center;
-      min-width: 400px;
-    `;
-    loadingBox.innerHTML = `
-      <div style="font-size: 48px; margin-bottom: 20px;">⏳</div>
-      <h3 style="margin: 0 0 15px 0; color: #2c3e50;">프로젝트 연동 중...</h3>
-      <p style="color: #7f8c8d; margin: 0;">잠시만 기다려주세요.</p>
-      <div id="syncProgress" style="margin-top: 15px; color: #3498db; font-weight: bold;"></div>
-    `;
-    loadingOverlay.appendChild(loadingBox);
-    document.body.appendChild(loadingOverlay);
+    // JSON 파일 생성 및 다운로드
+    const jsonString = JSON.stringify(projectsDataJSON, null, 2);
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
     
-    // 프로젝트 폴더 분석 및 연동
-    const projects = await analyzeProjectFolders(files);
-    await syncAllProjectsAuto(projects, files);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'projectsData.json';
+    a.click();
+    URL.revokeObjectURL(url);
     
-    loadingOverlay.remove();
+    console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log(`✅ projectsData.json 내보내기 완료: 총 ${exportCount}개 프로젝트`);
+    console.log(`   메인: ${mainCount}개, 캐비넷: ${cabinetCount}개, 꿀단지: ${trashCount}개`);
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
     
-    if (typeof isManagerOverlayOpen !== 'undefined') {
-      isManagerOverlayOpen = false;
-    }
-  };
-  
-  // 취소 시 플래그 해제
-  folderInput.oncancel = () => {
-    if (typeof isManagerOverlayOpen !== 'undefined') {
-      isManagerOverlayOpen = false;
-    }
-  };
-  
-  folderInput.click();
-}
-
-// 프로젝트 폴더 분석
-async function analyzeProjectFolders(files) {
-  console.log('🔍 프로젝트 폴더 분석 시작...');
-  
-  const projects = {};
-  
-  // 파일을 프로젝트별로 그룹화
-  files.forEach(file => {
-    const pathParts = file.webkitRelativePath.split('/');
+    alert(`✅ projectsData.json 파일 다운로드 완료!\n\n총 ${exportCount}개 프로젝트가 포함되었습니다.\n- 메인: ${mainCount}개\n- 캐비넷: ${cabinetCount}개\n- 꿀단지: ${trashCount}개\n\n📌 이 파일을 프로젝트 루트 폴더에 저장하고\nGitHub에 업로드하세요!`);
     
-    // projects/년도/년월 프로젝트명/파일명 구조 파싱
-    if (pathParts.length >= 4 && pathParts[0] === 'projects') {
-      const year = pathParts[1];  // 2024
-      const projectFolder = pathParts[2];  // 202401 구로동도서관
-      const fileName = pathParts[3];  // 구로동도서관.jpg
-      
-      // 프로젝트명 추출 (년월 제거)
-      const projectName = projectFolder.replace(/^\d{6}\s*/, '').trim();
-      
-      if (!projects[projectName]) {
-        projects[projectName] = {
-          name: projectName,
-          year: year,
-          folder: projectFolder,
-          fullPath: `projects/${year}/${projectFolder}`,
-          mainImageFile: null,
-          additionalImageFiles: [],
-          mainImagePath: null,
-          additionalImagePaths: []
-        };
-      }
-      
-      // 파일 분류 (File 객체와 경로 모두 저장)
-      if (fileName.endsWith('.jpg') || fileName.endsWith('.JPG')) {
-        projects[projectName].mainImageFile = file;
-        projects[projectName].mainImagePath = `${projects[projectName].fullPath}/${fileName}`;
-      } else if (fileName.match(/project\d+\.(png|jpg|jpeg)/i)) {
-        projects[projectName].additionalImageFiles.push(file);
-        projects[projectName].additionalImagePaths.push(`${projects[projectName].fullPath}/${fileName}`);
-      }
-    }
-  });
-  
-  // 추가 이미지 정렬 (파일명 기준)
-  Object.values(projects).forEach(project => {
-    // 파일과 경로를 함께 정렬
-    const combined = project.additionalImageFiles.map((file, i) => ({
-      file: file,
-      path: project.additionalImagePaths[i]
-    }));
-    combined.sort((a, b) => a.path.localeCompare(b.path));
-    
-    project.additionalImageFiles = combined.map(item => item.file);
-    project.additionalImagePaths = combined.map(item => item.path);
-  });
-  
-  console.log('✅ 프로젝트 분석 완료:', Object.keys(projects).length, '개');
-  return projects;
-}
-
-// 파일을 base64로 읽기
-function readFileAsBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => resolve(e.target.result);
-    reader.onerror = (e) => reject(e);
-    reader.readAsDataURL(file);
-  });
-}
-
-// 모든 프로젝트 자동 연동 (파일을 base64로 변환)
-async function syncAllProjectsAuto(projects, files) {
-  console.log('🔗 모든 프로젝트 자동 연동 시작:', Object.keys(projects).length, '개');
-  
-  const projectList = Object.values(projects);
-  const progressEl = document.getElementById('syncProgress');
-  
-  let successCount = 0;
-  let failCount = 0;
-  
-  // M00부터 순서대로 연동
-  const iconIds = ['M00', 'M01', 'M02', 'M03', 'M04', 'M05', 'M06', 'M07',
-                   'M10', 'M11', 'M12', 'M13', 'M14', 'M15', 'M16'];
-  
-  for (let i = 0; i < Math.min(projectList.length, iconIds.length); i++) {
-    const project = projectList[i];
-    const iconId = iconIds[i];
-    
-    if (progressEl) {
-      progressEl.textContent = `${i + 1}/${projectList.length}: ${project.name}`;
-    }
-    
-    try {
-      // 메인 이미지를 base64로 읽기
-      let mainImageData = null;
-      if (project.mainImageFile) {
-        mainImageData = await readFileAsBase64(project.mainImageFile);
-        console.log(`📸 메인 이미지 읽음: ${project.mainImagePath}`);
-      }
-      
-      // 추가 이미지들을 base64로 읽기
-      const additionalImagesData = [];
-      for (const imageFile of project.additionalImageFiles) {
-        const imageData = await readFileAsBase64(imageFile);
-        additionalImagesData.push(imageData);
-      }
-      console.log(`📸 추가 이미지 읽음: ${additionalImagesData.length}개`);
-      
-      // 프로젝트 데이터 생성
-      const projectData = {
-        projectName: {
-          text: project.name,
-          color: '#ffffff',
-          startYear: project.year,
-          endYear: project.year
-        },
-        usage: { text: '', color: '#ffffff' },
-        location: { text: '', color: '#ffffff' },
-        buildingArea: { text: '', color: '#ffffff' },
-        totalArea: { text: '', color: '#ffffff' },
-        designers: [],
-        staff: [],
-        mainImage: mainImageData,
-        additionalImages: additionalImagesData,
-        useInMainLoop: true
-      };
-      
-      // IndexedDB에 저장
-      const storageKey = `projectData_${iconId}`;
-      
-      if (typeof saveProjectToDB === 'function') {
-        await saveProjectToDB(storageKey, projectData);
-        
-        // 아이콘 업데이트
-        if (typeof updateIconImage === 'function') {
-          updateIconImage(iconId, projectData);
-        }
-        
-        // 프로젝트 목록 업데이트
-        if (typeof updateProjectList === 'function') {
-          updateProjectList(iconId);
-        }
-        
-        console.log(`✅ ${iconId}: ${project.name} 연동 완료`);
-        successCount++;
-      }
-    } catch (error) {
-      console.error(`❌ ${iconId}: ${project.name} 연동 실패`, error);
-      failCount++;
-    }
+  } catch (error) {
+    console.error('❌ 내보내기 오류:', error);
+    alert('❌ 데이터 내보내기 중 오류가 발생했습니다.');
   }
   
-  alert(`✅ 자동 연동 완료!\n\n성공: ${successCount}개\n실패: ${failCount}개\n\n페이지가 새로고침됩니다.`);
-  
-  // 페이지 새로고침하여 변경사항 반영
-  if (successCount > 0) {
-    setTimeout(() => {
-      location.reload();
-    }, 1000);
+  if (typeof isManagerOverlayOpen !== 'undefined') {
+    isManagerOverlayOpen = false;
   }
 }
+
+// ==================== 프로젝트 폴더 자동 연동 UI ====================
+
+// ==================== 폴더연동 기능 제거됨 ====================
+// 사용자 요청으로 폴더연동 기능이 제거되었습니다.
+// 내보내기 기능으로 대체되었습니다.
 
 // ==================== 전광판 수정 UI ====================
 
@@ -1452,6 +1582,523 @@ function showMarqueeEditUI() {
   
   // 입력창 포커스
   setTimeout(() => textarea.focus(), 100);
+}
+
+// ==================== 프로젝트 이동하기 UI ====================
+
+function showProjectMoveUI() {
+  console.log('🔄 프로젝트 이동하기 UI 표시');
+  
+  // 관리자 오버레이 열림 플래그 설정
+  if (typeof isManagerOverlayOpen !== 'undefined') {
+    isManagerOverlayOpen = true;
+  }
+  
+  const overlay = createOverlay();
+  const container = createPopupContainer('700px');
+  
+  // 헤더
+  const header = document.createElement('div');
+  header.style.cssText = 'margin-bottom: 25px; padding-bottom: 15px; border-bottom: 2px solid #e0e0e0; text-align: center;';
+  header.innerHTML = `
+    <div style="font-size: 48px; margin-bottom: 10px;">🔄</div>
+    <h2 style="margin: 0; font-size: 28px; font-weight: 700; color: #2c3e50;">프로젝트 이동하기</h2>
+    <p style="color: #7f8c8d; font-size: 14px; margin-top: 10px;">프로젝트를 다른 위치로 이동합니다 (원본은 삭제됨)</p>
+  `;
+  
+  // 폼
+  const form = document.createElement('form');
+  form.style.cssText = 'display: flex; flex-direction: column; gap: 25px;';
+  
+  // 출발지 섹션
+  const sourceSection = document.createElement('div');
+  sourceSection.style.cssText = 'padding: 20px; background: #e3f2fd; border-radius: 12px; border: 2px solid #2196f3;';
+  sourceSection.innerHTML = `
+    <div style="font-size: 20px; font-weight: bold; margin-bottom: 15px; color: #1976d2;">
+      📤 출발지 (이동할 프로젝트)
+    </div>
+    <div style="display: flex; gap: 15px; align-items: flex-end;">
+      <div style="flex: 1;">
+        <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px; color: #424242;">위치 선택</label>
+        <select id="sourceLocation" style="
+          width: 100%;
+          padding: 12px;
+          font-size: 16px;
+          border: 2px solid #2196f3;
+          border-radius: 8px;
+          font-family: 'WAGURI', sans-serif;
+          background: white;
+          font-weight: 600;
+        ">
+          <option value="main">메인화면</option>
+          <option value="cabinet">캐비넷</option>
+          <option value="trash">꿀단지</option>
+          <option value="favorites">즐겨찾기</option>
+          <option value="park">공원</option>
+          <option value="yong">용</option>
+        </select>
+      </div>
+      <div style="flex: 1;">
+        <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px; color: #424242;">그리드 번호</label>
+        <input type="text" id="sourceGrid" placeholder="예: 00, 01, 10, 14" style="
+          width: 100%;
+          padding: 12px;
+          font-size: 16px;
+          border: 2px solid #2196f3;
+          border-radius: 8px;
+          font-family: 'WAGURI', sans-serif;
+          text-align: center;
+          font-weight: 600;
+        ">
+      </div>
+    </div>
+    <div id="sourcePreview" style="
+      margin-top: 12px;
+      padding: 10px;
+      background: white;
+      border-radius: 8px;
+      text-align: center;
+      font-weight: bold;
+      color: #1976d2;
+      font-size: 14px;
+    ">
+      선택된 출발지: 메인화면00
+    </div>
+  `;
+  
+  // 화살표
+  const arrowSection = document.createElement('div');
+  arrowSection.style.cssText = 'text-align: center; font-size: 36px; color: #f093fb;';
+  arrowSection.textContent = '⬇️';
+  
+  // 도착지 섹션
+  const destSection = document.createElement('div');
+  destSection.style.cssText = 'padding: 20px; background: #f3e5f5; border-radius: 12px; border: 2px solid #9c27b0;';
+  destSection.innerHTML = `
+    <div style="font-size: 20px; font-weight: bold; margin-bottom: 15px; color: #7b1fa2;">
+      📥 도착지 (이동될 위치)
+    </div>
+    <div style="display: flex; gap: 15px; align-items: flex-end;">
+      <div style="flex: 1;">
+        <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px; color: #424242;">위치 선택</label>
+        <select id="destLocation" style="
+          width: 100%;
+          padding: 12px;
+          font-size: 16px;
+          border: 2px solid #9c27b0;
+          border-radius: 8px;
+          font-family: 'WAGURI', sans-serif;
+          background: white;
+          font-weight: 600;
+        ">
+          <option value="main">메인화면</option>
+          <option value="cabinet">캐비넷</option>
+          <option value="trash">꿀단지</option>
+          <option value="favorites">즐겨찾기</option>
+          <option value="park">공원</option>
+          <option value="yong">용</option>
+        </select>
+      </div>
+    </div>
+    <div id="destPreview" style="
+      margin-top: 12px;
+      padding: 10px;
+      background: white;
+      border-radius: 8px;
+      text-align: center;
+      font-weight: bold;
+      color: #7b1fa2;
+      font-size: 14px;
+    ">
+      선택된 도착지: 메인화면 (빈 자리 자동 배정)
+    </div>
+  `;
+  
+  // 버튼 그룹
+  const btnGroup = document.createElement('div');
+  btnGroup.style.cssText = 'display: flex; gap: 10px; margin-top: 20px;';
+  
+  const cancelBtn = document.createElement('button');
+  cancelBtn.type = 'button';
+  cancelBtn.textContent = '❌ 취소';
+  cancelBtn.style.cssText = `
+    flex: 1;
+    padding: 14px;
+    background: #95a5a6;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: 600;
+  `;
+  cancelBtn.onclick = () => {
+    overlay.remove();
+    if (typeof isManagerOverlayOpen !== 'undefined') {
+      isManagerOverlayOpen = false;
+    }
+  };
+  
+  const moveBtn = document.createElement('button');
+  moveBtn.type = 'submit';
+  moveBtn.textContent = '🔄 이동';
+  moveBtn.style.cssText = `
+    flex: 1;
+    padding: 14px;
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: 600;
+  `;
+  
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    await handleProjectMove();
+  };
+  
+  btnGroup.appendChild(cancelBtn);
+  btnGroup.appendChild(moveBtn);
+  
+  form.appendChild(sourceSection);
+  form.appendChild(arrowSection);
+  form.appendChild(destSection);
+  form.appendChild(btnGroup);
+  
+  container.appendChild(header);
+  container.appendChild(form);
+  overlay.appendChild(container);
+  document.body.appendChild(overlay);
+  
+  // 이벤트 리스너
+  setTimeout(() => {
+    const sourceLocationSelect = document.getElementById('sourceLocation');
+    const sourceGridInput = document.getElementById('sourceGrid');
+    const destLocationSelect = document.getElementById('destLocation');
+    const sourcePreview = document.getElementById('sourcePreview');
+    const destPreview = document.getElementById('destPreview');
+    
+    const updateSourcePreview = () => {
+      const location = sourceLocationSelect.value;
+      const grid = sourceGridInput.value || '00';
+      const locationNames = { main: '메인화면', cabinet: '캐비넷', trash: '꿀단지', favorites: '즐겨찾기', park: '공원', yong: '용' };
+      sourcePreview.textContent = `선택된 출발지: ${locationNames[location]}${grid}`;
+    };
+    
+    const updateDestPreview = () => {
+      const location = destLocationSelect.value;
+      const locationNames = { main: '메인화면', cabinet: '캐비넷', trash: '꿀단지', favorites: '즐겨찾기', park: '공원', yong: '용' };
+      destPreview.textContent = `선택된 도착지: ${locationNames[location]} (빈 자리 자동 배정)`;
+    };
+    
+    sourceLocationSelect.addEventListener('change', updateSourcePreview);
+    sourceGridInput.addEventListener('input', updateSourcePreview);
+    destLocationSelect.addEventListener('change', updateDestPreview);
+    
+    sourceGridInput.focus();
+  }, 100);
+  
+  // 이동 처리 함수
+  async function handleProjectMove() {
+    const sourceLocation = document.getElementById('sourceLocation').value;
+    const sourceGrid = document.getElementById('sourceGrid').value.trim();
+    const destLocation = document.getElementById('destLocation').value;
+    
+    if (!sourceGrid) {
+      alert('❌ 출발지 그리드 번호를 입력해주세요.');
+      return;
+    }
+    
+    if (sourceLocation === destLocation) {
+      alert('❌ 출발지와 도착지가 같을 수 없습니다.');
+      return;
+    }
+    
+    console.log('🔄 프로젝트 이동 시작:', { sourceLocation, sourceGrid, destLocation });
+    
+    // 출발지 아이콘 ID 생성
+    const locationPrefixes = { main: 'M', cabinet: 'C', trash: 'T' };
+    const sourcePrefix = locationPrefixes[sourceLocation];
+    const sourceIconId = `${sourcePrefix}${sourceGrid}`;
+    
+    // 출발지 데이터 로드
+    const sourceKey = `projectData_${sourceIconId}`;
+    let sourceData = null;
+    
+    if (typeof loadProjectFromDB === 'function') {
+      sourceData = await loadProjectFromDB(sourceKey);
+    }
+    
+    if (!sourceData) {
+      alert(`❌ ${sourceIconId}에 프로젝트가 없습니다.`);
+      return;
+    }
+    
+    console.log(`✅ ${sourceIconId} 데이터 로드 완료:`, sourceData.projectName?.text);
+    
+    // 도착지에서 빈 자리 찾기
+    const destPrefix = locationPrefixes[destLocation];
+    const destIconId = await findEmptySlot(destPrefix);
+    
+    if (!destIconId) {
+      alert(`❌ ${destLocation}에 빈 자리가 없습니다.`);
+      return;
+    }
+    
+    console.log(`📍 도착지 빈 자리 발견: ${destIconId}`);
+    
+    // 도착지로 데이터 복사
+    const destKey = `projectData_${destIconId}`;
+    const destData = {
+      ...sourceData,
+      iconId: destIconId,
+      gridPosition: {
+        row: parseInt(destIconId.substring(2)),
+        col: parseInt(destIconId.substring(1, 2))
+      }
+    };
+    
+    if (typeof saveProjectToDB === 'function') {
+      await saveProjectToDB(destKey, destData);
+      console.log(`✅ ${destIconId}로 데이터 저장 완료`);
+      
+      // 저장 검증
+      const verifyData = await loadProjectFromDB(destKey);
+      if (verifyData) {
+        console.log(`✅ 저장 검증 성공: ${destIconId}`, verifyData.projectName?.text);
+        
+        // 도착지 아이콘 이미지 업데이트만 (표시는 모드 전환 시에만)
+        if (typeof updateIconImage === 'function') {
+          await updateIconImage(destIconId, destData);
+          console.log(`✅ ${destIconId} 도착지 아이콘 이미지 업데이트 완료`);
+          
+          // 도착지가 메인화면이면 표시, 캐비넷/꿀단지면 숨김 유지
+          const destIcon = document.querySelector(`.icon-wrapper[data-id="${destIconId}"]`);
+          if (destIcon && destIconId.startsWith('M')) {
+            destIcon.style.display = 'flex';
+            destIcon.style.visibility = 'visible';
+            destIcon.style.opacity = '1';
+            console.log(`✅ ${destIconId} 메인 아이콘 표시`);
+          } else if (destIcon) {
+            destIcon.style.display = 'none';
+            destIcon.style.visibility = 'hidden';
+            destIcon.style.opacity = '0';
+            console.log(`✅ ${destIconId} 캐비넷/꿀단지 아이콘 숨김 유지`);
+          }
+        }
+      } else {
+        console.error(`❌ 저장 검증 실패: ${destIconId}`);
+        alert(`❌ 저장에 실패했습니다. 다시 시도해주세요.`);
+        return;
+      }
+    }
+    
+    // 출발지 데이터 삭제
+    if (typeof deleteProjectFromDB === 'function') {
+      await deleteProjectFromDB(sourceKey);
+      console.log(`🗑️ ${sourceIconId} 데이터 삭제 완료`);
+    }
+    
+    // 프로젝트 목록 업데이트
+    if (typeof updateProjectList === 'function') {
+      updateProjectList(destIconId);
+    }
+    let projectList = JSON.parse(localStorage.getItem('projectList') || '[]');
+    projectList = projectList.filter(id => id !== sourceIconId);
+    localStorage.setItem('projectList', JSON.stringify(projectList));
+    
+    // 출발지 아이콘 초기화
+    const sourceIcon = document.querySelector(`.icon-wrapper[data-id="${sourceIconId}"]`);
+    if (sourceIcon) {
+      const iconImg = sourceIcon.querySelector('.icon-image');
+      const iconLabel = sourceIcon.querySelector('.icon-label');
+      if (iconImg) iconImg.src = 'images/icon.png';
+      if (iconLabel) {
+        const locationNames = { M: '메인화면', C: '캐비넷', T: '꿀단지' };
+        iconLabel.textContent = `${locationNames[sourcePrefix]}${sourceGrid}`;
+      }
+      sourceIcon.style.display = 'none';
+    }
+    
+    // 성공 메시지
+    overlay.remove();
+    
+    const locationNames = { M: '메인화면', C: '캐비넷', T: '꿀단지' };
+    const destLocationName = locationNames[destPrefix];
+    
+    alert(`✅ 프로젝트 이동 완료!\n\n${sourceIconId} → ${destIconId}\n\n💡 ${destLocationName}에 저장되었습니다.\n관리자 → 생성/수정하기 → ${destLocationName}에서 확인할 수 있습니다.`);
+    
+    if (typeof isManagerOverlayOpen !== 'undefined') {
+      isManagerOverlayOpen = false;
+    }
+    
+    // 페이지 새로고침
+    setTimeout(() => location.reload(), 1000);
+  }
+  
+  // 빈 자리 찾기 함수
+  async function findEmptySlot(prefix) {
+    // 0,0 ~ 0,7, 1,0 ~ 1,7 순서로 검색
+    const slots = [];
+    for (let col = 0; col <= 1; col++) {
+      for (let row = 0; row <= 7; row++) {
+        slots.push(`${prefix}${col}${row}`);
+      }
+    }
+    
+    for (const slotId of slots) {
+      const key = `projectData_${slotId}`;
+      let data = null;
+      
+      if (typeof loadProjectFromDB === 'function') {
+        data = await loadProjectFromDB(key);
+      }
+      
+      if (!data) {
+        return slotId; // 빈 자리 발견
+      }
+    }
+    
+    return null; // 빈 자리 없음
+  }
+}
+
+// ==================== 데이터 확인 UI ====================
+
+async function showProjectDataViewer() {
+  console.log('🔍 데이터 확인 UI 표시');
+  
+  if (typeof isManagerOverlayOpen !== 'undefined') {
+    isManagerOverlayOpen = true;
+  }
+  
+  const overlay = createOverlay();
+  const container = createPopupContainer('900px');
+  
+  // 헤더
+  const header = document.createElement('div');
+  header.style.cssText = 'margin-bottom: 25px; padding-bottom: 15px; border-bottom: 2px solid #e0e0e0; text-align: center;';
+  header.innerHTML = `
+    <div style="font-size: 48px; margin-bottom: 10px;">🔍</div>
+    <h2 style="margin: 0; font-size: 28px; font-weight: 700; color: #2c3e50;">저장된 프로젝트 데이터 확인</h2>
+    <p style="color: #7f8c8d; font-size: 14px; margin-top: 10px;">메인화면, 캐비넷, 꿀단지에 저장된 프로젝트 목록</p>
+  `;
+  
+  // 로딩 메시지
+  const loadingMsg = document.createElement('div');
+  loadingMsg.style.cssText = 'text-align: center; padding: 40px; font-size: 18px; color: #7f8c8d;';
+  loadingMsg.textContent = '데이터를 불러오는 중...';
+  
+  container.appendChild(header);
+  container.appendChild(loadingMsg);
+  overlay.appendChild(container);
+  document.body.appendChild(overlay);
+  
+  // 데이터 로드
+  const locations = [
+    { name: '메인화면', prefix: 'M', color: '#3498db' },
+    { name: '캐비넷', prefix: 'C', color: '#9b59b6' },
+    { name: '꿀단지', prefix: 'T', color: '#95a5a6' }
+  ];
+  
+  const allData = {};
+  
+  for (const location of locations) {
+    allData[location.name] = [];
+    
+    for (let col = 0; col <= 2; col++) {
+      for (let row = 0; row <= 7; row++) {
+        const iconId = `${location.prefix}${col}${row}`;
+        const key = `projectData_${iconId}`;
+        
+        if (typeof loadProjectFromDB === 'function') {
+          const data = await loadProjectFromDB(key);
+          if (data) {
+            allData[location.name].push({
+              iconId,
+              projectName: data.projectName?.text || '(이름 없음)',
+              startYear: data.projectName?.startYear || '',
+              usage: data.usage?.text || ''
+            });
+          }
+        }
+      }
+    }
+  }
+  
+  // 결과 표시
+  loadingMsg.remove();
+  
+  const resultContainer = document.createElement('div');
+  resultContainer.style.cssText = 'max-height: 60vh; overflow-y: auto; padding: 20px;';
+  
+  locations.forEach(location => {
+    const locationSection = document.createElement('div');
+    locationSection.style.cssText = `margin-bottom: 30px; padding: 20px; background: ${location.color}15; border-radius: 12px; border: 2px solid ${location.color}40;`;
+    
+    const locationTitle = document.createElement('div');
+    locationTitle.style.cssText = `font-size: 20px; font-weight: bold; color: ${location.color}; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 2px solid ${location.color};`;
+    locationTitle.textContent = `${location.name} (${allData[location.name].length}개 프로젝트)`;
+    
+    locationSection.appendChild(locationTitle);
+    
+    if (allData[location.name].length === 0) {
+      const emptyMsg = document.createElement('div');
+      emptyMsg.style.cssText = 'text-align: center; padding: 20px; color: #7f8c8d; font-style: italic;';
+      emptyMsg.textContent = '저장된 프로젝트가 없습니다.';
+      locationSection.appendChild(emptyMsg);
+    } else {
+      const projectList = document.createElement('div');
+      projectList.style.cssText = 'display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;';
+      
+      allData[location.name].forEach(project => {
+        const projectCard = document.createElement('div');
+        projectCard.style.cssText = `
+          padding: 12px;
+          background: white;
+          border-radius: 8px;
+          border: 1px solid ${location.color}40;
+        `;
+        projectCard.innerHTML = `
+          <div style="font-weight: bold; color: ${location.color}; margin-bottom: 5px;">${project.iconId}</div>
+          <div style="font-size: 14px; color: #2c3e50; margin-bottom: 3px;">${project.projectName}</div>
+          <div style="font-size: 12px; color: #7f8c8d;">${project.startYear ? `📅 ${project.startYear}` : ''} ${project.usage ? `🏢 ${project.usage}` : ''}</div>
+        `;
+        projectList.appendChild(projectCard);
+      });
+      
+      locationSection.appendChild(projectList);
+    }
+    
+    resultContainer.appendChild(locationSection);
+  });
+  
+  // 닫기 버튼
+  const closeBtn = document.createElement('button');
+  closeBtn.textContent = '닫기';
+  closeBtn.style.cssText = `
+    width: 100%;
+    padding: 14px;
+    background: #95a5a6;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: 600;
+    margin-top: 20px;
+  `;
+  closeBtn.onclick = () => {
+    overlay.remove();
+    if (typeof isManagerOverlayOpen !== 'undefined') {
+      isManagerOverlayOpen = false;
+    }
+  };
+  
+  container.appendChild(resultContainer);
+  container.appendChild(closeBtn);
 }
 
 console.log('%c✅ 관리자 UI 모듈 로드됨 (Pure DOM)', 'color: #667eea; font-weight: bold; font-size: 14px;');
