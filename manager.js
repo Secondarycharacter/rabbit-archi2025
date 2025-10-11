@@ -1262,17 +1262,31 @@ async function exportProjectsDataJSON() {
   }
   
   try {
-    // 메인, 캐비넷, 꿀단지 모든 아이콘 포함
+    // 메인 아이콘 (M00-M17)
     const mainIconIds = ['M00', 'M01', 'M02', 'M03', 'M04', 'M05', 'M06', 'M07',
                          'M10', 'M11', 'M12', 'M13', 'M14', 'M15', 'M16', 'M17'];
-    const cabinetIconIds = ['C00', 'C01', 'C02', 'C03', 'C04', 'C05', 'C06', 'C07',
-                            'C10', 'C11', 'C12', 'C13', 'C14', 'C15', 'C16', 'C17',
-                            'C20', 'C21', 'C22', 'C23', 'C24', 'C25', 'C26', 'C27'];
-    const trashIconIds = ['T00', 'T01', 'T02', 'T03', 'T04', 'T05', 'T06', 'T07',
-                          'T10', 'T11', 'T12', 'T13', 'T14', 'T15', 'T16', 'T17',
-                          'T20', 'T21', 'T22', 'T23', 'T24', 'T25', 'T26', 'T27'];
+    
+    // 캐비넷 아이콘 (C00-C197, 19.7 제외)
+    const cabinetIconIds = [];
+    for (let x = 0; x <= 19; x++) {
+      for (let y = 0; y <= 7; y++) {
+        if (x === 19 && y === 7) continue; // 19.7은 관리자 아이콘 위치이므로 제외
+        cabinetIconIds.push(`C${x}${y}`);
+      }
+    }
+    
+    // 꿀단지 아이콘 (T00-T197, 19.7 제외)
+    const trashIconIds = [];
+    for (let x = 0; x <= 19; x++) {
+      for (let y = 0; y <= 7; y++) {
+        if (x === 19 && y === 7) continue; // 19.7은 관리자 아이콘 위치이므로 제외
+        trashIconIds.push(`T${x}${y}`);
+      }
+    }
     
     const allIconIds = [...mainIconIds, ...cabinetIconIds, ...trashIconIds];
+    
+    console.log(`📊 내보내기 대상: 메인 ${mainIconIds.length}개 + 캐비넷 ${cabinetIconIds.length}개 + 꿀단지 ${trashIconIds.length}개 = 총 ${allIconIds.length}개`);
     
     const projectsDataJSON = {};
     let exportCount = 0;

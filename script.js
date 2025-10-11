@@ -608,6 +608,55 @@ function updateContainerScale() {
 }
 
 // 페이지가 완전히 로드된 후 초기 위치 불러오기, 저장 및 이미지 위치 계산
+// JSON 파일 자동 로드 함수
+async function autoLoadProjectsDataJSON() {
+  console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('📂 projectsData.json 자동 로드 시작...');
+  
+  try {
+    const response = await fetch('projectsData.json');
+    
+    if (!response.ok) {
+      console.log('⚠️ projectsData.json 파일이 없습니다. (첫 방문자 또는 아직 내보내기 안 함)');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+      return;
+    }
+    
+    const projectsData = await response.json();
+    console.log('✅ JSON 파일 로드 성공');
+    console.log(`   발견된 프로젝트: ${Object.keys(projectsData).length}개`);
+    
+    let savedCount = 0;
+    let mainCount = 0, cabinetCount = 0, trashCount = 0;
+    
+    // IndexedDB에 저장
+    for (const [iconId, projectData] of Object.entries(projectsData)) {
+      const storageKey = `projectData_${iconId}`;
+      
+      if (typeof saveProjectToDB === 'function') {
+        await saveProjectToDB(storageKey, projectData);
+        savedCount++;
+        
+        if (iconId.startsWith('M')) mainCount++;
+        else if (iconId.startsWith('C')) cabinetCount++;
+        else if (iconId.startsWith('T')) trashCount++;
+        
+        const type = iconId.startsWith('M') ? '메인' : iconId.startsWith('C') ? '캐비넷' : '꿀단지';
+        console.log(`  ✅ ${iconId} (${type}): ${projectData.projectName?.text || iconId} → IndexedDB 저장`);
+      }
+    }
+    
+    console.log('\n✅ 자동 로드 완료!');
+    console.log(`   메인: ${mainCount}개 / 캐비넷: ${cabinetCount}개 / 꿀단지: ${trashCount}개`);
+    console.log(`   총 ${savedCount}개 프로젝트가 IndexedDB에 저장되었습니다.`);
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+    
+  } catch (error) {
+    console.error('❌ JSON 자동 로드 실패:', error);
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+  }
+}
+
 window.addEventListener('load', () => {
   setTimeout(async () => {
     loadInitialPositions();
