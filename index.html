@@ -3,8 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>토끼건축사사무소 워크패드 스튜디오</title>
+<title>토끼 건축사사무소 워크패드 스튜디오</title>
 <style>
+@font-face {
+  font-family: 'NanumSquareB';
+  src: url('fonts/NanumSquareB.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -16,201 +23,211 @@ body {
   height: 100vh;
   background: #000;
   overflow: hidden;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  font-family: 'WAGURI', sans-serif;
-}
-
-/* ON/OFF 이미지 컨테이너 */
-.onoff-container {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  opacity: 0;
-  animation: fadeIn 1s ease forwards;
-}
-
-@keyframes fadeIn {
-  to { opacity: 1; }
-}
-
-/* ON/OFF 이미지 */
-.onoff-image {
-  cursor: pointer;
-  display: block;
-  transition: all 0.3s ease;
-}
-
-/* 붉은색 네온 효과 (기본) */
-.onoff-image.red-neon {
-  filter: drop-shadow(0 0 1px rgba(255, 50, 50, 0.8))
-          drop-shadow(0 0 2px rgba(255, 50, 50, 0.6))
-          drop-shadow(0 0 3px rgba(255, 50, 50, 0.4));
-  animation: redNeonBlink 1.5s ease-in-out infinite;
-}
-
-@keyframes redNeonBlink {
-  0%, 100% {
-    filter: drop-shadow(0 0 1px rgba(255, 50, 50, 0.8))
-            drop-shadow(0 0 2px rgba(255, 50, 50, 0.6))
-            drop-shadow(0 0 3px rgba(255, 50, 50, 0.4));
-  }
-  50% {
-    filter: drop-shadow(0 0 2px rgba(255, 50, 50, 1))
-            drop-shadow(0 0 4px rgba(255, 50, 50, 0.8))
-            drop-shadow(0 0 6px rgba(255, 50, 50, 0.6));
-  }
-}
-
-/* 녹색 네온 효과 (클릭 시) */
-.onoff-image.green-neon {
-  filter: drop-shadow(0 0 2px rgba(50, 255, 50, 1))
-          drop-shadow(0 0 4px rgba(50, 255, 50, 0.8))
-          drop-shadow(0 0 6px rgba(50, 255, 50, 0.6))
-          drop-shadow(0 0 8px rgba(50, 255, 50, 0.4));
-  animation: greenNeonBlink 0.8s ease-in-out infinite;
-}
-
-@keyframes greenNeonBlink {
-  0%, 100% {
-    filter: drop-shadow(0 0 2px rgba(50, 255, 50, 1))
-            drop-shadow(0 0 4px rgba(50, 255, 50, 0.8))
-             drop-shadow(0 0 6px rgba(50, 255, 50, 0.6))
-            drop-shadow(0 0 8px rgba(50, 255, 50, 0.4));
-  }
-  50% {
-    filter: drop-shadow(0 0 2px rgba(50, 255, 50, 1))
-            drop-shadow(0 0 4px rgba(50, 255, 50, 0.8))
-           drop-shadow(0 0 6px rgba(50, 255, 50, 0.6))
-           drop-shadow(0 0 8px rgba(50, 255, 50, 0.4));
-  }
-}
-
-/* 타자 효과 텍스트 */
-.welcome-text {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  margin-top: 85px;
-  font-size: 24px;
+  font-family: 'NanumSquareB', sans-serif;
   color: #fff;
-  font-weight: bold;
+}
+
+.page-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.logo-wrapper {
+  position: absolute;
+  left: 50%;
+  top: calc(50% - 25px);
+  transform: translate(-50%, -100%);
+}
+
+.logo-frame {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 260px;
+  border: 4px solid #fff;
+  border-radius: 50%;
+  overflow: hidden;
+}
+
+.logo-frame img {
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+  display: block;
+}
+
+.welcome-wrapper {
+  position: absolute;
+  left: 50%;
+  top: calc(50% + 25px);
+  transform: translateX(-50%);
+}
+
+.welcome-message {
+  font-size: 18px;
+  line-height: 1.5;
+  text-align: center;
   text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
   opacity: 0;
-  white-space: nowrap;
+  transition: opacity 1s ease;
 }
 
-.welcome-text.show {
+.welcome-message.show {
   opacity: 1;
 }
 
-/* 페이드아웃 효과 */
-.fade-out {
-  animation: fadeOut 2s ease forwards;
+.bottom-area {
+  position: absolute;
+  left: 50%;
+  bottom: 25px;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
 }
 
-@keyframes fadeOut {
-  to { 
-    opacity: 0;
-    background: #000;
-  }
-}
-
-/* 메인 화면 로드 준비 */
-.main-loader {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background: #000;
-  z-index: 10000;
-  opacity: 1;
-  transition: opacity 1.5s ease;
-}
-
-.main-loader.fade-out {
+.uc-animation {
   opacity: 0;
-  pointer-events: none;
+  transition: opacity 0.5s ease;
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  transform: translateX(-10px);
+}
+
+.uc-animation.show {
+  opacity: 1;
+}
+
+.uc-animation img {
+  width: 160px;
+  height: auto;
+  object-fit: contain;
+}
+
+.maintenance-message {
+  font-size: 16px;
+  letter-spacing: 1px;
+  text-align: center;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+
+.maintenance-message.show {
+  opacity: 1;
+}
+
+@keyframes fadeBlink {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 1; }
+}
+
+.maintenance-message.fade {
+  animation: fadeBlink 1.5s ease-in-out infinite;
 }
 </style>
 </head>
 <body>
 
-<!-- ON/OFF 컨테이너 -->
-<div class="onoff-container" id="onoffContainer">
-  <img src="images/onoff.png" class="onoff-image red-neon" id="onoffImage" alt="ON/OFF">
-  <div class="welcome-text" id="welcomeText"></div>
+<div class="page-container">
+  <div class="logo-wrapper">
+    <div class="logo-frame">
+      <img src="images/CI/01 CI_index.png" alt="토끼건축사사무소 CI">
+    </div>
+  </div>
+
+  <div class="welcome-wrapper">
+    <div class="welcome-message" id="welcomeMessage"></div>
+  </div>
+
+  <div class="bottom-area">
+    <div class="uc-animation" id="ucAnimation">
+      <img src="images/UC/ps1.png" alt="토끼굴 애니메이션" id="ucAnimationImage">
+    </div>
+    <div class="maintenance-message" id="maintenanceMessage">토끼굴을 정비하고 있습니다.</div>
+  </div>
 </div>
 
 <script>
-// 전역 변수
-const onoffImage = document.getElementById('onoffImage');
-const welcomeText = document.getElementById('welcomeText');
-const onoffContainer = document.getElementById('onoffContainer');
-let isClicked = false;
+const welcomeMessage = document.getElementById('welcomeMessage');
+const maintenanceMessage = document.getElementById('maintenanceMessage');
+const ucAnimationContainer = document.getElementById('ucAnimation');
+const ucAnimationImage = document.getElementById('ucAnimationImage');
 
-// 타자 효과 함수
-function typeWriter(text, element, speed = 100) {
-  element.classList.add('show');
-  let i = 0;
-  
-  function type() {
-    if (i < text.length) {
-      element.textContent += text.charAt(i);
-      i++;
-      setTimeout(type, speed);
-    }
-  }
-  
-  type();
+const welcomeText = '토끼건축사사무소는 공간의 울림과 사람의 이야기에 귀 기울이고,<br>공간의 본질을 탐구하며, 새로운 도약을 꿈꾸는 건축사사무소입니다.';
+const animationFrames = Array.from({ length: 15 }, (_, idx) => `images/UC/ps${idx + 1}.png`);
+const tailFrames = animationFrames.slice(13);
+const frameDuration = 100;
+const tailLoopDuration = 5000;
+let animationStarted = false;
+
+function preloadFrames(frames) {
+  frames.forEach((src) => {
+    const img = new Image();
+    img.src = src;
+  });
 }
 
-// 페이드인 완료 후 네온 효과 시작 (1초 후)
-setTimeout(() => {
-  // 붉은색 네온 효과는 이미 CSS로 적용됨
-  console.log('✅ 붉은색 네온 효과 시작');
-}, 1000);
+function playFullSequence(callback) {
+  let index = 0;
 
-// 페이드인 완료 1초 후 텍스트 타자 효과 시작
-setTimeout(() => {
-  const message = '토끼건축사사무소 워크패드 스튜디오에 접속하시겠습니까?';
-  typeWriter(message, welcomeText, 80);
-}, 1000);
+  function nextFrame() {
+    ucAnimationImage.src = animationFrames[index];
+    index += 1;
 
-// ON/OFF 이미지 클릭 이벤트
-onoffImage.addEventListener('click', () => {
-  if (isClicked) return; // 중복 클릭 방지
-  isClicked = true;
-  
-  console.log('🖱️ ON/OFF 이미지 클릭됨');
-  
-  // 붉은색 네온 제거, 녹색 네온 추가
-  onoffImage.classList.remove('red-neon');
-  onoffImage.classList.add('green-neon');
-  
-  // 2초 후 화면 페이드아웃 및 메인 페이지로 이동
+    if (index < animationFrames.length) {
+      setTimeout(nextFrame, frameDuration);
+    } else if (typeof callback === 'function') {
+      callback();
+    }
+  }
+
+  nextFrame();
+}
+
+function playTailLoop() {
+  const startTime = performance.now();
+  let index = 0;
+
+  function nextTailFrame() {
+    ucAnimationImage.src = tailFrames[index % tailFrames.length];
+    index += 1;
+
+    if (performance.now() - startTime < tailLoopDuration) {
+      setTimeout(nextTailFrame, frameDuration);
+    } else {
+      playFullSequence(playTailLoop);
+    }
+  }
+
+  nextTailFrame();
+}
+
+function startUcAnimation() {
+  if (animationStarted) return;
+  animationStarted = true;
+  ucAnimationContainer.classList.add('show');
+  preloadFrames(animationFrames);
+  playFullSequence(playTailLoop);
+}
+
+function showWelcomeSequence() {
+  welcomeMessage.innerHTML = welcomeText;
+  welcomeMessage.classList.add('show');
+
   setTimeout(() => {
-    console.log('🌑 화면 페이드아웃 시작');
-    
-    // 전체 컨테이너 페이드아웃
-    onoffContainer.style.transition = 'opacity 2s ease';
-    onoffContainer.style.opacity = '0';
-    
-    // 2초 후 메인 페이지로 이동
-    setTimeout(() => {
-      console.log('📺 메인 페이지로 이동 (모니터 켜지는 효과)');
-      window.location.href = 'main.html';
-    }, 2000);
+    maintenanceMessage.classList.add('show', 'fade');
+    startUcAnimation();
   }, 2000);
-});
+}
 
-// 디버그용
-console.log('✅ 인덱스 페이지 로드 완료');
-console.log('📸 ON/OFF 이미지 페이드인 시작');
+window.addEventListener('DOMContentLoaded', () => {
+  console.log('✅ 인덱스 페이지 로드 완료');
+  showWelcomeSequence();
+});
 </script>
 
 </body>
