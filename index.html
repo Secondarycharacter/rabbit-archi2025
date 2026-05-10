@@ -4,12 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>토끼 건축사사무소 워크패드 스튜디오</title>
+
 <style>
 @font-face {
   font-family: 'NanumSquareB';
   src: url('fonts/NanumSquareB.otf') format('opentype');
-  font-weight: normal;
-  font-style: normal;
 }
 
 * {
@@ -53,8 +52,6 @@ body {
 
 .logo-frame img {
   width: 100%;
-  height: auto;
-  object-fit: contain;
   display: block;
 }
 
@@ -69,7 +66,6 @@ body {
   font-size: 18px;
   line-height: 1.5;
   text-align: center;
-  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
   opacity: 0;
   transition: opacity 1s ease;
 }
@@ -92,10 +88,6 @@ body {
 .uc-animation {
   opacity: 0;
   transition: opacity 0.5s ease;
-  display: flex;
-  justify-content: center;
-  width: 100%;
-  transform: translateX(-10px);
 }
 
 .uc-animation.show {
@@ -104,14 +96,10 @@ body {
 
 .uc-animation img {
   width: 160px;
-  height: auto;
-  object-fit: contain;
 }
 
 .maintenance-message {
   font-size: 16px;
-  letter-spacing: 1px;
-  text-align: center;
   opacity: 0;
   transition: opacity 0.5s ease;
 }
@@ -128,14 +116,72 @@ body {
 .maintenance-message.fade {
   animation: fadeBlink 1.5s ease-in-out infinite;
 }
+
+/* ROADMAP MENU */
+.roadmap-menu {
+  position: absolute;
+  top: 40px;
+  right: 50px;
+  color: #fff;
+  font-size: 18px;
+  letter-spacing: 2px;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 1s ease;
+  z-index: 100;
+}
+
+.roadmap-menu.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.roadmap-overlay {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  background: #000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.5s ease;
+  z-index: 9999;
+}
+
+.roadmap-overlay.show {
+  opacity: 1;
+  visibility: visible;
+}
+
+.roadmap-overlay img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.roadmap-guide {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 12px;
+  color: rgba(255,255,255,0.85);
+  animation: fadeBlink 1.5s ease-in-out infinite;
+}
 </style>
 </head>
+
 <body>
 
 <div class="page-container">
+
   <div class="logo-wrapper">
     <div class="logo-frame">
-      <img src="images/CI/01 CI_index.png" alt="토끼건축사사무소 CI">
+      <img src="images/CI/01 CI_index.png" alt="CI">
     </div>
   </div>
 
@@ -145,23 +191,46 @@ body {
 
   <div class="bottom-area">
     <div class="uc-animation" id="ucAnimation">
-      <img src="images/UC/ps1.png" alt="토끼굴 애니메이션" id="ucAnimationImage">
+      <img src="images/UC/ps1.png" alt="animation" id="ucAnimationImage">
     </div>
-    <div class="maintenance-message" id="maintenanceMessage">토끼굴을 정비하고 있습니다.</div>
+
+    <div class="maintenance-message" id="maintenanceMessage">
+      토끼굴을 정비하고 있습니다.
+    </div>
+  </div>
+
+  <div class="roadmap-menu" id="roadmapMenu">ROADMAP</div>
+
+</div>
+
+<div class="roadmap-overlay" id="roadmapOverlay">
+  <img src="images/roadmap/roadmap_ver260510.png" alt="ROADMAP">
+  <div class="roadmap-guide">
+    ESC를 누르면 초기화면으로 돌아갑니다.
   </div>
 </div>
 
 <script>
+
 const welcomeMessage = document.getElementById('welcomeMessage');
 const maintenanceMessage = document.getElementById('maintenanceMessage');
 const ucAnimationContainer = document.getElementById('ucAnimation');
 const ucAnimationImage = document.getElementById('ucAnimationImage');
 
-const welcomeText = '토끼건축사사무소는 공간의 울림과 사람의 이야기에 귀 기울이고,<br>공간의 본질을 탐구하며, 새로운 도약을 꿈꾸는 건축사사무소입니다.';
-const animationFrames = Array.from({ length: 15 }, (_, idx) => `images/UC/ps${idx + 1}.png`);
+const roadmapMenu = document.getElementById('roadmapMenu');
+const roadmapOverlay = document.getElementById('roadmapOverlay');
+
+const welcomeText =
+'토끼건축사사무소는 공간의 울림과 사람의 이야기에 귀 기울이고,<br>공간의 본질을 탐구하며, 새로운 도약을 꿈꾸는 건축사사무소입니다.';
+
+const animationFrames =
+Array.from({ length: 15 }, (_, idx) => `images/UC/ps${idx + 1}.png`);
+
 const tailFrames = animationFrames.slice(13);
+
 const frameDuration = 100;
 const tailLoopDuration = 5000;
+
 let animationStarted = false;
 
 function preloadFrames(frames) {
@@ -172,9 +241,11 @@ function preloadFrames(frames) {
 }
 
 function playFullSequence(callback) {
+
   let index = 0;
 
   function nextFrame() {
+
     ucAnimationImage.src = animationFrames[index];
     index += 1;
 
@@ -189,10 +260,12 @@ function playFullSequence(callback) {
 }
 
 function playTailLoop() {
+
   const startTime = performance.now();
   let index = 0;
 
   function nextTailFrame() {
+
     ucAnimationImage.src = tailFrames[index % tailFrames.length];
     index += 1;
 
@@ -207,27 +280,56 @@ function playTailLoop() {
 }
 
 function startUcAnimation() {
+
   if (animationStarted) return;
+
   animationStarted = true;
+
   ucAnimationContainer.classList.add('show');
+
   preloadFrames(animationFrames);
+
   playFullSequence(playTailLoop);
 }
 
 function showWelcomeSequence() {
+
   welcomeMessage.innerHTML = welcomeText;
   welcomeMessage.classList.add('show');
 
   setTimeout(() => {
+
     maintenanceMessage.classList.add('show', 'fade');
+
     startUcAnimation();
+
+    setTimeout(() => {
+      roadmapMenu.classList.add('show');
+    }, 3000);
+
   }, 2000);
 }
 
-window.addEventListener('DOMContentLoaded', () => {
-  console.log('✅ 인덱스 페이지 로드 완료');
-  showWelcomeSequence();
+roadmapMenu.addEventListener('click', () => {
+  roadmapOverlay.classList.add('show');
 });
+
+window.addEventListener('keydown', (event) => {
+
+  if (event.key === 'Escape') {
+    roadmapOverlay.classList.remove('show');
+  }
+
+});
+
+window.addEventListener('DOMContentLoaded', () => {
+
+  console.log('인덱스 페이지 로드 완료');
+
+  showWelcomeSequence();
+
+});
+
 </script>
 
 </body>
