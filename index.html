@@ -316,8 +316,25 @@ roadmapMenu.addEventListener('click', () => {
 
 window.addEventListener('keydown', (event) => {
 
-  if (event.key === 'Escape') {
-    roadmapOverlay.classList.remove('show');
+  if (event.key === 'Escape' && roadmapOverlay.classList.contains('show')) {
+
+    // 재시작 직전 요소 숨김 처리
+    roadmapOverlay.style.opacity = '0';
+    roadmapOverlay.style.visibility = 'hidden';
+
+    ucAnimationContainer.classList.remove('show');
+    maintenanceMessage.classList.remove('show', 'fade');
+    roadmapMenu.classList.remove('show');
+    welcomeMessage.classList.remove('show');
+
+    // 애니메이션 초기 프레임 고정
+    ucAnimationImage.src = 'images/UC/ps1.png';
+
+    // 완전히 숨겨진 뒤 새로고침
+    setTimeout(() => {
+      location.reload();
+    }, 100);
+
   }
 
 });
