@@ -4,102 +4,16 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ROADMAP</title>
-
-<style>
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-body {
-  width: 100vw;
-  height: 100vh;
-  overflow: hidden;
-  background: #000;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  transition: opacity 0.2s ease;
-  font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
-}
-
-.roadmap-container {
-  position: relative;
-  width: 100vw;
-  height: 100vh;
-}
-
-.roadmap-container img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-
-/* 애니메이션이 적용될 가평 수녀원 진행중 텍스트 레이어 */
-.status-overlay {
-  position: absolute;
-  /* 이미지 내 '가평OO수녀원 기본 및 실시설계 진행중' 위치에 맞춰 유동적으로 배치할 수 있는 레이어 예시 */
-  /* 실제 이미지 위에 정확히 얹기 위해 위치 값을 적절히 조정하거나, 기존 이미지의 해당 부분을 가리고 텍스트로 대체할 수 있습니다. */
-  top: 43.5%; 
-  left: 54.3%;
-  transform: translate(-50%, -50%);
-  color: rgba(17, 100, 10, 0.85);
-  /* color: #6d5343; /* 로드맵 이미지의 텍스트 톤에 맞춘 갈색 계열 */
-  font-size: 11px;
-  font-weight: bold;
-  line-height: 1.4;
-  text-align: center;
-  background-color: #faf8f5; /* 이미지 배경색과 일치시켜 기존 텍스트를 덮어씌움 */
-  padding: 2px 5px;
-  display: none; /* 기본적으로는 이미지 위에 완벽히 매칭하기 까다로우므로, CSS/JS 조작용 구조로 포함 */
-}
-
-/* 순차적으로 생성되고 사라지는 점(...) 애니메이션 */
-.dots::after {
-  content: '';
-  animation: dot-animation 1.5s infinite steps(4);
-}
-
-@keyframes dot-animation {
-  0% { content: ''; }
-  25% { content: '.'; }
-  50% { content: '..'; }
-  75% { content: '...'; }
-  100% { content: ''; }
-}
-
-.guide-message {
-  position: absolute;
-  bottom: 15px;
-  left: 50%;
-  transform: translateX(-50%);
-  color: rgba(17, 100, 10, 0.85);
-  font-size: 12px;
-  letter-spacing: 1px;
-  animation: blink 1.5s ease-in-out infinite;
-}
-
-@keyframes blink {
-  0%, 100% { opacity: 0; }
-  50% { opacity: 1; }
-}
-</style>
+<link rel="stylesheet" href="roadmap.css">
 </head>
 
 <body>
 
 <div class="roadmap-container">
 
-  <!-- 원본 로드맵 이미지 표시 -->
-  <img src="images/roadmap/roadmap.png" alt="ROADMAP" id="roadmap-img">
+  <img src="images/roadmap/roadmap.png" alt="ROADMAP">
 
-  <!-- 이미지 위에 특정 위치에 '진행중...' 애니메이션 효과를 동적으로 넣고 싶을 때 활용할 수 있는 가이드 레이어 -->
-  <!-- CSS로 정확한 위치(top, left)와 배경색을 맞춰 이미지 위의 글자를 덮어씌우는 용도입니다. -->
-  <div class="status-overlay" id="animated-status">
-    2026.05<br>
-    가평OO수녀원<br>
-    기본 및 실시설계<br>
+  <div class="animated-loading-status">
     진행중<span class="dots"></span>
   </div>
 
@@ -110,7 +24,7 @@ body {
 </div>
 
 <script>
-// ESC 키 입력 시 이전 페이지로 이동하는 기존 로직 유지
+// ESC 키 입력 시 index.html로 이동하는 로직
 window.addEventListener('keydown', (event) => {
   if (event.key === 'Escape') {
     document.body.style.opacity = '0';
@@ -118,18 +32,6 @@ window.addEventListener('keydown', (event) => {
       window.location.href = 'index.html';
     }, 200);
   }
-});
-
-/* [안내] 이미지 내의 특정 텍스트("진행중")의 글자만 직접 HTML/CSS로 애니메이션을 주기 위해서는,
-  해당 위치를 정확히 덮어씌우는 레이어가 필요합니다.
-  위의 #animated-status 레이어의 display를 block으로 바꾸고 
-  사용하시는 모니터/브라우저 해상도 및 이미지 크기에 맞춰 top, left 값을 미세 조정하여 사용하실 수 있습니다.
-  
-  또는 아래 스크립트를 통해 전체 화면 대비 이미지 비율을 계산하여 동적으로 위치를 맞출 수도 있습니다.
-*/
-window.addEventListener('load', () => {
-  const overlay = document.getElementById('animated-status');
-  // 필요 시 overlay.style.display = 'block'; 으로 설정하여 활성화할 수 있습니다.
 });
 </script>
 
