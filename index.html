@@ -203,12 +203,7 @@ body {
 
 </div>
 
-<div class="roadmap-overlay" id="roadmapOverlay">
-  <img src="images/roadmap/roadmap.png" alt="ROADMAP">
-  <div class="roadmap-guide">
-    ESC를 누르면 초기화면으로 돌아갑니다.
-  </div>
-</div>
+
 
 <script>
 
@@ -218,7 +213,7 @@ const ucAnimationContainer = document.getElementById('ucAnimation');
 const ucAnimationImage = document.getElementById('ucAnimationImage');
 
 const roadmapMenu = document.getElementById('roadmapMenu');
-const roadmapOverlay = document.getElementById('roadmapOverlay');
+
 
 const welcomeText =
 '토끼건축사사무소는 공간의 울림과 사람의 이야기에 귀 기울이고,<br>공간의 본질을 탐구하며, 새로운 도약을 꿈꾸는 건축사사무소입니다.';
@@ -311,33 +306,9 @@ function showWelcomeSequence() {
 }
 
 roadmapMenu.addEventListener('click', () => {
-  roadmapOverlay.classList.add('show');
+  window.location.href = 'roadmap.html';
 });
 
-window.addEventListener('keydown', (event) => {
-
-  if (event.key === 'Escape' && roadmapOverlay.classList.contains('show')) {
-
-    // 재시작 직전 요소 숨김 처리
-    roadmapOverlay.style.opacity = '0';
-    roadmapOverlay.style.visibility = 'hidden';
-
-    ucAnimationContainer.classList.remove('show');
-    maintenanceMessage.classList.remove('show', 'fade');
-    roadmapMenu.classList.remove('show');
-    welcomeMessage.classList.remove('show');
-
-    // 애니메이션 초기 프레임 고정
-    ucAnimationImage.src = 'images/UC/ps1.png';
-
-    // 완전히 숨겨진 뒤 새로고침
-    setTimeout(() => {
-      location.reload();
-    }, 100);
-
-  }
-
-});
 
 window.addEventListener('DOMContentLoaded', () => {
 
