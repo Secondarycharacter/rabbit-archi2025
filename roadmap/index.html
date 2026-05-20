@@ -1,1 +1,112 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Timeline Swing V3 - Roadmap Edition</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
 
+  <!-- 메인 타임라인 컨테이너 -->
+  <div class="timeline-wrapper">
+    <!-- 로드맵 상단 헤더 및 안내 문구 추가 -->
+    <div class="roadmap-header">
+      <h1>PROJECT ROADMAP</h1>
+      <p class="roadmap-subtitle">우리의 여정과 도전, 미래를 향한 로드맵 단계별 아카이브</p>
+    </div>
+
+    <div class="timeline">
+      <div class="period-nav">
+        <button class="nav-btn nav-left" id="btn-prev">&#8592;</button>
+        <div class="period-label-wrap">
+          <span class="period-label" id="period-label">2026 H1</span>
+        </div>
+        <button class="nav-btn nav-right" id="btn-next">&#8594;</button>
+      </div>
+
+      <div class="main-line">
+        <div class="edge left"></div>
+        <div class="edge right"></div>
+      </div>
+
+      <!-- 로드맵 기본 5단계 고정 가이드 인디케이터 (비주얼 강화) -->
+      <div class="roadmap-steps-guide">
+        <div class="step-badge">00. Journey</div>
+        <div class="step-badge">01. Investigate</div>
+        <div class="step-badge">02. Comprehend</div>
+        <div class="step-badge">03. Link</div>
+        <div class="step-badge">04. Broaden</div>
+      </div>
+
+      <div id="fruit-container"></div>
+    </div>
+  </div>
+
+  <!-- 우측 하단 어드민 진입 트리거 -->
+  <div class="admin-trigger" id="admin-trigger">...</div>
+
+  <!-- 프로젝트 관리 패널 모달 -->
+  <div class="admin-modal" id="admin-modal">
+    <div class="admin-panel">
+      <div class="admin-header">
+        <h2>프로젝트 및 로드맵 관리</h2>
+        <button class="close-btn" id="close-admin-btn">&times;</button>
+      </div>
+
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Period *</label>
+          <select id="project-period">
+            <option value="">선택</option>
+            <option>2025 H2</option>
+            <option>2026 H1</option>
+            <option>2026 H2</option>
+            <option>2027 H1</option>
+            <option>2027 H2</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Type / Roadmap Phase *</label>
+          <select id="project-type">
+            <option value="">선택</option>
+            <option value="type1">00. Journey (큰 과일)</option>
+            <option value="type2">01. Investigate (작은 과일)</option>
+            <option value="type3">02. Comprehend</option>
+            <option value="type4">03. Link</option>
+            <option value="type5">04. Broaden</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Date *</label>
+          <input type="text" id="project-date" placeholder="2026.01">
+        </div>
+
+        <div class="form-group desc-group">
+          <label>Description * (작성 시 입력한 줄바꿈이 그대로 반영됩니다)</label>
+          <textarea id="project-desc" rows="3" placeholder="프로젝트 내용 또는 공모명을 입력하세요."></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>Rank / Status</label>
+          <input type="text" id="project-rank" placeholder="예: 4위 또는 진행중">
+        </div>
+      </div>
+
+      <div class="button-row">
+        <button id="add-project-btn">프로젝트 추가</button>
+        <button id="update-project-btn">프로젝트 수정</button>
+        <button id="delete-project-btn">프로젝트 삭제</button>
+      </div>
+
+      <div class="project-list-wrap">
+        <select id="project-select" size="8"></select>
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
