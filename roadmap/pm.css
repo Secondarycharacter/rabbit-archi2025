@@ -1,0 +1,93 @@
+body{
+  background:#f7f3ef;
+  font-family:'Pretendard', sans-serif;
+  color:#665647;
+  padding: 20px;
+}
+
+.admin-panel{
+  width:1300px;
+  margin:40px auto 20px;
+  padding:24px;
+  background:#fff;
+  border:1px solid #ddd;
+  border-radius:16px;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+}
+
+.admin-panel h2{
+  font-size:22px;
+  margin-bottom:20px;
+  color:#665647;
+}
+
+.form-grid{
+  display:grid;
+  grid-template-columns:repeat(5, 1fr);
+  gap:16px;
+}
+
+.form-group{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+
+.form-group label{
+  font-size:13px;
+  color:#665647;
+  font-weight: bold;
+}
+
+.form-group input,
+.form-group select{
+  height:42px;
+  padding:0 12px;
+  border:1px solid #ccc;
+  border-radius:8px;
+  font-size:14px;
+}
+
+.button-row{
+  display:flex;
+  gap:12px;
+  margin-top:24px;
+}
+
+.button-row button{
+  height:42px;
+  padding:0 20px;
+  border:none;
+  border-radius:10px;
+  background:#8d7865;
+  color:white;
+  cursor:pointer;
+  font-size:14px;
+  font-weight: bold;
+  transition: background 0.2s;
+}
+
+.button-row button:hover{
+  background: #665647;
+}
+
+#delete-project-btn {
+  background: #c94c4c;
+}
+#delete-project-btn:hover {
+  background: #b03a3a;
+}
+
+.project-list-wrap{
+  margin-top:24px;
+}
+
+#project-select{
+  width:100%;
+  height:260px;
+  border-radius:12px;
+  border:1px solid #ccc;
+  padding:12px;
+  font-size:14px;
+  font-family: monospace;
+}

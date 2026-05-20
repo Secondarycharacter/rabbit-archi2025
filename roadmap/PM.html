@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Timeline Swing V3 - Project Manager</title>
+  <link rel="stylesheet" href="pm.css">
+</head>
+<body>
+
+<div class="admin-panel">
+  <h2>프로젝트 관리 툴</h2>
+  <div class="form-grid">
+    <div class="form-group">
+      <label>Period *</label>
+      <select id="project-period">
+        <option value="">선택</option>
+        <option>2025 H2</option>
+        <option>2026 H1</option>
+        <option>2026 H2</option>
+        <option>2027 H1</option>
+        <option>2027 H2</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label>Type *</label>
+      <select id="project-type">
+        <option value="">선택</option>
+        <option value="type1">type1 (큰 과일)</option>
+        <option value="type2">type2 (작은 과일)</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label>Date *</label>
+      <input type="text" id="project-date" placeholder="2026.01">
+    </div>
+
+    <div class="form-group">
+      <label>Description * (줄바꿈은 엔터 또는 공백 구분)</label>
+      <input type="text" id="project-desc" placeholder="프로젝트 이름을 입력하시오">
+    </div>
+
+    <div class="form-group">
+      <label>Rank</label>
+      <input type="text" id="project-rank" placeholder="랭크를 적으시오">
+    </div>
+  </div>
+
+  <div class="button-row">
+    <button id="add-project-btn">프로젝트 추가</button>
+    <button id="update-project-btn">프로젝트 수정</button>
+    <button id="delete-project-btn">프로젝트 삭제</button>
+  </div>
+
+  <div class="project-list-wrap">
+    <select id="project-select" size="10"></select>
+  </div>
+</div>
+
+<script src="projects.js"></script>
+<script src="pm.js"></script>
+</body>
+</html>

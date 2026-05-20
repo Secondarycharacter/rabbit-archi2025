@@ -1,0 +1,166 @@
+*{
+  margin:0;
+  padding:0;
+  box-sizing:border-box;
+}
+
+body{
+  background:#f7f3ef;
+  font-family:'Pretendard', sans-serif;
+  color:#665647;
+}
+
+.timeline{
+  width:1400px;
+  height:700px;
+  margin:0 auto;
+  position:relative;
+  padding-top:80px;
+}
+
+.period-nav{
+  position:absolute;
+  top:52px;           
+  left:50px;
+  width:1300px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:24px;
+  z-index:10;
+}
+
+.period-label-wrap{
+  min-width:140px;
+  text-align:center;
+  position:relative;
+}
+
+.period-label{
+  font-size:27px;       
+  font-weight:600;
+  color:#665647;
+  opacity:1;
+  transition:opacity 0.4s ease;
+  display:block;
+}
+
+.period-label.fade-out{
+  opacity:0;
+  transition:opacity 0.3s ease;
+}
+
+.nav-btn{
+  background:none;
+  border:none;
+  cursor:pointer;
+  font-size:20px;
+  color:#8d7865;
+  padding:4px 8px;
+  line-height:1;
+  transition:color 0.2s;
+  user-select:none;
+}
+
+.nav-btn:hover{
+  color:#665647;
+}
+
+.main-line{
+  position:absolute;
+  top:120px;
+  left:50px;
+  width:1300px;
+  height:3px;
+  background:#8d7865;
+}
+
+.edge{
+  position:absolute;
+  width:18px;
+  height:18px;
+  border-radius:50%;
+  background:#8d7865;
+  top:50%;
+  transform:translateY(-50%);
+}
+
+.edge.left{
+  left:-9px;
+}
+
+.edge.right{
+  right:-9px;
+}
+
+.fruit{
+  position:absolute;
+  top:113px; 
+  transform-origin:top center;
+}
+
+.hook{
+  width:14px;
+  height:14px;
+  border-radius:50%;
+  border:2px solid #8d7865;
+  background:#f7f3ef;
+  margin:0 auto;
+}
+
+.hook.small{
+  width:14px;
+  height:14px;
+  border:none;
+  background:#8d7865;
+  border-radius:50%;
+  margin:0 auto;
+}
+
+.stem{
+  width:2px;
+  height:90px;
+  background:#8d7865;
+  margin:0 auto;
+}
+
+.short{
+  height:50px;
+}
+
+.text{
+  text-align:center;
+}
+
+.date{
+  font-size:18px;
+  margin-top:18px;
+  margin-bottom:10px;
+}
+
+.desc{
+  font-size:14px;
+  line-height:1.5;
+}
+
+.rank{
+  display:inline-block;
+  margin-top:12px;
+  padding:2px 8px;
+  border:1px solid #8d7865;
+  font-size:12px;
+}
+
+.small-text{
+  text-align:center;
+  font-size:12px;
+  line-height:1.5;
+  margin-top:12px;
+}
+
+@media (max-width:1450px){
+  .timeline{
+    transform:scale(0.9);
+    transform-origin:top center;
+  }
+}

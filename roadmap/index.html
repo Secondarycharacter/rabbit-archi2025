@@ -1,1 +1,32 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Timeline Swing V3 - Viewer</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
 
+<div class="timeline">
+  <div class="period-nav">
+    <button class="nav-btn nav-left" id="btn-prev">&#8592;</button>
+    <div class="period-label-wrap">
+      <span class="period-label" id="period-label">2026 H1</span>
+    </div>
+    <button class="nav-btn nav-right" id="btn-next">&#8594;</button>
+  </div>
+
+  <div class="main-line">
+    <div class="edge left"></div>
+    <div class="edge right"></div>
+  </div>
+
+  <div id="fruit-container"></div>
+</div>
+
+<!-- 공통 데이터 로드 후 타임라인 스크립트 실행 -->
+<script src="projects.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
