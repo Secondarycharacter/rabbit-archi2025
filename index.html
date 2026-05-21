@@ -211,9 +211,7 @@ const welcomeMessage = document.getElementById('welcomeMessage');
 const maintenanceMessage = document.getElementById('maintenanceMessage');
 const ucAnimationContainer = document.getElementById('ucAnimation');
 const ucAnimationImage = document.getElementById('ucAnimationImage');
-
 const roadmapMenu = document.getElementById('roadmapMenu');
-
 
 const welcomeText =
 '토끼건축사사무소는 공간의 울림과 사람의 이야기에 귀 기울이고,<br>공간의 본질을 탐구하며, 새로운 도약을 꿈꾸는 건축사사무소입니다.';
@@ -236,87 +234,63 @@ function preloadFrames(frames) {
 }
 
 function playFullSequence(callback) {
-
   let index = 0;
-
   function nextFrame() {
-
     ucAnimationImage.src = animationFrames[index];
     index += 1;
-
     if (index < animationFrames.length) {
       setTimeout(nextFrame, frameDuration);
     } else if (typeof callback === 'function') {
       callback();
     }
   }
-
   nextFrame();
 }
 
 function playTailLoop() {
-
   const startTime = performance.now();
   let index = 0;
-
   function nextTailFrame() {
-
     ucAnimationImage.src = tailFrames[index % tailFrames.length];
     index += 1;
-
     if (performance.now() - startTime < tailLoopDuration) {
       setTimeout(nextTailFrame, frameDuration);
     } else {
       playFullSequence(playTailLoop);
     }
   }
-
   nextTailFrame();
 }
 
 function startUcAnimation() {
-
   if (animationStarted) return;
-
   animationStarted = true;
-
   ucAnimationContainer.classList.add('show');
-
   preloadFrames(animationFrames);
-
   playFullSequence(playTailLoop);
 }
 
 function showWelcomeSequence() {
-
   welcomeMessage.innerHTML = welcomeText;
   welcomeMessage.classList.add('show');
 
   setTimeout(() => {
-
     maintenanceMessage.classList.add('show', 'fade');
-
     startUcAnimation();
-
     setTimeout(() => {
       roadmapMenu.classList.add('show');
     }, 2000);
-
   }, 1500);
 }
 
-// 🔗 이 부분이 깃허브 폴더 구조에 맞춰 수정된 경로입니다!
+// GitHub Pages 구조: index.html(루트) → roadmap/roadmap.html
 roadmapMenu.addEventListener('click', () => {
   window.location.href = 'roadmap/roadmap.html';
 });
 
-
 window.addEventListener('DOMContentLoaded', () => {
-
   console.log('인덱스 페이지 로드 완료');
-
   showWelcomeSequence();
-
 });
 
 </script>
