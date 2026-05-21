@@ -1,6 +1,4 @@
 // ── Firebase SDK (CDN 방식) ──
-// roadmap.html의 <script type="module\"> 안에서 실행됩니다
-
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
@@ -17,7 +15,6 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const COLLECTION = 'projects';
 
-// 초기 기본 고정 데이터 (Firestore가 비어있을 때 1회 업로드)
 const defaultProjects = [
   { type: 'type1', date: '2025.11', period: '2025 H2', desc: ['서충주 종합사회복지관', '건립사업 설계공모'], rank: '4위' },
   { type: 'type1', date: '2026.01', period: '2026 H1', desc: ['진주시 글로벌', '어울림센터 조성사업', '설계공모'], rank: '5위' },
@@ -27,7 +24,6 @@ const defaultProjects = [
   { type: 'type2', date: '2026.05', period: '2026 H1', desc: ['가평OO수녀원', '기본 및 실시설계', '진행중...'], rank: '' }
 ];
 
-// ── Firestore CRUD ──
 async function loadProjectsFromFirestore() {
   const snapshot = await getDocs(collection(db, COLLECTION));
   if (snapshot.empty) {
@@ -54,9 +50,7 @@ async function deleteProjectFromFirestore(id) {
   await deleteDoc(ref);
 }
 
-// ── 앱 상태 ──
 let projects = [];
-
 const periods = ['2025 H2', '2026 H1', '2026 H2', '2027 H1', '2027 H2'];
 let currentIndex = 1;
 
@@ -78,7 +72,7 @@ function getDescHtml(descArray) {
   return descArray.map(d => `<div>${d}</div>`).join('');
 }
 
-// 🎨 타임라인 렌더링 함수 수정 (CSS 디자인 규격과 완벽 동기화)
+// 🎨 [위치 수정 완료] 타임라인 렌더링 함수
 function renderTimeline() {
   container.innerHTML = '';
   sortProjects();
@@ -88,43 +82,46 @@ function renderTimeline() {
 
   if (filtered.length === 0) return;
 
-  const totalWidth = 1400;
-  const margin = 150;
-  const startX = margin;
-  const endX = totalWidth - margin;
-  const availableWidth = endX - startX;
+  // CSS 가로축 설계 규격 명확히 반영
+  const totalWidth = 1400;      // .timeline-wrapper 전체 너비
+  const margin = 150;          // .main-line의 좌우 여백 (150px)
+  const startX = margin;       // 실제 배치 시작점: 150px
+  const endX = totalWidth - margin; // 실제 배치 종료점: 1250px
+  const availableWidth = endX - startX; // 실제 과일이 늘어설 줄의 유효 너비: 1100px
 
   filtered.forEach((proj, idx) => {
+    // 1. 가로(Left) 위치 계산
     let leftPosition = startX;
     if (filtered.length > 1) {
       leftPosition = startX + (availableWidth / (filtered.length - 1)) * idx;
     } else {
-      leftPosition = startX + (availableWidth / 2);
+      leftPosition = startX + (availableWidth / 2); // 데이터가 1개일 땐 정중앙
     }
 
     const fruitDiv = document.createElement('div');
-    // CSS에 정의된 .fruit 클래스를 부여하여 공통 속성 유지
     fruitDiv.className = `fruit ${proj.type || 'type1'}`;
     fruitDiv.style.left = `${leftPosition}px`;
 
-    // 💡 핵심: 홀수와 짝수 인덱스 정렬을 지그재그 분기하여 겹침 방지 및 대롱대롱 효과 극대화
+    // 2. 세로(Top) 및 줄 기하학적 매칭 구조 조정
     let hookClass = 'hook';
     let stemClass = 'stem';
 
+    // 인덱스 순서(idx)에 따라 상하 지그재그 배치 분기
     if (idx % 2 === 1) {
-      // 홀수 번째 과일은 위쪽 라인에 배치 (줄과 고리를 짧고 작게 변경)
-      fruitDiv.style.top = '150px';
+      // 홀수 번째 과일은 중심선보다 '위'로 올려 매달기
+      // CSS에서 메인 라인이 중앙(top: 300px 근처)에 있으므로, 
+      // 위로 매달리는 아이템은 줄이 위쪽으로 솟아야 레이아웃 정합성이 맞습니다.
+      fruitDiv.style.top = '100px'; 
       hookClass = 'hook small';
       stemClass = 'stem short';
     } else {
-      // 짝수 번째 과일은 아래쪽 라인에 배치
-      fruitDiv.style.top = '300px';
+      // 짝수 번째 과일은 중심선보다 '아래'로 내려 매달기
+      fruitDiv.style.top = '295px'; 
     }
 
     const descHtml = getDescHtml(proj.desc);
     const textGroupClass = (proj.type === 'type2') ? 'small-text' : 'text';
 
-    // 클래스 구조를 통일하여 흔들림 중심축(transform-origin)이 뒤틀리지 않도록 래핑
     fruitDiv.innerHTML = `
       <div class="${hookClass}"></div>
       <div class="${stemClass}"></div>
@@ -185,7 +182,6 @@ function changePeriod(newIndex) {
 btnPrev.addEventListener('click', () => changePeriod(currentIndex - 1));
 btnNext.addEventListener('click', () => changePeriod(currentIndex + 1));
 
-
 /* ── 관리자 모달 ── */
 const adminTrigger = document.getElementById('admin-trigger');
 const adminModal = document.getElementById('admin-modal');
@@ -212,7 +208,6 @@ window.addEventListener('click', (e) => {
     clearForm();
   }
 });
-
 
 /* ── CRUD 핸들러 ── */
 const periodInput = document.getElementById('project-period');
@@ -258,7 +253,6 @@ function parseDescValue(text) {
   return text.split('\n').map(line => line.trim()).filter(line => line !== '');
 }
 
-// Firestore 실시간 구독 (onSnapshot)
 function subscribeToFirestore() {
   const q = query(collection(db, COLLECTION));
   onSnapshot(q, (snapshot) => {
@@ -271,7 +265,6 @@ function subscribeToFirestore() {
   });
 }
 
-// 추가
 addBtn.addEventListener('click', async () => {
   if (!periodInput.value || !typeInput.value || !dateInput.value || !descInput.value.trim()) {
     alert('필수항목을 모두 입력해주세요.');
@@ -304,7 +297,6 @@ addBtn.addEventListener('click', async () => {
   }
 });
 
-// 목록 선택
 projectSelect.addEventListener('change', () => {
   selectedProjectIndex = Number(projectSelect.value);
   const p = projects[selectedProjectIndex];
@@ -317,7 +309,6 @@ projectSelect.addEventListener('change', () => {
   rankInput.value = p.rank || '';
 });
 
-// 수정
 updateBtn.addEventListener('click', async () => {
   if (selectedProjectIndex === null) {
     alert('수정할 프로젝트를 선택해주세요.');
@@ -352,7 +343,6 @@ updateBtn.addEventListener('click', async () => {
   }
 });
 
-// 삭제
 deleteBtn.addEventListener('click', async () => {
   if (selectedProjectIndex === null) {
     alert('삭제할 프로젝트를 선택해주세요.');
@@ -378,11 +368,9 @@ deleteBtn.addEventListener('click', async () => {
   }
 });
 
-// ── 초기 실행 ──
+// ── 초기 가동 함수 정의 ──
 async function initApp() {
-  // 앱이 켜질 때 파이어스토어가 비어있다면 defaultProjects를 먼저 업로드합니다.
   await loadProjectsFromFirestore(); 
-  // 그 후 실시간 데이터 감시를 시작합니다.
   subscribeToFirestore();
 }
 
