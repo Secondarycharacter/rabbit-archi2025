@@ -5,12 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Timeline Swing V3</title>
   <link rel="stylesheet" href="roadmap.css">
-  
-  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
 </head>
 <body>
 
+  <!-- 메인 타임라인 컨테이너 -->
   <div class="timeline-wrapper">
     <div class="timeline">
       <div class="period-nav">
@@ -30,8 +28,10 @@
     </div>
   </div>
 
+  <!-- 우측 하단 어드민 진입 트리거 -->
   <div class="admin-trigger" id="admin-trigger">...</div>
 
+  <!-- 프로젝트 관리 패널 모달 -->
   <div class="admin-modal" id="admin-modal">
     <div class="admin-panel">
       <div class="admin-header">
@@ -41,16 +41,9 @@
 
       <div class="form-grid">
         <div class="form-group">
-          <label>프로젝트 목록 선택 (수정/삭제시)</label>
-          <select id="admin-project-select">
-            <option value="">-- 새로 추가하기 --</option>
-          </select>
-        </div>
-
-        <div class="form-group">
           <label>Period *</label>
           <select id="project-period">
-            <option>2025 H1</option>
+            <option value="">선택</option>
             <option>2025 H2</option>
             <option>2026 H1</option>
             <option>2026 H2</option>
@@ -86,14 +79,17 @@
 
       <div class="button-row">
         <button id="add-project-btn">프로젝트 추가</button>
-        <div class="edit-buttons">
-          <button id="update-project-btn" class="update-btn">수정완료</button>
-          <button id="delete-project-btn" class="delete-btn">삭제하기</button>
-        </div>
+        <button id="update-project-btn">프로젝트 수정</button>
+        <button id="delete-project-btn">프로젝트 삭제</button>
+      </div>
+
+      <div class="project-list-wrap">
+        <select id="project-select" size="8"></select>
       </div>
     </div>
   </div>
 
-  <script src="roadmap.js"></script>
+  <!-- Firebase SDK는 ES Module 방식으로 roadmap.js에서 import -->
+  <script type="module" src="roadmap.js"></script>
 </body>
 </html>
