@@ -72,7 +72,7 @@ function getDescHtml(descArray) {
   return descArray.map(d => `<div>${d}</div>`).join('');
 }
 
-// 🎨 [위치 수정 완료] 타임라인 렌더링 함수
+// 🎨 타임라인 렌더링 함수 (높이 통일 및 구조 수정 완료)
 function renderTimeline() {
   container.innerHTML = '';
   sortProjects();
@@ -82,45 +82,36 @@ function renderTimeline() {
 
   if (filtered.length === 0) return;
 
-  // CSS 가로축 설계 규격 명확히 반영
-  const totalWidth = 1400;      // .timeline-wrapper 전체 너비
-  const margin = 150;          // .main-line의 좌우 여백 (150px)
-  const startX = margin;       // 실제 배치 시작점: 150px
-  const endX = totalWidth - margin; // 실제 배치 종료점: 1250px
-  const availableWidth = endX - startX; // 실제 과일이 늘어설 줄의 유효 너비: 1100px
+  const totalWidth = 1400;      
+  const margin = 150;          
+  const startX = margin;       
+  const endX = totalWidth - margin; 
+  const availableWidth = endX - startX; 
 
   filtered.forEach((proj, idx) => {
-    // 1. 가로(Left) 위치 계산
     let leftPosition = startX;
     if (filtered.length > 1) {
       leftPosition = startX + (availableWidth / (filtered.length - 1)) * idx;
     } else {
-      leftPosition = startX + (availableWidth / 2); // 데이터가 1개일 땐 정중앙
+      leftPosition = startX + (availableWidth / 2);
     }
 
     const fruitDiv = document.createElement('div');
-    fruitDiv.className = `fruit ${proj.type || 'type1'}`;
+    // type1 또는 type2 클래스가 유기적으로 매칭되도록 동적 반영
+    const currentType = proj.type || 'type1';
+    fruitDiv.className = `fruit ${currentType}`;
     fruitDiv.style.left = `${leftPosition}px`;
+    
+    // ✨ 수정조항 1: type 구분 없이 메인라인 가로축 선상에 완벽히 고정
+    fruitDiv.style.top = '295px'; 
 
-    // 2. 세로(Top) 및 줄 기하학적 매칭 구조 조정
-    let hookClass = 'hook';
-    let stemClass = 'stem';
-
-    // 인덱스 순서(idx)에 따라 상하 지그재그 배치 분기
-    if (idx % 2 === 1) {
-      // 홀수 번째 과일은 중심선보다 '위'로 올려 매달기
-      // CSS에서 메인 라인이 중앙(top: 300px 근처)에 있으므로, 
-      // 위로 매달리는 아이템은 줄이 위쪽으로 솟아야 레이아웃 정합성이 맞습니다.
-      fruitDiv.style.top = '100px'; 
-      hookClass = 'hook small';
-      stemClass = 'stem short';
-    } else {
-      // 짝수 번째 과일은 중심선보다 '아래'로 내려 매달기
-      fruitDiv.style.top = '295px'; 
-    }
+    // 모든 과일이 통일된 고리와 줄 구조를 갖추어 정렬을 맞춤
+    const hookClass = 'hook';
+    const stemClass = 'stem';
 
     const descHtml = getDescHtml(proj.desc);
-    const textGroupClass = (proj.type === 'type2') ? 'small-text' : 'text';
+    // 내부에 공통으로 사용할 클래스를 배치하고, 외부 래퍼(.type1, .type2)를 통해 원형 모양 제어
+    const textGroupClass = 'text-content-circle';
 
     fruitDiv.innerHTML = `
       <div class="${hookClass}"></div>
@@ -368,7 +359,6 @@ deleteBtn.addEventListener('click', async () => {
   }
 });
 
-// ── 초기 가동 함수 정의 ──
 async function initApp() {
   await loadProjectsFromFirestore(); 
   subscribeToFirestore();
