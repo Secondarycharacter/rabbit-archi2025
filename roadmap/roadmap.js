@@ -1,5 +1,5 @@
 // ── Firebase SDK (CDN 방식) ──
-// roadmap.html의 <script type="module\"> 안에서 실행됩니다
+// roadmap.html의 <script type="module"> 안에서 실행됩니다
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -31,6 +31,7 @@ const defaultProjects = [
 async function loadProjectsFromFirestore() {
   const snapshot = await getDocs(collection(db, COLLECTION));
   if (snapshot.empty) {
+    // 처음 한 번만 기본 데이터 업로드
     for (const p of defaultProjects) {
       await addDoc(collection(db, COLLECTION), p);
     }
@@ -78,7 +79,6 @@ function getDescHtml(descArray) {
   return descArray.map(d => `<div>${d}</div>`).join('');
 }
 
-// 🎨 타임라인 렌더링 함수 수정 (CSS 디자인 규격과 완벽 동기화)
 function renderTimeline() {
   container.innerHTML = '';
   sortProjects();
@@ -103,37 +103,31 @@ function renderTimeline() {
     }
 
     const fruitDiv = document.createElement('div');
-    // CSS에 정의된 .fruit 클래스를 부여하여 공통 속성 유지
-    fruitDiv.className = `fruit ${proj.type || 'type1'}`;
+    fruitDiv.className = `fruit ${proj.type}`;
     fruitDiv.style.left = `${leftPosition}px`;
 
-    // 💡 핵심: 홀수와 짝수 인덱스 정렬을 지그재그 분기하여 겹침 방지 및 대롱대롱 효과 극대화
-    let hookClass = 'hook';
-    let stemClass = 'stem';
-
-    if (idx % 2 === 1) {
-      // 홀수 번째 과일은 위쪽 라인에 배치 (줄과 고리를 짧고 작게 변경)
-      fruitDiv.style.top = '150px';
-      hookClass = 'hook small';
-      stemClass = 'stem short';
-    } else {
-      // 짝수 번째 과일은 아래쪽 라인에 배치
-      fruitDiv.style.top = '300px';
-    }
-
     const descHtml = getDescHtml(proj.desc);
-    const textGroupClass = (proj.type === 'type2') ? 'small-text' : 'text';
 
-    // 클래스 구조를 통일하여 흔들림 중심축(transform-origin)이 뒤틀리지 않도록 래핑
-    fruitDiv.innerHTML = `
-      <div class="${hookClass}"></div>
-      <div class="${stemClass}"></div>
-      <div class="${textGroupClass}">
-        <div class="date">${proj.date}</div>
-        <div class="desc">${descHtml}</div>
-        ${proj.rank ? `<div class="rank">${proj.rank}</div>` : ''}
-      </div>
-    `;
+    if (proj.type === 'type1') {
+      fruitDiv.innerHTML = `
+        <div class="hook"></div>
+        <div class="stem"></div>
+        <div class="text">
+          <div class="date">${proj.date}</div>
+          <div class="desc">${descHtml}</div>
+          ${proj.rank ? `<div class="rank">${proj.rank}</div>` : ''}
+        </div>
+      `;
+    } else if (proj.type === 'type2') {
+      fruitDiv.innerHTML = `
+        <div class="hook small"></div>
+        <div class="stem short"></div>
+        <div class="small-text">
+          <div class="date">${proj.date}</div>
+          ${descHtml}
+        </div>
+      `;
+    }
 
     container.appendChild(fruitDiv);
     bindSwingAnimation(fruitDiv, idx);
@@ -258,13 +252,14 @@ function parseDescValue(text) {
   return text.split('\n').map(line => line.trim()).filter(line => line !== '');
 }
 
-// Firestore 실시간 구독 (onSnapshot)
+// Firestore 실시간 구독 (onSnapshot) - 다른 기기에서 수정 시 자동 반영
 function subscribeToFirestore() {
   const q = query(collection(db, COLLECTION));
   onSnapshot(q, (snapshot) => {
     projects = snapshot.docs.map(d => ({ ...d.data(), _id: d.id }));
     sortProjects();
     renderTimeline();
+    // 관리자 패널이 열려있으면 목록도 갱신
     if (adminModal.classList.contains('active')) {
       refreshProjectList();
     }
@@ -379,4 +374,4 @@ deleteBtn.addEventListener('click', async () => {
 });
 
 // ── 초기 실행 ──
-subscribeToFirestore();
+subscribeToFirestore(); // 실시간 구독 시작 (최초 데이터 로드 포함)
