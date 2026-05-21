@@ -105,20 +105,32 @@ function updateFirebaseDatabase(targetArray, successMessage) {
 
 // 📡 [실시간] 파이어베이스 데이터 구독 및 동기화 리스너
 // 이 함수 덕분에 다른 컴퓨터가 데이터를 바꿔도 내 화면이 실시간으로 새로고침 없이 바뀝니다!
+// 📡 [실시간] 파이어베이스 데이터 구독 및 동기화 리스너
 db.ref('roadmap_data/projects').on('value', (snapshot) => {
   const firebaseData = snapshot.val();
   
   if (!firebaseData || firebaseData.length === 0) {
-    // DB가 비어 있다면 초기 데이터를 심어 줍니다.
+    // DB가 완전히 비어 있다면 초기 데이터를 심어 줍니다.
     projects = [...defaultProjects];
     updateFirebaseDatabase(projects);
     return;
   }
   
-  // 실시간으로 변동된 데이터를 로컬 배열에 받아와 타임라인 전면 갱신
+  // 1. 실시간 데이터를 먼저 로컬 배열에 담고 정렬합니다.
   projects = firebaseData;
   sortProjects();
+  
+  // 2. 전체 데이터 기준 고유 반기 목록(uniquePeriods)을 갱신합니다.
   initPeriods();
+  
+  // 3. [핵심] 방금 갱신된 uniquePeriods 목록 안에서 현재 표시해야 할 반기('2026 H1')의 정확한 위치(인덱스)를 다시 추적합니다.
+  if (uniquePeriods.includes('2026 H1')) {
+    currentPeriodIndex = uniquePeriods.indexOf('2026 H1');
+  } else if (uniquePeriods.length > 0 && currentPeriodIndex >= uniquePeriods.length) {
+    currentPeriodIndex = 0;
+  }
+
+  // 4. 어드민 프로젝트 목록과 타임라인 화면을 실시간 렌더링합니다.
   refreshProjectList();
   renderTimeline();
 });
