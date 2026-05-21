@@ -116,7 +116,7 @@ db.ref('roadmap_data/projects').on('value', (snapshot) => {
   renderTimeline();
 });
 
-// ── 🎨 [UI 교정] 기존 매달린 형태 스타일 완벽 동기화 렌더러 ──
+// ── 🎨 [물리 효과 복원] 대롱대롱 매달린 형태 스타일 완벽 렌더러 ──
 function renderTimeline() {
   if (uniquePeriods.length === 0) return;
   const currentPeriod = uniquePeriods[currentPeriodIndex];
@@ -125,12 +125,12 @@ function renderTimeline() {
   // 현재 선택된 반기의 프로젝트만 추출
   const currentProjects = projects.filter(p => p.period === currentPeriod);
 
-  // 컨테이너 초기화
+  // 컨테이너 비우기
   fruitContainer.innerHTML = '';
 
   if (currentProjects.length === 0) return;
 
-  // 기존 고유 레이아웃 비율 설정 유지
+  // 원본 고유 레이아웃 스펙 상수 유지
   const containerWidth = 1400;
   const padding = 120;
   const availableWidth = containerWidth - (padding * 2);
@@ -143,26 +143,26 @@ function renderTimeline() {
       leftPos = padding + (availableWidth / (count - 1)) * idx;
     }
 
-    // 2. 새로운 과일 아이템 노드 생성
+    // 2. 과일 전체 감싸는 부모 엘리먼트 동적 생성
     const item = document.createElement('div');
     item.className = `fruit-item ${proj.type || 'type1'}`;
     item.style.left = `${leftPos}px`;
 
-    // 3. 기존의 상하 지그재그(매달린 형태) 높낮이 클래스 주입 규칙 원복
+    // 3. 상하 지그재그 높낮이 배치 규칙
     if (idx % 2 === 0) {
       item.classList.add('top-fruit');
     } else {
       item.classList.add('bottom-fruit');
     }
 
-    // 4. Description 줄바꿈 가공 처리
+    // 4. Description 내부 스팬 태그 생성 처리
     const descLines = Array.isArray(proj.desc) ? proj.desc : [proj.desc];
     const descHtml = descLines.map(line => `<span>${line}</span>`).join('');
     
-    // 5. Rank 배지 예외 처리
+    // 5. Rank 배지 구조화
     const rankHtml = proj.rank ? `<div class="rank-badge">${proj.rank}</div>` : '';
 
-    // 6. 원본 CSS 구조와 완벽히 동일한 HTML 구조 동적 설계 복원
+    // 6. 줄(Rope)과 열매 노드가 엮인 원본 마크업 트리 그대로 렌더링
     item.innerHTML = `
       <div class="rope"></div>
       <div class="fruit-node">
@@ -175,7 +175,15 @@ function renderTimeline() {
       </div>
     `;
 
+    // 7. 화면에 먼저 노드를 붙여넣습니다.
     fruitContainer.appendChild(item);
+
+    // ✨ [핵심 복원] 대롱대롱 매달리는 흔들림 애니메이션 엔진 시동 코드
+    // 브라우저가 화면을 갱신한 미세한 직후(일종의 트릭), 'swing-start' 클래스를 순차적으로 먹여서 
+    // 기존 CSS에 정의되어 있던 매달린 물체의 흔들림 물리 연출을 강제로 트리거합니다.
+    setTimeout(() => {
+      item.classList.add('swing-start');
+    }, 10 + (idx * 60)); // 순차적으로 툭툭 떨어지며 매달리는 듯한 고급 연출 효과 유지
   });
 }
 
