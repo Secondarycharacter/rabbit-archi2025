@@ -1,0 +1,354 @@
+*{
+  margin:0;
+  padding:0;
+  box-sizing:border-box;
+}
+
+body{
+  background:#f7f3ef;
+  font-family:'Pretendard', sans-serif;
+  color:#665647;
+  overflow: hidden;
+}
+
+/* 타임라인 화면 한가운데 정렬 */
+.timeline-wrapper {
+  display: block;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 1400px;
+  height: 700px;
+}
+
+/* ── 반기 내비게이션 ── */
+.period-nav{
+  position:absolute;
+  top:225px;
+  left:10px;
+  width:1400px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:24px;
+  z-index:10;
+}
+/*좌우 이동 화살표*/
+.period-label-wrap{
+  min-width:140px;
+  text-align:center;
+  position:relative;
+}
+
+/*년도 반기 글씨*/
+.period-label{
+  font-size:27px;
+  font-weight:600;
+  color:#665647;
+  opacity:1;
+  transition:opacity 0.4s ease;
+  display:block;
+}
+
+.period-label.fade-out{
+  opacity:0;
+  transition:opacity 0.3s ease;
+}
+
+.nav-btn{
+  background:none;
+  border:none;
+  cursor:pointer;
+  font-size:20px;
+  color:#8d7865;
+  padding:4px 8px;
+  line-height:1;
+  transition:color 0.2s;
+  user-select:none;
+}
+
+.nav-btn:hover{
+  color:#665647;
+}
+
+/* ── 메인 라인 ── */
+.main-line{
+  position:absolute;
+  top:300px;
+  left:-50px;
+  width:1500px;
+  height:3px;
+  background:#8d7865;
+}
+
+.edge{
+  position:absolute;
+  width:18px;
+  height:18px;
+  border-radius:50%;
+  background:#8d7865;
+  top:50%;
+  transform:translateY(-50%);
+}
+
+.edge.left{
+  left:-9px;
+}
+
+.edge.right{
+  right:-9px;
+}
+
+/* ── 과일 요소 ── */
+.fruit{
+  position:absolute;
+  top:295px;
+  transform-origin:top center;
+}
+
+.hook{
+  width:14px;
+  height:14px;
+  border-radius:50%;
+  border:2px solid #8d7865;
+  background:#f7f3ef;
+  margin:0 auto;
+}
+
+.hook.small{
+  width:14px;
+  height:14px;
+  border:none;
+  background:#8d7865;
+  border-radius:50%;
+  margin:0 auto;
+}
+
+.stem{
+  width:2px;
+  height:90px;
+  background:#8d7865;
+  margin:0 auto;
+}
+
+.short{
+  height:50px;
+}
+
+/* 타입별 가로폭 세팅 */
+.fruit.type1 .text {
+  width: 240px;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+}
+
+.fruit.type2 .small-text {
+  width: 180px;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+}
+
+.date{
+  font-size:18px;
+  margin-top:18px;
+  margin-bottom:10px;
+}
+
+/* [수정] 강제 줄바꿈(nowrap) 속성을 제거하고 사용자의 의도대로 흐르도록 설정 */
+.desc, .desc div, .small-text div {
+  font-size:14px;
+  line-height:1.5;
+  word-break: keep-all;
+  white-space: normal; 
+  margin-bottom: 2px;
+}
+
+.fruit.type2 .small-text div {
+  font-size:12px;
+}
+
+.rank{
+  display:inline-block;
+  margin-top:12px;
+  padding:2px 8px;
+  border:1px solid #8d7865;
+  font-size:12px;
+}
+
+@media (max-width:1450px){
+  .timeline-wrapper{
+    transform: translate(-50%, -50%) scale(0.9);
+  }
+}
+
+/* ── 우측하단 비밀 관리자 트리거 ── */
+.admin-trigger {
+  position: fixed;
+  bottom: 20px;
+  right: 25px;
+  font-size: 24px;
+  color: #8d7865;
+  cursor: pointer;
+  user-select: none;
+  opacity: 0.5;
+  transition: opacity 0.2s, transform 0.2s;
+  font-weight: bold;
+  letter-spacing: 2px;
+  z-index: 100;
+}
+
+.admin-trigger:hover {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+/* ── 관리자 모달창 스타일 ── */
+.admin-modal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(102, 86, 71, 0.4);
+  z-index: 200;
+}
+
+.admin-modal.active {
+  display: block;
+}
+
+.admin-panel{
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 900px;
+  max-width: 95%;
+  background: #fff;
+  border-radius: 16px;
+  padding: 28px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+}
+
+.admin-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 12px;
+}
+
+.admin-panel h2{
+  font-size: 20px;
+  color: #665647;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 28px;
+  color: #aaa;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.close-btn:hover {
+  color: #665647;
+}
+
+.form-grid{
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+
+/* Description 패널 영역 디자인 */
+.form-grid .form-group.desc-group {
+  grid-column: span 3;
+}
+
+.form-group{
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-group label{
+  font-size: 13px;
+  color: #665647;
+  font-weight: 500;
+}
+
+.form-group input,
+.form-group select{
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #443c35;
+}
+
+/* textarea 전용 커스텀 스타일 디자인 */
+.form-group textarea {
+  padding: 10px 12px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #443c35;
+  font-family: inherit;
+  resize: none; 
+  line-height: 1.5;
+}
+
+.button-row{
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.button-row button{
+  height: 40px;
+  padding: 0 20px;
+  border: none;
+  border-radius: 8px;
+  background: #8d7865;
+  color: white;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background 0.2s;
+}
+
+.button-row button:hover{
+  background: #665647;
+}
+
+#delete-project-btn {
+  background: #c94c4c;
+}
+
+#delete-project-btn:hover {
+  background: #b03a3a;
+}
+
+.project-list-wrap{
+  margin-top: 20px;
+}
+
+#project-select{
+  width: 100%;
+  height: 140px;
+  border-radius: 10px;
+  border: 1px solid #ccc;
+  padding: 10px;
+  font-size: 13px;
+  color: #555;
+}
