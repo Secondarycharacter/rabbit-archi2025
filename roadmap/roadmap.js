@@ -379,4 +379,11 @@ deleteBtn.addEventListener('click', async () => {
 });
 
 // ── 초기 실행 ──
-subscribeToFirestore();
+async function initApp() {
+  // 앱이 켜질 때 파이어스토어가 비어있다면 defaultProjects를 먼저 업로드합니다.
+  await loadProjectsFromFirestore(); 
+  // 그 후 실시간 데이터 감시를 시작합니다.
+  subscribeToFirestore();
+}
+
+initApp();
