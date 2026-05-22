@@ -95,7 +95,7 @@ body{
   z-index: 1;        /* A2보다 낮은 숫자를 주어 뒤로 보냅니다 */
 }
 .zone-a3 .scale-img {
-  transform: scale(0.65);
+  transform: scale(0.60);
   transform-origin: top right;
   float: right;
   display: block;
@@ -195,7 +195,7 @@ body{
 }
 .stem{
   width:2px;
-  height:45px;
+  height:60px;
   background-color:#665647;
   position:absolute;
   left:50%;
@@ -273,7 +273,7 @@ body{
   display: flex;
   height: 180px;
   width: 100%;
-  margin-top: 150px;
+  margin-top: 200px;
   margin-left: 100px;
 }
 .zone-c-item {
@@ -306,7 +306,7 @@ body{
 /* 최하단 브랜드 텍스트 정렬 푸터 */
 .zone-footer {
   width: 100%;
-  margin-top: 50px;
+  margin-top: 100px;
   text-align: center; /* 조건 14: 가운데 정렬 */
   padding-bottom: 15px;
 }
