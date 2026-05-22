@@ -246,6 +246,27 @@ body{
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
+/* ── TYPE3 과일 (기타) ── */
+.fruit.type3 .fruit-body {
+  position: absolute;
+  top: 56px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90px;          /* 💡 type3 동그라미 가로폭 */
+  height: 90px;         /* 💡 type3 동그라미 세로폭 */
+  border-radius: 50%;
+  border: 3px solid #665647;   /* 테두리 선 종류 */
+  background-color: #e2dcd5;   /* type3만의 배경색 */
+  color: #665647;              /* 글자 색상 */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 10px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
 /* 폰트 크기 세팅 */
 .fruit.type1 .date { font-size: 18px; font-weight: bold; margin-bottom: 5px; }
 .fruit.type1 .desc { font-size: 14px; line-height: 1.5; word-break: keep-all; }
@@ -260,6 +281,14 @@ body{
 .fruit.type2 .rank {
   font-size: 11px; font-weight: bold; margin-top: 5px; padding: 2px 8px;
   border-radius: 10px; background-color: #fff; color: #665647;
+}
+
+/* type3 전용 글씨 크기 제어 */
+.fruit.type3 .date { font-size: 12px; font-weight: bold; margin-bottom: 4px; }
+.fruit.type3 .desc { font-size: 10px; line-height: 1.4; word-break: keep-all; }
+.fruit.type3 .rank {
+  font-size: 10px; font-weight: bold; margin-top: 4px; padding: 1px 6px;
+  border-radius: 8px; background-color: #665647; color: #fff;
 }
 
 .fruit:hover .fruit-body {
