@@ -252,8 +252,8 @@ body{
   top: 56px;
   left: 50%;
   transform: translateX(-50%);
-  width: 90px;          /* 💡 type3 동그라미 가로폭 */
-  height: 90px;         /* 💡 type3 동그라미 세로폭 */
+  width: 90px;         
+  height: 90px;        
   border-radius: 50%;
   border: none;
   background-color: #e2dcd5;   /* type3만의 배경색 */
