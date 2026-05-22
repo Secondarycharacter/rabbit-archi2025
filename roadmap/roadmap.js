@@ -21,7 +21,6 @@ const defaultProjects = [
   { type: 'type1', date: '2026.03', period: '2026 H1', desc: ['거창군 지역활력타운', '다누리복합문화센터', '건립사업 설계공모'], rank: '10위' },
   { type: 'type1', date: '2026.05', period: '2026 H1', desc: ['앵지발골 시니어형', '소규모체육관 건립사업', '설계공모'], rank: '4위' },
   { type: 'type2', date: '2026.05', period: '2026 H1', desc: ['가평OO 수녀원', '기본 및 실시설계', '진행중...'], rank: '' }
-  { type: 'type3', date: '2025.11', period: '2025 H2', desc: ['해체감리', '교육이수'], rank: '완료' }
 ];
 
 async function loadProjectsFromFirestore() {
