@@ -72,7 +72,7 @@ function getDescHtml(descArray) {
   return descArray.map(d => `<div>${d}</div>`).join('');
 }
 
-// 🎨 타임라인 렌더링 함수 (높이 통일 및 구조 수정 완료)
+// ── 타임라인 렌더링 ──
 function renderTimeline() {
   container.innerHTML = '';
   sortProjects();
@@ -82,41 +82,40 @@ function renderTimeline() {
 
   if (filtered.length === 0) return;
 
-  const totalWidth = 1400;      
-  const margin = 150;          
-  const startX = margin;       
-  const endX = totalWidth - margin; 
-  const availableWidth = endX - startX; 
+  // 메인라인 총 길이 2000px, 좌우 150px 마진
+  const totalWidth = 2000;
+  const margin = 150;
+  const startX = margin;
+  const endX = totalWidth - margin;
+  const availableWidth = endX - startX;
 
   filtered.forEach((proj, idx) => {
-    let leftPosition = startX;
-    if (filtered.length > 1) {
-      leftPosition = startX + (availableWidth / (filtered.length - 1)) * idx;
+    // 등간격 배치: 프로젝트 추가/삭제 시 자동 재배치
+    let centerX;
+    if (filtered.length === 1) {
+      centerX = startX + availableWidth / 2;
     } else {
-      leftPosition = startX + (availableWidth / 2);
+      centerX = startX + (availableWidth / (filtered.length - 1)) * idx;
     }
 
     const fruitDiv = document.createElement('div');
-    // type1 또는 type2 클래스가 유기적으로 매칭되도록 동적 반영
     const currentType = proj.type || 'type1';
     fruitDiv.className = `fruit ${currentType}`;
-    fruitDiv.style.left = `${leftPosition}px`;
-    
-    // ✨ 수정조항 1: type 구분 없이 메인라인 가로축 선상에 완벽히 고정
-    fruitDiv.style.top = '295px'; 
 
-    // 모든 과일이 통일된 고리와 줄 구조를 갖추어 정렬을 맞춤
-    const hookClass = 'hook';
-    const stemClass = 'stem';
+    // 과일 요소를 centerX에 중앙정렬 (transform으로 처리)
+    fruitDiv.style.left = `${centerX}px`;
+    fruitDiv.style.transform = 'translateX(-50%)';
+    fruitDiv.style.transformOrigin = 'top center';
+
+    // 메인라인(top:300px)에 훅 꼭지점이 걸리도록 top 설정
+    fruitDiv.style.top = '296px';
 
     const descHtml = getDescHtml(proj.desc);
-    // 내부에 공통으로 사용할 클래스를 배치하고, 외부 래퍼(.type1, .type2)를 통해 원형 모양 제어
-    const textGroupClass = 'text-content-circle';
 
     fruitDiv.innerHTML = `
-      <div class="${hookClass}"></div>
-      <div class="${stemClass}"></div>
-      <div class="${textGroupClass}">
+      <div class="hook"></div>
+      <div class="stem"></div>
+      <div class="fruit-body">
         <div class="date">${proj.date}</div>
         <div class="desc">${descHtml}</div>
         ${proj.rank ? `<div class="rank">${proj.rank}</div>` : ''}
@@ -141,12 +140,13 @@ function bindSwingAnimation(fruit, index) {
     velocity += (-angle) * stiffness;
     velocity *= damping;
     angle += velocity;
-    fruit.style.transform = `rotate(${angle}deg)`;
+    // translateX(-50%)를 유지하면서 rotate 적용
+    fruit.style.transform = `translateX(-50%) rotate(${angle}deg)`;
 
     if (Math.abs(angle) > 0.005 || Math.abs(velocity) > 0.005) {
       rafId = requestAnimationFrame(animate);
     } else {
-      fruit.style.transform = 'rotate(0deg)';
+      fruit.style.transform = 'translateX(-50%) rotate(0deg)';
       rafId = null;
     }
   }
@@ -360,7 +360,7 @@ deleteBtn.addEventListener('click', async () => {
 });
 
 async function initApp() {
-  await loadProjectsFromFirestore(); 
+  await loadProjectsFromFirestore();
   subscribeToFirestore();
 }
 
