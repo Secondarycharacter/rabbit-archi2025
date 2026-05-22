@@ -78,7 +78,7 @@ body{
   display: flex;
   align-items: flex-start;
   padding-top: 50px;
-  padding-left: 300px;
+  padding-left: 450px;
   position: relative; /* z-index를 적용하기 위해 필수 */
   z-index: 2;        /* A3보다 높은 숫자를 주어 앞으로 가져옵니다 */
 }
