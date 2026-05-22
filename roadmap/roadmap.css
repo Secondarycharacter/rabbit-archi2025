@@ -62,13 +62,13 @@ body{
 }
 .roadmap-title {
   font-family: 'NanumBarunGothicBold', sans-serif;
-  font-size: 60pt; /* 조건 6: 60pt, BOLD */
+  font-size: 54pt; /* 조건 6: 54pt, BOLD */
   line-height: 1.1;
   margin-bottom: 12px;
 }
 .roadmap-sub-desc {
   width: 600px; /* 조건 7: 가로폭 범위 600px */
-  font-size: 18pt; /* 조건 7: 18pt */
+  font-size: 15pt; /* 조건 7: 18pt */
   line-height: 1.5;
   word-break: keep-all; /* 단어 단위 줄바꿈 */
 }
@@ -79,8 +79,8 @@ body{
   padding-top: 20px;
 }
 .roadmap-main-desc {
-  width: 450px; /* 조건 8: 가로폭 범위 450px */
-  font-size: 18pt; /* 조건 8: 18pt */
+  width: 500px; /* 조건 8: 가로폭 범위 500px */
+  font-size: 15pt; /* 조건 8: 15pt */
   line-height: 1.5;
   word-break: keep-all; /* 단어 단위 줄바꿈 */
 }
