@@ -95,7 +95,7 @@ body{
   z-index: 1;        /* A2보다 낮은 숫자를 주어 뒤로 보냅니다 */
 }
 .zone-a3 .scale-img {
-  transform: scale(0.60);
+  transform: scale(0.55);
   transform-origin: top right;
   float: right;
   display: block;
@@ -122,7 +122,7 @@ body{
 
 .b-header-subtitle {
   font-family: 'NanumBarunGothicBold', sans-serif;
-  font-size: 20px;         /* 둘째줄 크기 */
+  font-size: 18px;         /* 둘째줄 크기 */
   font-weight: bold;       /* 둘째줄 굵게 */
   color: #665647;
 }
@@ -174,7 +174,7 @@ body{
 /* 중심 축선 (메인라인) - 1800px 축소 */
 .main-line{
   position:absolute;
-  top:100px;
+  top:75px;
   left:0;
   width:1800px; /* 조건 1: 메인라인 길이 1800px */
   height:4px;
