@@ -313,14 +313,14 @@ body{
 }
 .zone-c-item .scale-img {
   flex-shrink: 0;
-  margin-top: 250px;
+  margin-top: 100px;
 }
 .item-text {
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
   text-align: left; /* 조건 10,11,12,13: 왼쪽 정렬 */
-  margin-top: 250px;
+  margin-top: 100px;
 }
 .item-text h3 {
   font-family: 'NanumBarunGothicBold', sans-serif;
