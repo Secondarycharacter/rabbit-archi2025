@@ -104,6 +104,29 @@ body{
 /* ==========================================
    B 영역 스타일 (중간 타임라인 레벨)
    ========================================== */
+
+/* ── B 영역 상단 추가 문구 스타일 ── */
+.zone-b-header {
+  width: 100%;
+  text-align: center;      /* 글씨 가운데 정렬 */
+  margin-bottom: 25px;     /* 아래쪽 반기 선택 버튼(period-nav)과의 간격 조절 */
+}
+
+.b-header-title {
+  font-family: 'NanumBarunGothicBold', sans-serif;
+  font-size: 24px;         /* 첫째줄 크기 */
+  font-weight: bold;       /* 첫째줄 굵게 */
+  color: #665647;
+  margin-bottom: 6px;      /* 첫째줄과 둘째줄 사이의 간격 */
+}
+
+.b-header-subtitle {
+  font-family: 'NanumBarunGothicBold', sans-serif;
+  font-size: 20px;         /* 둘째줄 크기 */
+  font-weight: bold;       /* 둘째줄 굵게 */
+  color: #665647;
+}
+
 .zone-b {
   position: relative;
   height: 380px;
@@ -133,7 +156,7 @@ body{
   text-align:center;
 }
 .period-label{
-  font-size:27px;
+  font-size:24px;
   font-weight:600;
   color:#665647;
 }
@@ -234,7 +257,7 @@ body{
   width: 120px;
   height: 120px;
   border-radius: 50%;
-  border: none;
+  border: 2px solid #665647;
   background-color: #665647;
   color: #ffffff;
   display: flex;
@@ -255,7 +278,7 @@ body{
   width: 90px;         
   height: 90px;        
   border-radius: 50%;
-  border: none;
+  border: 1px solid #665647;
   background-color: #e2dcd5;   /* type3만의 배경색 */
   color: #665647;              /* 글자 색상 */
   display: flex;
@@ -313,14 +336,14 @@ body{
 }
 .zone-c-item .scale-img {
   flex-shrink: 0;
-  margin-top: 100px;
+  margin-top: 125px;
 }
 .item-text {
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
   text-align: left; /* 조건 10,11,12,13: 왼쪽 정렬 */
-  margin-top: 100px;
+  margin-top: 125px;
 }
 .item-text h3 {
   font-family: 'NanumBarunGothicBold', sans-serif;
