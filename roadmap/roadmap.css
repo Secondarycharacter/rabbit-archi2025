@@ -77,8 +77,8 @@ body{
   width: 33.333%;
   display: flex;
   align-items: flex-start;
-  padding-top: 30px;
-  padding-left: 450px;
+  padding-top: 50px;
+  padding-left: 300px;
   position: relative; /* z-index를 적용하기 위해 필수 */
   z-index: 2;        /* A3보다 높은 숫자를 주어 앞으로 가져옵니다 */
 }
@@ -306,7 +306,7 @@ body{
 /* 최하단 브랜드 텍스트 정렬 푸터 */
 .zone-footer {
   width: 100%;
-  margin-top: 50px;
+  padding-top: 50px;
   text-align: center; /* 조건 14: 가운데 정렬 */
   padding-bottom: 15px;
 }
