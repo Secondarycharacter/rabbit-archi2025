@@ -200,7 +200,6 @@ body{
 }
 
 /* ── TYPE1 과일 (속 빈 원) ── */
-/* 조건 4: 기존 160px에서 1.2배 키워 192px로 설정 */
 .fruit.type1 .fruit-body {
   position: absolute;
   top: 56px;
@@ -222,14 +221,13 @@ body{
 }
 
 /* ── TYPE2 과일 (속이 꽉 찬 원) ── */
-/* 조건 5: 기존 80px에서 0.8배 축소하여 64px로 조정 + 색이 채워진 형태 유지 */
 .fruit.type2 .fruit-body {
   position: absolute;
   top: 56px;
   left: 50%;
   transform: translateX(-50%);
-  width: 80px;
-  height: 80px;
+  width: 120px;
+  height: 120px;
   border-radius: 50%;
   border: none;
   background-color: #665647;
@@ -289,12 +287,12 @@ body{
 }
 .item-text h3 {
   font-family: 'NanumBarunGothicBold', sans-serif;
-  font-size: 24pt; /* 조건 10,11,12,13: 24pt, BOLD */
+  font-size: 20pt; /* 조건 10,11,12,13: 20pt, BOLD */
   color: #665647;
   margin-bottom: 6px;
 }
 .item-text p {
-  font-size: 18pt; /* 조건 10,11,12,13: 18pt */
+  font-size: 15pt; /* 조건 10,11,12,13: 18pt */
   line-height: 1.4;
   color: #665647;
 }
@@ -308,7 +306,7 @@ body{
 .footer-en {
   font-family: 'NanumBarunGothicBold', sans-serif;
   font-size: 24pt; /* 조건 14: 24pt, BOLD */
-  letter-spacing: 2px;
+  letter-spacing: 3px;
   margin-bottom: 4px;
 }
 .footer-ko {
