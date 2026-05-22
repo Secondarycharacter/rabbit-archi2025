@@ -255,10 +255,10 @@ body{
 
 /* 조건 3: TYPE2 글씨 크기 1.5배 확대 조정 */
 .fruit.type2 .date { font-size: 14px; font-weight: bold; color: #e2dcd5; margin-bottom: 3px; }
-.fruit.type2 .desc { font-size: 11px; line-height: 1.4; word-break: keep-all; }
+.fruit.type2 .desc { font-size: 12px; line-height: 1.4; word-break: keep-all; }
 .fruit.type2 .rank {
-  font-size: 11px; font-weight: bold; margin-top: 2px; padding: 1px 5px;
-  border-radius: 8px; background-color: #fff; color: #665647;
+  font-size: 11px; font-weight: bold; margin-top: 5px; padding: 2px 8px;
+  border-radius: 10px; background-color: #fff; color: #665647;
 }
 
 .fruit:hover .fruit-body {
