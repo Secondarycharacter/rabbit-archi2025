@@ -79,7 +79,7 @@ body{
   align-items: flex-start;
   padding-top: 20px;
   position: relative; /* z-index를 적용하기 위해 필수 */
-  z-index: 2;        /* A3보다 높은 숫자를 주어 앞으로 가져옵니다 */
+  z-index: 1;        /* A3보다 높은 숫자를 주어 앞으로 가져옵니다 */
 }
 .roadmap-main-desc {
   width: 500px; /* 조건 8: 가로폭 범위 500px */
@@ -90,7 +90,7 @@ body{
 .zone-a3 {
   width: 33.333%;
   position: relative; /* z-index를 적용하기 위해 필수 */
-  z-index: 1;        /* A2보다 낮은 숫자를 주어 뒤로 보냅니다 */
+  z-index: 2;        /* A2보다 낮은 숫자를 주어 뒤로 보냅니다 */
 }
 .zone-a3 .scale-img {
   transform-origin: top right;
