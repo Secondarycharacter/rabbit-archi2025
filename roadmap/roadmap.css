@@ -131,7 +131,6 @@ body{
   position: relative;
   height: 380px;
   width: 100%;
-  margin-top: 50px;
 }
 .timeline {
   position: relative;
@@ -142,7 +141,7 @@ body{
 /* 반기 내비게이션 */
 .period-nav{
   position:absolute;
-  top:35px;
+  top:15px;
   left:0;
   width:1800px;
   display:flex;
