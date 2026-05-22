@@ -79,7 +79,19 @@ function renderTimeline() {
   const currentPeriod = periods[currentIndex];
   const filtered = projects.filter(p => p.period === currentPeriod);
 
-  if (filtered.length === 0) return;
+  // 💡 [수정 및 추가된 부분] 해당 period에 프로젝트가 0개일 때 안내 문구 출력
+  if (filtered.length === 0) {
+    const emptyMsgDiv = document.createElement('div');
+    emptyMsgDiv.className = 'empty-period-message';
+    emptyMsgDiv.innerHTML = `
+      <div>다양한 현상설계에 지속적으로 참여</div>
+      <div>새로운 주제와 프로그램에 대한 탐구</div>
+      <div>지역과 사람을 연결하는 공간 제안</div>
+      <div>실무 역량과 팀워크의 성장</div>
+    `;
+    container.appendChild(emptyMsgDiv);
+    return; // 프로젝트가 없으므로 문구만 렌더링하고 여기서 함수를 종료(리턴)합니다.
+  }
 
   // 조건 1 & 2: 총 길이 1800px로 변경 및 좌우 마진 200px로 확대 적용
   const totalWidth = 1800;
