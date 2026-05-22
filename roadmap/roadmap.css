@@ -79,7 +79,7 @@ body{
   align-items: flex-start;
   padding-top: 20px;
   position: relative; /* z-index를 적용하기 위해 필수 */
-  z-index: 1;        /* A3보다 높은 숫자를 주어 앞으로 가져옵니다 */
+  z-index: 2;        /* A3보다 높은 숫자를 주어 앞으로 가져옵니다 */
 }
 .roadmap-main-desc {
   width: 500px; /* 조건 8: 가로폭 범위 500px */
@@ -90,7 +90,7 @@ body{
 .zone-a3 {
   width: 33.333%;
   position: relative; /* z-index를 적용하기 위해 필수 */
-  z-index: 2;        /* A2보다 낮은 숫자를 주어 뒤로 보냅니다 */
+  z-index: 1;        /* A2보다 낮은 숫자를 주어 뒤로 보냅니다 */
 }
 .zone-a3 .scale-img {
   transform-origin: top right;
@@ -190,7 +190,7 @@ body{
   top:0;
 }
 .stem{
-  width:1.5px;
+  width:2px;
   height:45px;
   background-color:#665647;
   position:absolute;
@@ -205,8 +205,8 @@ body{
   top: 56px;
   left: 50%;
   transform: translateX(-50%);
-  width: 192px; 
-  height: 192px;
+  width: 180px; 
+  height: 180px;
   border-radius: 50%;
   border: 3px solid #665647;
   background-color: #f7f3ef;
@@ -292,7 +292,7 @@ body{
   margin-bottom: 6px;
 }
 .item-text p {
-  font-size: 15pt; /* 조건 10,11,12,13: 18pt */
+  font-size: 15pt; /* 조건 10,11,12,13: 15pt */
   line-height: 1.4;
   color: #665647;
 }
@@ -306,7 +306,7 @@ body{
 .footer-en {
   font-family: 'NanumBarunGothicBold', sans-serif;
   font-size: 24pt; /* 조건 14: 24pt, BOLD */
-  letter-spacing: 3px;
+  letter-spacing: 2px;
   margin-bottom: 4px;
 }
 .footer-ko {
