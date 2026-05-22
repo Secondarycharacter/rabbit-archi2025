@@ -254,8 +254,8 @@ body{
 }
 
 /* 조건 3: TYPE2 글씨 크기 1.5배 확대 조정 */
-.fruit.type2 .date { font-size: 14px; font-weight: bold; color: #e2dcd5; margin-bottom: 2px; }
-.fruit.type2 .desc { font-size: 11px; line-height: 1.35; word-break: keep-all; }
+.fruit.type2 .date { font-size: 14px; font-weight: bold; color: #e2dcd5; margin-bottom: 3px; }
+.fruit.type2 .desc { font-size: 11px; line-height: 1.4; word-break: keep-all; }
 .fruit.type2 .rank {
   font-size: 11px; font-weight: bold; margin-top: 2px; padding: 1px 5px;
   border-radius: 8px; background-color: #fff; color: #665647;
@@ -273,7 +273,7 @@ body{
   display: flex;
   height: 180px;
   width: 100%;
-  margin-top: 100px;
+  margin-top: 300px;
   margin-left: 100px;
 }
 .zone-c-item {
@@ -308,7 +308,7 @@ body{
   width: 100%;
   text-align: center; /* 조건 14: 가운데 정렬 */
   padding-bottom: 15px;
-  margin-top: 100px;
+  margin-top: 200px;
 }
 .footer-en {
   font-family: 'NanumBarunGothicBold', sans-serif;
