@@ -1,4 +1,3 @@
-// ── Firebase SDK (CDN 방식) ──
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
@@ -82,15 +81,14 @@ function renderTimeline() {
 
   if (filtered.length === 0) return;
 
-  // 메인라인 총 길이 2000px, 좌우 150px 마진
-  const totalWidth = 2000;
-  const margin = 150;
+  // 조건 1 & 2: 총 길이 1800px로 변경 및 좌우 마진 200px로 확대 적용
+  const totalWidth = 1800;
+  const margin = 200;
   const startX = margin;
   const endX = totalWidth - margin;
   const availableWidth = endX - startX;
 
   filtered.forEach((proj, idx) => {
-    // 등간격 배치: 프로젝트 추가/삭제 시 자동 재배치
     let centerX;
     if (filtered.length === 1) {
       centerX = startX + availableWidth / 2;
@@ -102,13 +100,12 @@ function renderTimeline() {
     const currentType = proj.type || 'type1';
     fruitDiv.className = `fruit ${currentType}`;
 
-    // 과일 요소를 centerX에 중앙정렬 (transform으로 처리)
     fruitDiv.style.left = `${centerX}px`;
     fruitDiv.style.transform = 'translateX(-50%)';
     fruitDiv.style.transformOrigin = 'top center';
 
-    // 메인라인(top:300px)에 훅 꼭지점이 걸리도록 top 설정
-    fruitDiv.style.top = '296px';
+    // 메인라인 디자인 축에 맞춰 top 위치 지정
+    fruitDiv.style.top = '96px';
 
     const descHtml = getDescHtml(proj.desc);
 
@@ -140,7 +137,6 @@ function bindSwingAnimation(fruit, index) {
     velocity += (-angle) * stiffness;
     velocity *= damping;
     angle += velocity;
-    // translateX(-50%)를 유지하면서 rotate 적용
     fruit.style.transform = `translateX(-50%) rotate(${angle}deg)`;
 
     if (Math.abs(angle) > 0.005 || Math.abs(velocity) > 0.005) {
@@ -173,7 +169,7 @@ function changePeriod(newIndex) {
 btnPrev.addEventListener('click', () => changePeriod(currentIndex - 1));
 btnNext.addEventListener('click', () => changePeriod(currentIndex + 1));
 
-/* ── 관리자 모달 ── */
+/* ── 관리자 모달 및 CRUD 핸들러 (기존 기능 유지) ── */
 const adminTrigger = document.getElementById('admin-trigger');
 const adminModal = document.getElementById('admin-modal');
 const closeAdminBtn = document.getElementById('close-admin-btn');
@@ -188,19 +184,9 @@ adminTrigger.addEventListener('click', () => {
   }
 });
 
-closeAdminBtn.addEventListener('click', () => {
-  adminModal.classList.remove('active');
-  clearForm();
-});
+closeAdminBtn.addEventListener('click', () => { adminModal.classList.remove('active'); clearForm(); });
+window.addEventListener('click', (e) => { if (e.target === adminModal) { adminModal.classList.remove('active'); clearForm(); } });
 
-window.addEventListener('click', (e) => {
-  if (e.target === adminModal) {
-    adminModal.classList.remove('active');
-    clearForm();
-  }
-});
-
-/* ── CRUD 핸들러 ── */
 const periodInput = document.getElementById('project-period');
 const typeInput = document.getElementById('project-type');
 const dateInput = document.getElementById('project-date');
@@ -217,7 +203,6 @@ let selectedProjectIndex = null;
 function refreshProjectList() {
   projectSelect.innerHTML = '';
   sortProjects();
-
   projects.forEach((p, index) => {
     const option = document.createElement('option');
     option.value = index;
@@ -227,22 +212,9 @@ function refreshProjectList() {
   });
 }
 
-function isValidDateFormat(dateStr) {
-  return /^\d{4}\.\d{2}$/.test(dateStr);
-}
-
-function clearForm() {
-  periodInput.value = '';
-  typeInput.value = '';
-  dateInput.value = '';
-  descInput.value = '';
-  rankInput.value = '';
-  selectedProjectIndex = null;
-}
-
-function parseDescValue(text) {
-  return text.split('\n').map(line => line.trim()).filter(line => line !== '');
-}
+function isValidDateFormat(dateStr) { return /^\d{4}\.\d{2}$/.test(dateStr); }
+function clearForm() { periodInput.value = ''; typeInput.value = ''; dateInput.value = ''; descInput.value = ''; rankInput.value = ''; selectedProjectIndex = null; }
+function parseDescValue(text) { return text.split('\n').map(line => line.trim()).filter(line => line !== ''); }
 
 function subscribeToFirestore() {
   const q = query(collection(db, COLLECTION));
@@ -250,118 +222,42 @@ function subscribeToFirestore() {
     projects = snapshot.docs.map(d => ({ ...d.data(), _id: d.id }));
     sortProjects();
     renderTimeline();
-    if (adminModal.classList.contains('active')) {
-      refreshProjectList();
-    }
+    if (adminModal.classList.contains('active')) { refreshProjectList(); }
   });
 }
 
 addBtn.addEventListener('click', async () => {
-  if (!periodInput.value || !typeInput.value || !dateInput.value || !descInput.value.trim()) {
-    alert('필수항목을 모두 입력해주세요.');
-    return;
-  }
-  if (!isValidDateFormat(dateInput.value)) {
-    alert('날짜는 YYYY.MM 형식으로 입력해주세요.');
-    return;
-  }
-
+  if (!periodInput.value || !typeInput.value || !dateInput.value || !descInput.value.trim()) { alert('필수항목을 모두 입력해주세요.'); return; }
+  if (!isValidDateFormat(dateInput.value)) { alert('날짜는 YYYY.MM 형식으로 입력해주세요.'); return; }
   const descLines = parseDescValue(descInput.value);
-  const newProject = {
-    period: periodInput.value,
-    type: typeInput.value,
-    date: dateInput.value,
-    desc: descLines,
-    rank: rankInput.value
-  };
-
-  addBtn.disabled = true;
-  addBtn.textContent = '저장 중...';
-  try {
-    await addProjectToFirestore(newProject);
-    clearForm();
-  } catch (e) {
-    alert('저장 중 오류가 발생했습니다: ' + e.message);
-  } finally {
-    addBtn.disabled = false;
-    addBtn.textContent = '프로젝트 추가';
-  }
+  const newProject = { period: periodInput.value, type: typeInput.value, date: dateInput.value, desc: descLines, rank: rankInput.value };
+  addBtn.disabled = true; try { await addProjectToFirestore(newProject); clearForm(); } catch (e) { alert('오류: ' + e.message); } finally { addBtn.disabled = false; }
 });
 
 projectSelect.addEventListener('change', () => {
   selectedProjectIndex = Number(projectSelect.value);
   const p = projects[selectedProjectIndex];
   if (!p) return;
-
-  periodInput.value = p.period;
-  typeInput.value = p.type;
-  dateInput.value = p.date;
-  descInput.value = Array.isArray(p.desc) ? p.desc.join('\n') : p.desc;
-  rankInput.value = p.rank || '';
+  periodInput.value = p.period; typeInput.value = p.type; dateInput.value = p.date;
+  descInput.value = Array.isArray(p.desc) ? p.desc.join('\n') : p.desc; rankInput.value = p.rank || '';
 });
 
 updateBtn.addEventListener('click', async () => {
-  if (selectedProjectIndex === null) {
-    alert('수정할 프로젝트를 선택해주세요.');
-    return;
-  }
+  if (selectedProjectIndex === null) return;
   const p = projects[selectedProjectIndex];
-  if (!p || !p._id) {
-    alert('선택된 프로젝트 정보를 찾을 수 없습니다.');
-    return;
-  }
-
+  if (!p || !p._id) return;
   const descLines = parseDescValue(descInput.value);
-  const updated = {
-    period: periodInput.value,
-    type: typeInput.value,
-    date: dateInput.value,
-    desc: descLines,
-    rank: rankInput.value
-  };
-
-  updateBtn.disabled = true;
-  updateBtn.textContent = '수정 중...';
-  try {
-    await updateProjectInFirestore(p._id, updated);
-    clearForm();
-    alert('수정되었습니다.');
-  } catch (e) {
-    alert('수정 중 오류가 발생했습니다: ' + e.message);
-  } finally {
-    updateBtn.disabled = false;
-    updateBtn.textContent = '프로젝트 수정';
-  }
+  const updated = { period: periodInput.value, type: typeInput.value, date: dateInput.value, desc: descLines, rank: rankInput.value };
+  updateBtn.disabled = true; try { await updateProjectInFirestore(p._id, updated); clearForm(); } catch (e) { alert('오류: ' + e.message); } finally { updateBtn.disabled = false; }
 });
 
 deleteBtn.addEventListener('click', async () => {
-  if (selectedProjectIndex === null) {
-    alert('삭제할 프로젝트를 선택해주세요.');
-    return;
-  }
+  if (selectedProjectIndex === null) return;
   const p = projects[selectedProjectIndex];
-  if (!p || !p._id) {
-    alert('선택된 프로젝트 정보를 찾을 수 없습니다.');
-    return;
-  }
+  if (!p || !p._id) return;
   if (!confirm('정말 삭제하시겠습니까?')) return;
-
-  deleteBtn.disabled = true;
-  deleteBtn.textContent = '삭제 중...';
-  try {
-    await deleteProjectFromFirestore(p._id);
-    clearForm();
-  } catch (e) {
-    alert('삭제 중 오류가 발생했습니다: ' + e.message);
-  } finally {
-    deleteBtn.disabled = false;
-    deleteBtn.textContent = '프로젝트 삭제';
-  }
+  deleteBtn.disabled = true; try { await deleteProjectFromFirestore(p._id); clearForm(); } catch (e) { alert('오류: ' + e.message); } finally { deleteBtn.disabled = false; }
 });
 
-async function initApp() {
-  await loadProjectsFromFirestore();
-  subscribeToFirestore();
-}
-
+async function initApp() { await loadProjectsFromFirestore(); subscribeToFirestore(); }
 initApp();

@@ -3,35 +3,92 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Timeline Swing V3</title>
+  <title>Timeline Swing V3 - Roadmap</title>
   <link rel="stylesheet" href="roadmap.css">
 </head>
 <body>
 
-  <!-- 메인 타임라인 컨테이너 -->
   <div class="timeline-wrapper">
-    <div class="timeline">
-      <div class="period-nav">
-        <button class="nav-btn nav-left" id="btn-prev">&#8592;</button>
-        <div class="period-label-wrap">
-          <span class="period-label" id="period-label">2026 H1</span>
-        </div>
-        <button class="nav-btn nav-right" id="btn-next">&#8594;</button>
+    
+    <div class="zone-a">
+      <div class="zone-a1">
+        <h1 class="roadmap-title">ROADMAP</h1>
+        <p class="roadmap-sub-desc">
+          작은 발걸음이 모여 더 넓은 가능성을 만듭니다. 토끼건축사사무소는 한 걸음씩, 함께, 더 멀리 나아갑니다.
+        </p>
       </div>
-
-      <div class="main-line">
-        <div class="edge left"></div>
-        <div class="edge right"></div>
+      <div class="zone-a2">
+        <p class="roadmap-main-desc">
+          토끼건축사사무소는 다양한 현상설계를 통해 공간의 가능성을 탐구하고, 사람과 사람을 연결하여 지역사회에 좋은 영향을 미치는 건축을 만들기 위해 노력하고 있습니다.
+        </p>
       </div>
-
-      <div id="fruit-container"></div>
+      <div class="zone-a3">
+        <img src="images/00 Journey.jpg" alt="Journey" class="scale-img">
+      </div>
     </div>
+
+    <div class="zone-b">
+      <div class="timeline">
+        <div class="period-nav">
+          <button class="nav-btn nav-left" id="btn-prev">&#8592;</button>
+          <div class="period-label-wrap">
+            <span class="period-label" id="period-label">2026 H1</span>
+          </div>
+          <button class="nav-btn nav-right" id="btn-next">&#8594;</button>
+        </div>
+
+        <div class="main-line">
+          <div class="edge left"></div>
+          <div class="edge right"></div>
+        </div>
+
+        <div id="fruit-container"></div>
+      </div>
+    </div>
+
+    <div class="zone-c">
+      <div class="zone-c-item">
+        <img src="images/01 Investigate.jpg" alt="탐구" class="scale-img">
+        <div class="item-text">
+          <h3>탐구</h3>
+          <p>다양한 주제와 공간에 대한<br>지속적인 탐구</p>
+        </div>
+      </div>
+      
+      <div class="zone-c-item">
+        <img src="images/02 Comprehend.jpg" alt="이해" class="scale-img">
+        <div class="item-text">
+          <h3>이해</h3>
+          <p>지역과 사람, 맥락을<br>깊이 이해</p>
+        </div>
+      </div>
+      
+      <div class="zone-c-item">
+        <img src="images/03 Link.jpg" alt="연결" class="scale-img">
+        <div class="item-text">
+          <h3>연결</h3>
+          <p>사람과 공간, 프로그램을<br>섬세하게 연결</p>
+        </div>
+      </div>
+      
+      <div class="zone-c-item">
+        <img src="images/04 Broaden.jpg" alt="확장" class="scale-img">
+        <div class="item-text">
+          <h3>확장</h3>
+          <p>작은 시도들이 모여<br>더 큰 가능성으로 확장</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="zone-footer">
+      <div class="footer-en">T H E   R A B B I T   A R C H I T E C T S</div>
+      <div class="footer-ko">토끼건축사사무소</div>
+    </div>
+
   </div>
 
-  <!-- 우측 하단 어드민 진입 트리거 -->
   <div class="admin-trigger" id="admin-trigger">...</div>
 
-  <!-- 프로젝트 관리 패널 모달 -->
   <div class="admin-modal" id="admin-modal">
     <div class="admin-panel">
       <div class="admin-header">
@@ -67,8 +124,8 @@
         </div>
 
         <div class="form-group desc-group">
-          <label>Description * (작성 시 입력한 줄바꿈이 그대로 반영됩니다)</label>
-          <textarea id="project-desc" rows="3" placeholder="예: 거창군 지역활력타운&#10;다부리복합문화센터&#10;건립사업 설계공모"></textarea>
+          <label>Description * (작성 시 줄바꿈 그대로 반영)</label>
+          <textarea id="project-desc" rows="3" placeholder="예: 거창군 지역활력타운&#10;다누리복합문화센터&#10;건립사업 설계공모"></textarea>
         </div>
 
         <div class="form-group">
@@ -89,7 +146,6 @@
     </div>
   </div>
 
-  <!-- Firebase SDK는 ES Module 방식으로 roadmap.js에서 import -->
   <script type="module" src="roadmap.js"></script>
 </body>
 </html>
