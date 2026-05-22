@@ -310,7 +310,7 @@ body{
 .fruit.type3 .desc { font-size: 12px; line-height: 1.4; word-break: keep-all; }
 .fruit.type3 .rank {
   font-size: 11px; font-weight: bold; margin-top: 5px; padding: 2px 8px;
-  border-radius: 10px; background-color: #665647; color: #fff;
+  border-radius: 10px; background-color: #fff; color: #665647;
 }
 
 .fruit:hover .fruit-body {
