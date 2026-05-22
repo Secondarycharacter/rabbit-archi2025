@@ -83,14 +83,14 @@ body{
   z-index: 2;        /* A3보다 높은 숫자를 주어 앞으로 가져옵니다 */
 }
 .roadmap-main-desc {
-  width: 500px; /* 조건 8: 가로폭 범위 500px */
+  width: autopx; /* 조건 8: 가로폭 범위 500px */
   font-size: 15pt; /* 조건 8: 15pt */
   line-height: 1.5;
+  white-space: nowrap;
   word-break: keep-all; /* 단어 단위 줄바꿈 */
 }
 .zone-a3 {
   width: 33.333%;
-  overflow: hidden;
   position: relative; /* z-index를 적용하기 위해 필수 */
   z-index: 1;        /* A2보다 낮은 숫자를 주어 뒤로 보냅니다 */
 }
