@@ -37,11 +37,11 @@ body{
   justify-content: space-between;
 }
 
-/* 이미지 공통 원본 대비 0.77배 리사이징 적용 */
+/* 이미지 공통 원본 대비 0.9배 리사이징 적용 */
 .scale-img {
   width: auto;
   height: auto;
-  transform: scale(1);
+  transform: scale(0.9);
   transform-origin: top left;
   display: block;
 }
@@ -95,7 +95,7 @@ body{
   z-index: 1;        /* A2보다 낮은 숫자를 주어 뒤로 보냅니다 */
 }
 .zone-a3 .scale-img {
-  transform: scale(0.6);
+  transform: scale(0.75);
   transform-origin: top right;
   float: right;
   display: block;
