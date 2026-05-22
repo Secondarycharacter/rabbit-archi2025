@@ -77,7 +77,8 @@ body{
   width: 33.333%;
   display: flex;
   align-items: flex-start;
-  padding-top: 20px;
+  padding-top: 50px;
+  padding-left: 150px;
   position: relative; /* z-index를 적용하기 위해 필수 */
   z-index: 2;        /* A3보다 높은 숫자를 주어 앞으로 가져옵니다 */
 }
@@ -272,6 +273,8 @@ body{
   display: flex;
   height: 180px;
   width: 100%;
+  margin-top: 100px;
+  margin-left: 100px;
 }
 .zone-c-item {
   width: 25%;
