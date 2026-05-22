@@ -41,7 +41,7 @@ body{
 .scale-img {
   width: auto;
   height: auto;
-  transform: scale(0.77);
+  transform: scale(1);
   transform-origin: top left;
   display: block;
 }
@@ -89,12 +89,15 @@ body{
 }
 .zone-a3 {
   width: 33.333%;
+  overflow: hidden;
   position: relative; /* z-index를 적용하기 위해 필수 */
   z-index: 1;        /* A2보다 낮은 숫자를 주어 뒤로 보냅니다 */
 }
 .zone-a3 .scale-img {
+  transform: scale(0.5);
   transform-origin: top right;
   float: right;
+  display: block;
 }
 
 /* ==========================================
