@@ -246,23 +246,23 @@ body{
 }
 
 /* 폰트 크기 세팅 */
-.fruit.type1 .date { font-size: 16px; font-weight: bold; margin-bottom: 5px; }
-.fruit.type1 .desc { font-size: 13px; line-height: 1.35; word-break: keep-all; }
+.fruit.type1 .date { font-size: 18px; font-weight: bold; margin-bottom: 5px; }
+.fruit.type1 .desc { font-size: 14px; line-height: 1.5; word-break: keep-all; }
 .fruit.type1 .rank {
-  font-size: 12px; font-weight: bold; margin-top: 5px; padding: 2px 8px;
-  border-radius: 10px; background-color: #665647; color: #fff;
+  font-size: 13px; font-weight: bold; margin-top: 5px; padding: 2px 8px;
+  border-radius: 11px; background-color: #665647; color: #fff;
 }
 
 /* 조건 3: TYPE2 글씨 크기 1.5배 확대 조정 */
-.fruit.type2 .date { font-size: 13.5px; font-weight: bold; color: #e2dcd5; margin-bottom: 2px; }
-.fruit.type2 .desc { font-size: 12px; line-height: 1.2; word-break: keep-all; }
+.fruit.type2 .date { font-size: 14px; font-weight: bold; color: #e2dcd5; margin-bottom: 2px; }
+.fruit.type2 .desc { font-size: 11px; line-height: 1.35; word-break: keep-all; }
 .fruit.type2 .rank {
-  font-size: 12px; font-weight: bold; margin-top: 2px; padding: 1px 5px;
+  font-size: 11px; font-weight: bold; margin-top: 2px; padding: 1px 5px;
   border-radius: 8px; background-color: #fff; color: #665647;
 }
 
 .fruit:hover .fruit-body {
-  transform: translateX(-50%) scale(1.06);
+  transform: translateX(-50%) scale(1.1);
   box-shadow: 0 4px 16px rgba(102,86,71,0.2);
 }
 
