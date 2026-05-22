@@ -273,7 +273,6 @@ body{
   display: flex;
   height: 180px;
   width: 100%;
-  margin-top: 50px;
   margin-left: 100px;
 }
 .zone-c-item {
@@ -284,12 +283,14 @@ body{
 }
 .zone-c-item .scale-img {
   flex-shrink: 0;
+  margin-top: 200px;
 }
 .item-text {
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
   text-align: left; /* 조건 10,11,12,13: 왼쪽 정렬 */
+  margin-top: 200px;
 }
 .item-text h3 {
   font-family: 'NanumBarunGothicBold', sans-serif;
