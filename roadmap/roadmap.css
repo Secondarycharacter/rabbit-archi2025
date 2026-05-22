@@ -77,8 +77,8 @@ body{
   width: 33.333%;
   display: flex;
   align-items: flex-start;
-  padding-top: 50px;
-  padding-left: 150px;
+  padding-top: 30px;
+  padding-left: 450px;
   position: relative; /* z-index를 적용하기 위해 필수 */
   z-index: 2;        /* A3보다 높은 숫자를 주어 앞으로 가져옵니다 */
 }
@@ -95,7 +95,7 @@ body{
   z-index: 1;        /* A2보다 낮은 숫자를 주어 뒤로 보냅니다 */
 }
 .zone-a3 .scale-img {
-  transform: scale(0.5);
+  transform: scale(0.6);
   transform-origin: top right;
   float: right;
   display: block;
@@ -298,7 +298,7 @@ body{
   margin-bottom: 6px;
 }
 .item-text p {
-  font-size: 12px; /* 조건 10,11,12,13: 12px */
+  font-size: 15px; /* 조건 10,11,12,13: 12px */
   line-height: 1.4;
   color: #665647;
 }
@@ -306,6 +306,7 @@ body{
 /* 최하단 브랜드 텍스트 정렬 푸터 */
 .zone-footer {
   width: 100%;
+  margin-top: 50px;
   text-align: center; /* 조건 14: 가운데 정렬 */
   padding-bottom: 15px;
 }
