@@ -290,12 +290,12 @@ body{
 }
 .item-text h3 {
   font-family: 'NanumBarunGothicBold', sans-serif;
-  font-size: 20pt; /* 조건 10,11,12,13: 20pt, BOLD */
+  font-size: 18px; /* 조건 10,11,12,13: 18px, BOLD */
   color: #665647;
   margin-bottom: 6px;
 }
 .item-text p {
-  font-size: 15pt; /* 조건 10,11,12,13: 15pt */
+  font-size: 12px; /* 조건 10,11,12,13: 12px */
   line-height: 1.4;
   color: #665647;
 }
