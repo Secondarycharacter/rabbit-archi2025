@@ -108,7 +108,7 @@ body{
   position: relative;
   height: 380px;
   width: 100%;
-  margin-top: 100px;
+  margin-top: 50px;
 }
 .timeline {
   position: relative;
@@ -313,14 +313,14 @@ body{
 }
 .zone-c-item .scale-img {
   flex-shrink: 0;
-  margin-top: 300px;
+  margin-top: 250px;
 }
 .item-text {
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
   text-align: left; /* 조건 10,11,12,13: 왼쪽 정렬 */
-  margin-top: 300px;
+  margin-top: 250px;
 }
 .item-text h3 {
   font-family: 'NanumBarunGothicBold', sans-serif;
@@ -339,6 +339,7 @@ body{
   width: 100%;
   text-align: center; /* 조건 14: 가운데 정렬 */
   padding-bottom: 15px;
+  margin-top: 100px;
 }
 .footer-en {
   font-family: 'NanumBarunGothicBold', sans-serif;
