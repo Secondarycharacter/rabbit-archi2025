@@ -22,7 +22,6 @@ body{
   font-family:'NanumBarunGothic', sans-serif;
   color:#665647;
   overflow: hidden;
-  overflow-y: auto;
 }
 
 /* ── 타임라인 화면 대형 컨테이너 ── */
@@ -34,7 +33,7 @@ body{
   left: 50%;
   transform: translate(-50%, -50%);
   width: 1800px; /* 조건 1: 메인라인 길이에 맞추어 전체 가로폭 1800px 조정 */
-  min-height: 960px;
+  height: 960px;
   justify-content: space-between;
   overflow: visible; /* zone-a 위 돌출(-100px), footer 아래 돌출(-100px) 클립 방지 */
 }
@@ -55,16 +54,6 @@ body{
 /* zone-a1(타이틀), zone-a2(본문), zone-a3(우측그림)을 한 번에 묶어서 위로 올립니다 */
 .zone-a1, .zone-a2, .zone-a3 {
   margin-top: -100px !important; 
-}
-
-/* 모바일 대응 */
-@media screen and (max-width: 932px){
-
-  .zone-a1,
-  .zone-a2,
-  .zone-a3{
-    margin-top:-40px !important;
-  }
 }
 
 .zone-a {
@@ -455,26 +444,18 @@ body{
 /* ── ESC 안내 문구 스타일 및 깜빡임 효과 ── */
 .esc-guide {
   position: absolute;
-  bottom: 15px;
+  bottom: 15px;      /* 화면 맨 바닥에서 15px 띄움 (취향껏 조절) */
   left: 50%;
   transform: translateX(-50%);
   
   font-family: 'NanumBarunGothicBold', sans-serif;
   font-size: 14px;
-  color: #8c7e72;
+  color: #8c7e72;    /* 로드맵 테마에 어울리는 브라운 계열 톤 */
   letter-spacing: 1px;
   z-index: 100;
   
+  /* 💡 blink 애니메이션을 1.5초 간격으로 무한(infinite) 반복 실행 */
   animation: blink 1.5s infinite ease-in-out; 
-}
-
-/* 모바일/태블릿에서는 ESC 안내 숨김 */
-@media screen and (max-width: 1024px){
-
-  .esc-guide{
-    display:none;
-  }
-
 }
 
 /* 💡 투명도를 100%에서 20%로 부드럽게 오가며 깜빡이는 규칙 */
