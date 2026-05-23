@@ -368,11 +368,10 @@ body{
   position: absolute; 
   
   /* 💡 전체 틀(.timeline-wrapper)의 맨 바닥면으로부터 딱 5px만 띄웁니다 */
-  bottom: 5px; 
+  bottom: -50px; 
   left: 0;
   width: 100%; /*[cite: 2] */
   text-align: center; /*[cite: 2] */
-  padding-top: 50px;
   
   /* 💡 absolute 환경이 되었으므로 기존의 무시되던 마진은 지워줍니다 */
 }
