@@ -368,7 +368,7 @@ body{
   position: absolute; 
   
   /* 💡 전체 틀(.timeline-wrapper)의 맨 바닥면으로부터 딱 5px만 띄웁니다 */
-  bottom: -75px; 
+  bottom: -100px; 
   left: 0;
   width: 100%; /*[cite: 2] */
   text-align: center; /*[cite: 2] */
