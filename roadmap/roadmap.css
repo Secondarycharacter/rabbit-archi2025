@@ -54,7 +54,7 @@ body{
   height: 25%;
   width: 100%;
   position: relative; /* 자식 요소들의 z-index 기준점이 됩니다 */
-  margin-top: -50px;
+  padding-top: -50px;
 }
 .zone-a1 {
   width: 33.333%;
@@ -339,14 +339,16 @@ body{
 }
 .zone-c-item .scale-img {
   flex-shrink: 0;
-  margin-top: 125px;
+  padding-top: 125px;
+  /* margin-top: 125px; */
 }
 .item-text {
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
   text-align: left; /* 조건 10,11,12,13: 왼쪽 정렬 */
-  margin-top: 125px;
+  padding-top: 125px;
+  /* margin-top: 125px; */
 }
 .item-text h3 {
   font-family: 'NanumBarunGothicBold', sans-serif;
@@ -368,7 +370,7 @@ body{
   left: 0;
   width: 100%; /*[cite: 2] */
   text-align: center; /*[cite: 2] */
-  margin-bottom: -50px;
+  padding-bottomtop: -50px;
   
   /* 💡 absolute 환경이 되었으므로 기존의 무시되던 마진은 지워줍니다 */
 }
