@@ -54,7 +54,7 @@ body{
   height: 25%;
   width: 100%;
   position: relative; /* 자식 요소들의 z-index 기준점이 됩니다 */
-  margin-top: -20px;
+  margin-top: -50px;
 }
 .zone-a1 {
   width: 33.333%;
@@ -368,6 +368,7 @@ body{
   left: 0;
   width: 100%; /*[cite: 2] */
   text-align: center; /*[cite: 2] */
+  margin-bottom: -50px;
   
   /* 💡 absolute 환경이 되었으므로 기존의 무시되던 마진은 지워줍니다 */
 }
