@@ -186,25 +186,36 @@ const adminTrigger = document.getElementById('admin-trigger');
 const adminModal = document.getElementById('admin-modal');
 const closeAdminBtn = document.getElementById('close-admin-btn');
 
-// 💡 () 앞에 async를 붙여서 비동기 함수로 만들어 줍니다.
-adminTrigger.addEventListener('click', async () => {
+// 💡 화살표 함수 대신 'async function ()' 형태로 안전하게 선언합니다.
+adminTrigger.addEventListener('click', async function (event) {
   const password = prompt("관리자 비밀번호를 입력하세요:");
-  if (!password) return; // 취소 버튼을 누르면 종료
+  if (!password) return; 
 
-  // 1. 입력받은 비밀번호를 즉석에서 SHA-256으로 암호화(해싱)
-  const msgBuffer = new TextEncoder().encode(password);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  const hashedInput = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  try {
+    // 1. 암호화 진행
+    const msgBuffer = new TextEncoder().encode(password);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashedInput = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 
   // 2. 미리 준비한 내 비밀번호의 해시값과 비교
   const adminHash = "d5f4667cf6475357097dacbc04f2aa0372df86183fb922b6c77babcae9f50cc4"; 
   
-  if (hashedInput === adminHash) { 
-    // 💡 인증 성공 시 실행될 기존 로직을 이 중괄호 안에 그대로 두시면 됩니다.
-    await openAdminPanel(); 
-  } else {
-    alert("비밀번호가 일치하지 않습니다.");
+if (hashedInput === adminHash) {
+      console.log("🔒 인증 성공! 관리자 도구를 실행합니다.");
+      
+      // 💡 [확인] 이 부분에 들어가는 기존의 관리자 도구 오픈 코드가 
+      // 만약 함수 형태라면 앞에 꼭 'await'를 붙여서 실행해 보세요.
+      // 예: await 기존_관리자창_열기_함수();
+      
+      // (기존에 중괄호 안에 있던 관리자 도구 진입 코드를 여기에 그대로 넣어주세요)
+
+    } else {
+      alert("비밀번호가 일치하지 않습니다.");
+    }
+  } catch (error) {
+    console.error("암호화 처리 중 오류 발생:", error);
+    alert("보안 기능 실행 중 오류가 발생했습니다. 개발자 도구(F12)를 확인하세요.");
   }
 });
 
