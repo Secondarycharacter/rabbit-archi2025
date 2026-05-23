@@ -35,6 +35,7 @@ body{
   width: 1800px; /* 조건 1: 메인라인 길이에 맞추어 전체 가로폭 1800px 조정 */
   height: 960px;
   justify-content: space-between;
+  overflow: visible; /* zone-a 위 돌출(-100px), footer 아래 돌출(-100px) 클립 방지 */
 }
 
 /* 이미지 공통 원본 대비 0.9배 리사이징 적용 */

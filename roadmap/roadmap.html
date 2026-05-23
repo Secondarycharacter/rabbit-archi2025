@@ -154,15 +154,53 @@
     </div>
   </div>
 
+  <!-- 📱 핸드폰 세로 모드 안내 오버레이 -->
+  <div id="rotate-overlay" style="
+    display:none;
+    position:fixed; inset:0; z-index:99999;
+    background:#f7f3ef;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    font-family:'NanumBarunGothic',sans-serif;
+    color:#665647;
+    text-align:center;
+  ">
+    <div style="font-size:60px; margin-bottom:20px; animation:rotateHint 1.5s ease-in-out infinite;">↻</div>
+    <div style="font-family:'NanumBarunGothicBold',sans-serif; font-size:20px; margin-bottom:10px;">화면을 가로로 돌려주세요</div>
+    <div style="font-size:14px; line-height:1.6; opacity:0.7;">로드맵은 가로 모드에서<br>더 잘 보입니다</div>
+  </div>
+  <style>
+    @keyframes rotateHint {
+      0%   { transform: rotate(0deg);   }
+      40%  { transform: rotate(90deg);  }
+      60%  { transform: rotate(90deg);  }
+      100% { transform: rotate(0deg);   }
+    }
+  </style>
+
   <script type="module" src="roadmap.js"></script>
 
-  <!-- 아이패드/태블릿 대응: JS로 정밀 스케일 계산
-       CSS !important보다 강하게 적용하기 위해 setProperty('important') 사용
-       Safari의 min() CSS 함수 미지원 문제 완전 해결 -->
+  <!-- 데스크탑 / 태블릿 / 핸드폰 통합 스케일 핸들러
+       - 데스크탑 (1850×980 초과)   : JS 미개입, CSS 기본값 유지
+       - 태블릿 (933px ~ 1850px)    : 전체 scale 축소, 화면 중앙 고정, 스크롤 없음
+       - 핸드폰 가로 (≤932px, 가로) : 가로 width에 맞춰 scale, 세로 스크롤
+       - 핸드폰 세로 (≤932px, 세로) : "가로로 돌려주세요" 안내 오버레이 표시 -->
   <script>
     (function() {
-      var DESIGN_W = 1800;
-      var DESIGN_H = 960;
+      var DESIGN_W  = 1800;
+      // zone-a: margin-top:-100px(위 돌출), zone-footer: bottom:-100px(아래 돌출)
+      // 실제 시각적 콘텐츠 높이 = 960 + 100 + 100 = 1160px
+      var VISUAL_H  = 1160;
+      // 핸드폰 판별: landscape 기준 짧은 쪽(높이)이 500px 이하
+      var PHONE_H_LIMIT = 500;
+
+      var overlay = document.getElementById('rotate-overlay');
+
+      function isPhone() {
+        var short = Math.min(window.innerWidth, window.innerHeight);
+        return short <= PHONE_H_LIMIT;
+      }
 
       function applyScale() {
         var wrapper = document.querySelector('.timeline-wrapper');
@@ -170,43 +208,85 @@
 
         var vw = window.innerWidth;
         var vh = window.innerHeight;
+        var isLandscape = vw > vh;
 
-        // 데스크탑 (1850px 초과 AND 980px 초과): JS 개입 안 함, CSS 기본값 유지
+        // ── 핸드폰 ──────────────────────────────────────────────
+        if (isPhone()) {
+          if (!isLandscape) {
+            // 세로 모드: 안내 오버레이 표시
+            overlay.style.display = 'flex';
+            wrapper.style.setProperty('visibility', 'hidden', 'important');
+            return;
+          }
+
+          // 가로 모드: 가로 너비에 맞춰 scale, 세로는 스크롤
+          overlay.style.display = 'none';
+          wrapper.style.setProperty('visibility', 'visible', 'important');
+
+          var scale = (vw * 0.98) / DESIGN_W;
+          var renderedH = VISUAL_H * scale;
+
+          // body: 세로 스크롤 허용, 가로 스크롤 차단
+          document.body.style.setProperty('overflow-x', 'hidden', 'important');
+          document.body.style.setProperty('overflow-y', 'auto',   'important');
+          document.body.style.setProperty('height',     'auto',   'important');
+          // 스크롤 가능 영역을 렌더된 콘텐츠 높이만큼 확보
+          document.body.style.setProperty('min-height', renderedH + 'px', 'important');
+
+          // wrapper: 위에서 아래로 자연스럽게 스크롤되도록 absolute + top:0
+          wrapper.style.setProperty('position',         'absolute',                                'important');
+          wrapper.style.setProperty('top',              '0',                                       'important');
+          wrapper.style.setProperty('left',             '50%',                                     'important');
+          wrapper.style.setProperty('transform-origin', 'top center',                              'important');
+          wrapper.style.setProperty('transform',        'translateX(-50%) scale(' + scale + ')',   'important');
+          wrapper.style.setProperty('overflow',         'visible',                                 'important');
+          return;
+        }
+
+        // ── 태블릿 / 데스크탑 ────────────────────────────────────
+        overlay.style.display = 'none';
+        wrapper.style.setProperty('visibility', 'visible', 'important');
+
+        // 핸드폰 → 태블릿 전환 시 body 스크롤 초기화
+        document.body.style.removeProperty('overflow-x');
+        document.body.style.removeProperty('overflow-y');
+        document.body.style.removeProperty('height');
+        document.body.style.removeProperty('min-height');
+
+        // 데스크탑: JS 미개입
         if (vw > 1850 && vh > 980) {
-          // 혹시 이전에 JS가 적용한 inline style 초기화
           wrapper.style.removeProperty('position');
           wrapper.style.removeProperty('top');
           wrapper.style.removeProperty('left');
           wrapper.style.removeProperty('transform-origin');
           wrapper.style.removeProperty('transform');
+          wrapper.style.removeProperty('overflow');
+          wrapper.style.removeProperty('visibility');
           return;
         }
 
-        // 태블릿/소형 화면: 가로/세로 여유 중 작은 쪽으로 축소
+        // 태블릿: 가로/세로 모두 화면 안에 들어오도록 scale, 중앙 고정
         var scaleW = (vw * 0.96) / DESIGN_W;
-        var scaleH = (vh * 0.94) / DESIGN_H;
+        var scaleH = (vh * 0.94) / VISUAL_H;
         var scale  = Math.min(scaleW, scaleH);
-        var transformVal = 'translate(-50%, -50%) scale(' + scale + ')';
 
-        // setProperty의 세 번째 인자 'important'로 CSS !important보다 강하게 적용
-        wrapper.style.setProperty('position',         'fixed',         'important');
-        wrapper.style.setProperty('top',              '50%',           'important');
-        wrapper.style.setProperty('left',             '50%',           'important');
-        wrapper.style.setProperty('transform-origin', 'center center', 'important');
-        wrapper.style.setProperty('transform',        transformVal,    'important');
+        wrapper.style.setProperty('position',         'fixed',                                          'important');
+        wrapper.style.setProperty('top',              '50%',                                            'important');
+        wrapper.style.setProperty('left',             '50%',                                            'important');
+        wrapper.style.setProperty('transform-origin', 'center center',                                  'important');
+        wrapper.style.setProperty('transform',        'translate(-50%, -50%) scale(' + scale + ')',     'important');
+        wrapper.style.setProperty('overflow',         'visible',                                        'important');
       }
 
-      // DOM 준비 후 즉시 실행
       if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', applyScale);
       } else {
         applyScale();
       }
 
-      // 리사이즈 및 방향 전환 시 재계산
       window.addEventListener('resize', applyScale);
       window.addEventListener('orientationchange', function() {
-        setTimeout(applyScale, 300); // 방향 전환 완료 대기 후 재계산
+        setTimeout(applyScale, 300);
       });
     })();
   </script>
