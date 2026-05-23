@@ -49,12 +49,17 @@ body{
 /* ==========================================
    A 영역 스타일 (상단 삼등분)
    ========================================== */
+
+/* zone-a1(타이틀), zone-a2(본문), zone-a3(우측그림)을 한 번에 묶어서 위로 올립니다 */
+.zone-a1, .zone-a2, .zone-a3 {
+  margin-top: -50px !important; 
+}
+
 .zone-a {
   display: flex;
   height: 25%;
   width: 100%;
   position: relative; /* 자식 요소들의 z-index 기준점이 됩니다 */
-  padding-top: -150px;
 }
 .zone-a1 {
   width: 33.333%;
