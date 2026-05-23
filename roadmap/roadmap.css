@@ -368,11 +368,10 @@ body{
   position: absolute; 
   
   /* 💡 전체 틀(.timeline-wrapper)의 맨 바닥면으로부터 딱 5px만 띄웁니다 */
-  bottom: 0px; 
+  bottom: -100px; 
   left: 0;
   width: 100%; /*[cite: 2] */
   text-align: center; /*[cite: 2] */
-  margin-bottom: -100px;
   
   /* 💡 absolute 환경이 되었으므로 기존의 무시되던 마진은 지워줍니다 */
 }
@@ -465,32 +464,22 @@ body{
 }
 
 /* ==========================================
-   아이패드, 갤럭시탭 등 태블릿 화면 맞춤 (완전판)
+   아이패드, 갤럭시탭 등 태블릿 화면 맞춤
+   ※ 실제 스케일 계산은 roadmap.html 내 JS가 담당합니다.
+      JS가 setProperty('important')로 강제 적용하므로
+      CSS 미디어쿼리와 충돌 없이 모든 해상도를 커버합니다.
    ========================================== */
+
+/* JS 스케일 적용 시 wrapper가 fixed + center로 고정되도록 기반 설정 */
 @media screen and (max-width: 1850px), screen and (max-height: 980px) {
-  /* 1. 패드 환경에서는 화면이 잘리지 않도록 스크롤과 넘침 제한을 일시적으로 풀어줍니다 */
   body {
-    overflow: auto !important; 
-    position: relative !important;
-    min-height: 100vh !important;
+    overflow: hidden;
   }
-
   .timeline-wrapper {
-    /* 2. 아이패드 화면 비율에 맞춰 가로/세로 중 더 좁은 쪽에 맞춰 전체 비율을 안전하게 축소시킵니다 */
-    /* 수식을 min()으로 묶어 좌우, 상하 중 어느 곳도 절대 잘리지 않도록 강제합니다 */
-    transform: translate(-50%, -50%) scale(min(calc(96vw / 1800), calc(94vh / 960))) !important;
-    transform-origin: center center !important;
-    
-    /* 3. 축소되었을 때 화면 정중앙에 완벽하게 고정되도록 잡아줍니다 */
-    position: fixed !important;
-    top: 50% !important;
-    left: 50% !important;
-  }
-}
-
-/* ── 4. 아이패드를 세로로 돌렸을 때(화면 가로폭이 극단적으로 좁아질 때) 추가 안전장치 ── */
-@media screen and (max-width: 1024px) {
-  .timeline-wrapper {
-    transform: translate(-50%, -50%) scale(calc(98vw / 1800)) !important;
+    /* JS가 position/top/left/transform-origin/transform을 inline으로 덮어씁니다 */
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform-origin: center center;
   }
 }

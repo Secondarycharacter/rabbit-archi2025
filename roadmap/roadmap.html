@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Timeline Swing V3 - Roadmap</title>
   <link rel="stylesheet" href="roadmap.css">
 </head>
@@ -155,5 +155,60 @@
   </div>
 
   <script type="module" src="roadmap.js"></script>
+
+  <!-- 아이패드/태블릿 대응: JS로 정밀 스케일 계산
+       CSS !important보다 강하게 적용하기 위해 setProperty('important') 사용
+       Safari의 min() CSS 함수 미지원 문제 완전 해결 -->
+  <script>
+    (function() {
+      var DESIGN_W = 1800;
+      var DESIGN_H = 960;
+
+      function applyScale() {
+        var wrapper = document.querySelector('.timeline-wrapper');
+        if (!wrapper) return;
+
+        var vw = window.innerWidth;
+        var vh = window.innerHeight;
+
+        // 데스크탑 (1850px 초과 AND 980px 초과): JS 개입 안 함, CSS 기본값 유지
+        if (vw > 1850 && vh > 980) {
+          // 혹시 이전에 JS가 적용한 inline style 초기화
+          wrapper.style.removeProperty('position');
+          wrapper.style.removeProperty('top');
+          wrapper.style.removeProperty('left');
+          wrapper.style.removeProperty('transform-origin');
+          wrapper.style.removeProperty('transform');
+          return;
+        }
+
+        // 태블릿/소형 화면: 가로/세로 여유 중 작은 쪽으로 축소
+        var scaleW = (vw * 0.96) / DESIGN_W;
+        var scaleH = (vh * 0.94) / DESIGN_H;
+        var scale  = Math.min(scaleW, scaleH);
+        var transformVal = 'translate(-50%, -50%) scale(' + scale + ')';
+
+        // setProperty의 세 번째 인자 'important'로 CSS !important보다 강하게 적용
+        wrapper.style.setProperty('position',         'fixed',         'important');
+        wrapper.style.setProperty('top',              '50%',           'important');
+        wrapper.style.setProperty('left',             '50%',           'important');
+        wrapper.style.setProperty('transform-origin', 'center center', 'important');
+        wrapper.style.setProperty('transform',        transformVal,    'important');
+      }
+
+      // DOM 준비 후 즉시 실행
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', applyScale);
+      } else {
+        applyScale();
+      }
+
+      // 리사이즈 및 방향 전환 시 재계산
+      window.addEventListener('resize', applyScale);
+      window.addEventListener('orientationchange', function() {
+        setTimeout(applyScale, 300); // 방향 전환 완료 대기 후 재계산
+      });
+    })();
+  </script>
 </body>
 </html>
