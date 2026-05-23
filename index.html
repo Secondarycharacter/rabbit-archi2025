@@ -201,20 +201,56 @@ body {
   }
 }
 
-/* ── 스마트폰 대응 ── */
-@media screen and (max-width: 480px) {
+/* ── 스마트폰 가로 모드 ── */
+@media screen and (max-height: 500px) and (orientation: landscape) {
   .logo-frame {
-    max-width: 150px;
+    max-width: 100px;
+  }
+
+  .logo-wrapper {
+    top: calc(50% - 10px);
   }
 
   .welcome-message {
-    font-size: 13px;
+    font-size: 12px;
+    white-space: normal;
+    max-width: 80vw;
   }
 
   .roadmap-menu {
-    top: 16px;
+    top: 12px;
     right: 16px;
     font-size: 14px;
+  }
+
+  .uc-animation img {
+    width: 80px;
+  }
+
+  .maintenance-message {
+    font-size: 12px;
+  }
+
+  .bottom-area {
+    bottom: 10px;
+    gap: 8px;
+  }
+}
+
+/* ── 스마트폰 세로 모드: 가로 전환 안내 ── */
+@media screen and (max-width: 500px) and (orientation: portrait) {
+  body::after {
+    content: '↻  화면을 가로로 돌려주세요';
+    position: fixed;
+    inset: 0;
+    background: #000;
+    color: #fff;
+    font-family: 'NanumSquareB', sans-serif;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 99999;
   }
 }
 </style>
