@@ -303,3 +303,19 @@ deleteBtn.addEventListener('click', async () => {
 
 async function initApp() { await loadProjectsFromFirestore(); subscribeToFirestore(); }
 initApp();
+
+
+// ── ESC 키 입력 시 처음 화면으로 이동하는 이벤트 리스너 ──
+window.addEventListener('keydown', (event) => {
+  // 사용자가 누른 키가 'Escape'(ESC)인지 확인합니다.
+  if (event.key === 'Escape' || event.key === 'Esc') {
+    console.log("⌨️ ESC 키 감지! 처음 화면으로 이동합니다.");
+    
+    /* 
+     * 💡 [이동 주소 설정] 
+     * 보통 프로젝트의 첫 메인 화면 파일명이 'index.html'인 경우가 많습니다.
+     * 만약 메인 페이지 파일명이 다르다면 아래 주소를 본인의 메인 파일명으로 수정해 주세요!
+     */
+    window.location.href = 'index.html'; 
+  }
+});
