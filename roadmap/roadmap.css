@@ -52,7 +52,7 @@ body{
 
 /* zone-a1(타이틀), zone-a2(본문), zone-a3(우측그림)을 한 번에 묶어서 위로 올립니다 */
 .zone-a1, .zone-a2, .zone-a3 {
-  margin-top: -50px !important; 
+  margin-top: -100px !important; 
 }
 
 .zone-a {
@@ -334,7 +334,6 @@ body{
   height: 35%;
   width: 100%;
   margin-left: 100px;
-  /* margin-bottom: -30px; */
 }
 .zone-c-item {
   width: 25%;
@@ -345,7 +344,6 @@ body{
 .zone-c-item .scale-img {
   flex-shrink: 0;
   padding-top: 125px;
-  /* margin-top: 125px; */
 }
 .item-text {
   display: flex;
@@ -353,7 +351,6 @@ body{
   justify-content: flex-start;
   text-align: left; /* 조건 10,11,12,13: 왼쪽 정렬 */
   padding-top: 125px;
-  /* margin-top: 125px; */
 }
 .item-text h3 {
   font-family: 'NanumBarunGothicBold', sans-serif;
@@ -375,7 +372,7 @@ body{
   left: 0;
   width: 100%; /*[cite: 2] */
   text-align: center; /*[cite: 2] */
-  padding-bottomtop: -50px;
+  padding-top: 50px;
   
   /* 💡 absolute 환경이 되었으므로 기존의 무시되던 마진은 지워줍니다 */
 }
