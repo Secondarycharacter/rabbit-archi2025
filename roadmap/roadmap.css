@@ -54,7 +54,7 @@ body{
   height: 260px;
   width: 100%;
   position: relative; /* 자식 요소들의 z-index 기준점이 됩니다 */
-  margin-top: -50px;
+  margin-top: -20px;
 }
 .zone-a1 {
   width: 33.333%;
@@ -132,6 +132,8 @@ body{
   position: relative;
   height: 380px;
   width: 100%;
+  margin-bottom: 25px;
+  
 }
 .timeline {
   position: relative;
@@ -327,7 +329,7 @@ body{
   height: 180px;
   width: 100%;
   margin-left: 100px;
-  margin-bottom: -30px;
+  /* margin-bottom: -30px; */
 }
 .zone-c-item {
   width: 25%;
@@ -362,7 +364,7 @@ body{
   position: absolute; 
   
   /* 💡 전체 틀(.timeline-wrapper)의 맨 바닥면으로부터 딱 5px만 띄웁니다 */
-  bottom: 20px; 
+  bottom: 5px; 
   left: 0;
   width: 100%; /*[cite: 2] */
   text-align: center; /*[cite: 2] */
