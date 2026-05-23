@@ -54,6 +54,7 @@ body{
   height: 260px;
   width: 100%;
   position: relative; /* 자식 요소들의 z-index 기준점이 됩니다 */
+  margin-top: -50px;
 }
 .zone-a1 {
   width: 33.333%;
@@ -326,6 +327,7 @@ body{
   height: 180px;
   width: 100%;
   margin-left: 100px;
+  margin-bottom: -50px;
 }
 .zone-c-item {
   width: 25%;
