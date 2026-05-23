@@ -427,3 +427,34 @@ body{
 #delete-project-btn{background-color:#d9534f;color:#fff;}
 .project-list-wrap { margin-top: 15px; }
 .project-list-wrap select { width: 100%; border-radius: 8px; padding: 8px; border: 1px solid #ccc; }
+
+
+/* ── 컴퓨터 모니터보다 작은 노트북, 아이패드, 태블릿 가로 모드 대응 (1850px 이하) ── */
+@media screen and (max-width: 1850px) {
+  .timeline-wrapper {
+    /* 1. 고정된 가로폭 1800px을 풀고 화면 크기에 맞춰 유연하게 조절합니다 */
+    width: 95vw !important; 
+    
+    /* 2. 전체적인 가로 세로 비율을 유지하면서 화면 크기에 맞게 자동으로 축소(Scale)되도록 만듭니다 */
+    transform: translate(-50%, -50%) scale(calc(95vw / 1800)) !important;
+    transform-origin: center center !important;
+  }
+}
+
+/* ── 화면 높이가 낮아서 위아래가 잘리는 환경 대응 ── */
+@media screen and (max-height: 980px) {
+  .timeline-wrapper {
+    /* 높이가 너무 낮은 모니터나 태블릿 환경에서는 높이 기준으로 화면을 안전하게 축소합니다 */
+    transform: translate(-50%, -50%) scale(calc(90vh / 960)) !important;
+    transform-origin: center center !important;
+  }
+}
+
+/* ── 화면 너비와 높이가 모두 작아지는 복합 환경 (예: 아이패드 정방향 등) ── */
+@media screen and (max-width: 1850px) and (max-height: 980px) {
+  .timeline-wrapper {
+    /* 너비 축소 비율과 높이 축소 비율 중 더 작은 쪽에 맞춰 화면이 절대 잘리지 않도록 안전장치를 겁니다 */
+    transform: translate(-50%, -50%) scale(min(calc(95vw / 1800), calc(90vh / 960))) !important;
+    transform-origin: center center !important;
+  }
+}
