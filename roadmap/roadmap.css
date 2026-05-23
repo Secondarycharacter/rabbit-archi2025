@@ -130,7 +130,7 @@ body{
 
 .zone-b {
   position: relative;
-  height: 35%;
+  height: 40%;
   width: 100%;
   margin-bottom: 25px;
   
@@ -326,7 +326,7 @@ body{
    ========================================== */
 .zone-c {
   display: flex;
-  height: 40%;
+  height: 35%;
   width: 100%;
   margin-left: 100px;
   /* margin-bottom: -30px; */
