@@ -51,7 +51,7 @@ body{
    ========================================== */
 .zone-a {
   display: flex;
-  height: 260px;
+  height: 25%;
   width: 100%;
   position: relative; /* 자식 요소들의 z-index 기준점이 됩니다 */
   margin-top: -20px;
@@ -130,7 +130,7 @@ body{
 
 .zone-b {
   position: relative;
-  height: 380px;
+  height: 35%;
   width: 100%;
   margin-bottom: 25px;
   
@@ -326,7 +326,7 @@ body{
    ========================================== */
 .zone-c {
   display: flex;
-  height: 180px;
+  height: 40%;
   width: 100%;
   margin-left: 100px;
   /* margin-bottom: -30px; */
