@@ -186,13 +186,25 @@ const adminTrigger = document.getElementById('admin-trigger');
 const adminModal = document.getElementById('admin-modal');
 const closeAdminBtn = document.getElementById('close-admin-btn');
 
-adminTrigger.addEventListener('click', () => {
-  const password = prompt('관리자 암호를 입력하세요:');
-  if (password === '1031!@') {
-    adminModal.classList.add('active');
-    refreshProjectList();
-  } else if (password !== null) {
-    alert('암호가 올바르지 않습니다.');
+// 💡 () 앞에 async를 붙여서 비동기 함수로 만들어 줍니다.
+adminTrigger.addEventListener('click', async () => {
+  const password = prompt("관리자 비밀번호를 입력하세요:");
+  if (!password) return; // 취소 버튼을 누르면 종료
+
+  // 1. 입력받은 비밀번호를 즉석에서 SHA-256으로 암호화(해싱)
+  const msgBuffer = new TextEncoder().encode(password);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const hashedInput = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+  // 2. 미리 준비한 내 비밀번호의 해시값과 비교
+  const adminHash = "D5F4667CF6475357097DACBC04F2AA0372DF86183FB922B6C77BABCAE9F50CC4"; 
+  
+  if (hashedInput === adminHash) { 
+    // 💡 인증 성공 시 실행될 기존 로직을 이 중괄호 안에 그대로 두시면 됩니다.
+    openAdminPanel(); 
+  } else {
+    alert("비밀번호가 일치하지 않습니다.");
   }
 });
 
