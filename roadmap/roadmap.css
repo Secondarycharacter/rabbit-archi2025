@@ -357,14 +357,17 @@ body{
   line-height: 1.4;
   color: #665647;
 }
-
-/* 최하단 브랜드 텍스트 정렬 푸터 */
 .zone-footer {
-  width: 100%;
-  text-align: center; /* 조건 14: 가운데 정렬 */
-  padding-bottom: 15px;
-  margin-top: 100px;
-  margin-bottom: -30px;
+  /* 💡 플렉스 박스의 자동 정렬 규칙을 깨부수고 독립시킵니다 */
+  position: absolute; 
+  
+  /* 💡 전체 틀(.timeline-wrapper)의 맨 바닥면으로부터 딱 5px만 띄웁니다 */
+  bottom: 20px; 
+  left: 0;
+  width: 100%; /*[cite: 2] */
+  text-align: center; /*[cite: 2] */
+  
+  /* 💡 absolute 환경이 되었으므로 기존의 무시되던 마진은 지워줍니다 */
 }
 .footer-en {
   font-family: 'NanumBarunGothicBold', sans-serif;
@@ -432,32 +435,33 @@ body{
 .project-list-wrap select { width: 100%; border-radius: 8px; padding: 8px; border: 1px solid #ccc; }
 
 
-/* ── 컴퓨터 모니터보다 작은 노트북, 아이패드, 태블릿 가로 모드 대응 (1850px 이하) ── */
-@media screen and (max-width: 1850px) {
+/* ==========================================
+   아이패드, 갤럭시탭 등 태블릿 화면 맞춤 (완전판)
+   ========================================== */
+@media screen and (max-width: 1850px), screen and (max-height: 980px) {
+  /* 1. 패드 환경에서는 화면이 잘리지 않도록 스크롤과 넘침 제한을 일시적으로 풀어줍니다 */
+  body {
+    overflow: auto !important; 
+    position: relative !important;
+    min-height: 100vh !important;
+  }
+
   .timeline-wrapper {
-    /* 1. 고정된 가로폭 1800px을 풀고 화면 크기에 맞춰 유연하게 조절합니다 */
-    width: 95vw !important; 
+    /* 2. 아이패드 화면 비율에 맞춰 가로/세로 중 더 좁은 쪽에 맞춰 전체 비율을 안전하게 축소시킵니다 */
+    /* 수식을 min()으로 묶어 좌우, 상하 중 어느 곳도 절대 잘리지 않도록 강제합니다 */
+    transform: translate(-50%, -50%) scale(min(calc(96vw / 1800), calc(94vh / 960))) !important;
+    transform-origin: center center !important;
     
-    /* 2. 전체적인 가로 세로 비율을 유지하면서 화면 크기에 맞게 자동으로 축소(Scale)되도록 만듭니다 */
-    transform: translate(-50%, -50%) scale(calc(95vw / 1800)) !important;
-    transform-origin: center center !important;
+    /* 3. 축소되었을 때 화면 정중앙에 완벽하게 고정되도록 잡아줍니다 */
+    position: fixed !important;
+    top: 50% !important;
+    left: 50% !important;
   }
 }
 
-/* ── 화면 높이가 낮아서 위아래가 잘리는 환경 대응 ── */
-@media screen and (max-height: 980px) {
+/* ── 4. 아이패드를 세로로 돌렸을 때(화면 가로폭이 극단적으로 좁아질 때) 추가 안전장치 ── */
+@media screen and (max-width: 1024px) {
   .timeline-wrapper {
-    /* 높이가 너무 낮은 모니터나 태블릿 환경에서는 높이 기준으로 화면을 안전하게 축소합니다 */
-    transform: translate(-50%, -50%) scale(calc(90vh / 960)) !important;
-    transform-origin: center center !important;
-  }
-}
-
-/* ── 화면 너비와 높이가 모두 작아지는 복합 환경 (예: 아이패드 정방향 등) ── */
-@media screen and (max-width: 1850px) and (max-height: 980px) {
-  .timeline-wrapper {
-    /* 너비 축소 비율과 높이 축소 비율 중 더 작은 쪽에 맞춰 화면이 절대 잘리지 않도록 안전장치를 겁니다 */
-    transform: translate(-50%, -50%) scale(min(calc(95vw / 1800), calc(90vh / 960))) !important;
-    transform-origin: center center !important;
+    transform: translate(-50%, -50%) scale(calc(98vw / 1800)) !important;
   }
 }
