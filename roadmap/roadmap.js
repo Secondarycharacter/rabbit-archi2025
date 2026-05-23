@@ -202,17 +202,34 @@ adminTrigger.addEventListener('click', async function (event) {
   const adminHash = "d5f4667cf6475357097dacbc04f2aa0372df86183fb922b6c77babcae9f50cc4"; 
   
 if (hashedInput === adminHash) {
-      console.log("🔒 인증 성공! 관리자 도구를 실행합니다.");
+  console.log("🔒 인증 성공! 관리자 도구를 실행합니다.");
+  
+  // 1. 관리자 패널 엘리먼트를 직관적으로 다시 선언해서 확실하게 붙잡습니다.
+  // (만약 관리자창 ID가 'admin-panel'이 아니라 다른 것이라면 그 이름으로 바꾸어 주세요)
+  const adminPanel = document.getElementById('admin-panel') || document.querySelector('.admin-modal');
+  
+  if (adminPanel) {
+    // 2. 비동기 환경에서도 화면 렌더링이 즉시 반영되도록 처리
+    setTimeout(async () => {
+      // 💡 기존에 비밀번호가 맞았을 때 실행되던 관리자 오픈 코드를 여기에 넣어줍니다.
+      // 예시 1: 스타일을 직접 바꿨던 경우
+      adminPanel.style.display = 'block'; 
+      adminPanel.classList.add('show');
       
-      // 💡 [확인] 이 부분에 들어가는 기존의 관리자 도구 오픈 코드가 
-      // 만약 함수 형태라면 앞에 꼭 'await'를 붙여서 실행해 보세요.
-      // 예: await 기존_관리자창_열기_함수();
+      // 예시 2: 기존에 실행되던 오픈 함수가 따로 있었다면 앞에 await를 붙여 호출합니다.
+      // if (typeof openAdminModal === 'function') {
+      //   await openAdminModal();
+      // }
       
-      // (기존에 중괄호 안에 있던 관리자 도구 진입 코드를 여기에 그대로 넣어주세요)
+      console.log("🖥️ 관리자 패널 표시 완료");
+    }, 50);
+  } else {
+    console.error("❌ 에러: 화면에서 관리자 패널 HTML 요소를 찾을 수 없습니다. ID나 클래스명을 확인하세요.");
+  }
 
-    } else {
-      alert("비밀번호가 일치하지 않습니다.");
-    }
+} else {
+  alert("비밀번호가 일치하지 않습니다.");
+}
   } catch (error) {
     console.error("암호화 처리 중 오류 발생:", error);
     alert("보안 기능 실행 중 오류가 발생했습니다. 개발자 도구(F12)를 확인하세요.");
