@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>토끼 건축사사무소 워크패드 스튜디오</title>
 
 <style>
@@ -171,6 +171,51 @@ body {
   font-size: 12px;
   color: rgba(30,145,20,0.85);
   animation: fadeBlink 1.5s ease-in-out infinite;
+}
+
+/* ── 태블릿 / 아이패드 대응 ── */
+@media screen and (max-width: 1024px) {
+  .logo-frame {
+    max-width: 200px;
+  }
+
+  .welcome-message {
+    font-size: 15px;
+    white-space: normal;
+    max-width: 90vw;
+    padding: 0 20px;
+  }
+
+  .roadmap-menu {
+    top: 24px;
+    right: 30px;
+    font-size: 16px;
+  }
+
+  .uc-animation img {
+    width: 120px;
+  }
+
+  .maintenance-message {
+    font-size: 14px;
+  }
+}
+
+/* ── 스마트폰 대응 ── */
+@media screen and (max-width: 480px) {
+  .logo-frame {
+    max-width: 150px;
+  }
+
+  .welcome-message {
+    font-size: 13px;
+  }
+
+  .roadmap-menu {
+    top: 16px;
+    right: 16px;
+    font-size: 14px;
+  }
 }
 </style>
 </head>
