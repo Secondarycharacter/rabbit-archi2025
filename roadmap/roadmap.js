@@ -202,7 +202,7 @@ adminTrigger.addEventListener('click', async () => {
   
   if (hashedInput === adminHash) { 
     // 💡 인증 성공 시 실행될 기존 로직을 이 중괄호 안에 그대로 두시면 됩니다.
-    openAdminPanel(); 
+    await openAdminPanel(); 
   } else {
     alert("비밀번호가 일치하지 않습니다.");
   }
