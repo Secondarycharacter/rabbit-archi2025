@@ -368,7 +368,7 @@ body{
   position: absolute; 
   
   /* 💡 전체 틀(.timeline-wrapper)의 맨 바닥면으로부터 딱 5px만 띄웁니다 */
-  bottom: -50px; 
+  bottom: -75px; 
   left: 0;
   width: 100%; /*[cite: 2] */
   text-align: center; /*[cite: 2] */
@@ -440,6 +440,28 @@ body{
 .project-list-wrap { margin-top: 15px; }
 .project-list-wrap select { width: 100%; border-radius: 8px; padding: 8px; border: 1px solid #ccc; }
 
+/* ── ESC 안내 문구 스타일 및 깜빡임 효과 ── */
+.esc-guide {
+  position: absolute;
+  bottom: 15px;      /* 화면 맨 바닥에서 15px 띄움 (취향껏 조절) */
+  left: 50%;
+  transform: translateX(-50%);
+  
+  font-family: 'NanumBarunGothicBold', sans-serif;
+  font-size: 14px;
+  color: #8c7e72;    /* 로드맵 테마에 어울리는 브라운 계열 톤 */
+  letter-spacing: 1px;
+  z-index: 100;
+  
+  /* 💡 blink 애니메이션을 1.5초 간격으로 무한(infinite) 반복 실행 */
+  animation: blink 1.5s infinite ease-in-out; 
+}
+
+/* 💡 투명도를 100%에서 20%로 부드럽게 오가며 깜빡이는 규칙 */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.2; }
+}
 
 /* ==========================================
    아이패드, 갤럭시탭 등 태블릿 화면 맞춤 (완전판)
