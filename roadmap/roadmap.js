@@ -316,6 +316,6 @@ window.addEventListener('keydown', (event) => {
      * 보통 프로젝트의 첫 메인 화면 파일명이 'index.html'인 경우가 많습니다.
      * 만약 메인 페이지 파일명이 다르다면 아래 주소를 본인의 메인 파일명으로 수정해 주세요!
      */
-    window.location.href = 'index.html'; 
+    window.location.href = 'https://rabbit-archi2025.com/'; 
   }
 });
