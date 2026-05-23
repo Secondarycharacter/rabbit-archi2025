@@ -372,6 +372,7 @@ body{
   left: 0;
   width: 100%; /*[cite: 2] */
   text-align: center; /*[cite: 2] */
+  margin-bottom: -100px;
   
   /* 💡 absolute 환경이 되었으므로 기존의 무시되던 마진은 지워줍니다 */
 }
