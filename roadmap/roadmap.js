@@ -198,7 +198,7 @@ adminTrigger.addEventListener('click', async () => {
   const hashedInput = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 
   // 2. 미리 준비한 내 비밀번호의 해시값과 비교
-  const adminHash = "D5F4667CF6475357097DACBC04F2AA0372DF86183FB922B6C77BABCAE9F50CC4"; 
+  const adminHash = "2114FEFB56A2CDD4E70BE7FDC7C1E41818F2EE860AE6F4CD3C44BD88A7EC7F8C"; 
   
   if (hashedInput === adminHash) { 
     // 💡 인증 성공 시 실행될 기존 로직을 이 중괄호 안에 그대로 두시면 됩니다.
