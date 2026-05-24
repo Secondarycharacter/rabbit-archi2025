@@ -128,8 +128,17 @@ function renderTimeline() {
         <div class="date">${proj.date}</div>
         <div class="desc">${descHtml}</div>
         ${proj.rank ? `<div class="rank">${proj.rank}</div>` : ''}
+        ${proj.url ? `<div class="url-indicator">🔗</div>` : ''}
       </div>
     `;
+
+    // URL이 등록된 경우에만 클릭 시 새 창으로 연결
+    if (proj.url && proj.url.trim() !== '') {
+      fruitDiv.style.cursor = 'pointer';
+      fruitDiv.addEventListener('click', () => {
+        window.open(proj.url, '_blank', 'noopener,noreferrer');
+      });
+    }
 
     container.appendChild(fruitDiv);
     bindSwingAnimation(fruitDiv, idx);
@@ -234,6 +243,7 @@ const typeInput = document.getElementById('project-type');
 const dateInput = document.getElementById('project-date');
 const descInput = document.getElementById('project-desc');
 const rankInput = document.getElementById('project-rank');
+const urlInput  = document.getElementById('project-url');
 
 const addBtn = document.getElementById('add-project-btn');
 const updateBtn = document.getElementById('update-project-btn');
@@ -255,7 +265,7 @@ function refreshProjectList() {
 }
 
 function isValidDateFormat(dateStr) { return /^\d{4}\.\d{2}$/.test(dateStr); }
-function clearForm() { periodInput.value = ''; typeInput.value = ''; dateInput.value = ''; descInput.value = ''; rankInput.value = ''; selectedProjectIndex = null; }
+function clearForm() { periodInput.value = ''; typeInput.value = ''; dateInput.value = ''; descInput.value = ''; rankInput.value = ''; urlInput.value = ''; selectedProjectIndex = null; }
 function parseDescValue(text) { return text.split('\n').map(line => line.trim()).filter(line => line !== ''); }
 
 function subscribeToFirestore() {
@@ -272,7 +282,7 @@ addBtn.addEventListener('click', async () => {
   if (!periodInput.value || !typeInput.value || !dateInput.value || !descInput.value.trim()) { alert('필수항목을 모두 입력해주세요.'); return; }
   if (!isValidDateFormat(dateInput.value)) { alert('날짜는 YYYY.MM 형식으로 입력해주세요.'); return; }
   const descLines = parseDescValue(descInput.value);
-  const newProject = { period: periodInput.value, type: typeInput.value, date: dateInput.value, desc: descLines, rank: rankInput.value };
+  const newProject = { period: periodInput.value, type: typeInput.value, date: dateInput.value, desc: descLines, rank: rankInput.value, url: urlInput.value.trim() };
   addBtn.disabled = true; try { await addProjectToFirestore(newProject); clearForm(); } catch (e) { alert('오류: ' + e.message); } finally { addBtn.disabled = false; }
 });
 
@@ -282,6 +292,7 @@ projectSelect.addEventListener('change', () => {
   if (!p) return;
   periodInput.value = p.period; typeInput.value = p.type; dateInput.value = p.date;
   descInput.value = Array.isArray(p.desc) ? p.desc.join('\n') : p.desc; rankInput.value = p.rank || '';
+  urlInput.value = p.url || '';
 });
 
 updateBtn.addEventListener('click', async () => {
@@ -289,7 +300,7 @@ updateBtn.addEventListener('click', async () => {
   const p = projects[selectedProjectIndex];
   if (!p || !p._id) return;
   const descLines = parseDescValue(descInput.value);
-  const updated = { period: periodInput.value, type: typeInput.value, date: dateInput.value, desc: descLines, rank: rankInput.value };
+  const updated = { period: periodInput.value, type: typeInput.value, date: dateInput.value, desc: descLines, rank: rankInput.value, url: urlInput.value.trim() };
   updateBtn.disabled = true; try { await updateProjectInFirestore(p._id, updated); clearForm(); } catch (e) { alert('오류: ' + e.message); } finally { updateBtn.disabled = false; }
 });
 
