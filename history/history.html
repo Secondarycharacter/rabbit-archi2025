@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Timeline Swing V3 - Roadmap</title>
+  <link rel="stylesheet" href="history.css">
+</head>
+<body>
+
+  <div class="timeline-wrapper">
+    
+    <div class="zone-a">
+      <div class="zone-a1">
+        <h1 class="roadmap-title">HISTORY</h1>
+        <p class="roadmap-sub-desc">
+          작은 발걸음이 모여 더 넓은 가능성을 만듭니다. </br>토끼건축사사무소는 한 걸음씩, 함께, 더 멀리 나아갑니다.
+        </p>
+      </div>
+      <div class="zone-a2">
+        <p class="roadmap-main-desc">
+          토끼건축사사무소는 다양한 현상설계를 통해</br> 공간의 가능성을 탐구하고, 사람과 사람을 연결하여</br> 지역사회에 좋은 영향을 미치는 건축을 만들기 위해</br> 노력하고 있습니다.
+        </p>
+      </div>
+      <div class="zone-a3">
+        <img src="../history/images/00 Journey.jpg" alt="Journey" class="scale-img">
+      </div>
+    </div>
+
+<div class="zone-b">
+      <div class="zone-b-header">
+        <div class="b-header-title">2025. 10 ~ 2027. 12 (ABOUT 2 YEARS)</div>
+        <div class="b-header-subtitle">경험을 쌓고, 연결을 넓혀, 가치를 만드는 시간</div>
+      </div>
+      <div class="timeline">
+        <div class="period-nav">
+          <button class="nav-btn nav-left" id="btn-prev">&laquo;</button>
+          <div class="period-label-wrap">
+            <span class="period-label" id="period-label">2026 H1</span>
+          </div>
+          <button class="nav-btn nav-right" id="btn-next">&raquo;</button>
+        </div>
+
+        <div class="main-line">
+          <div class="edge left"></div>
+          <div class="edge right"></div>
+        </div>
+
+        <div id="fruit-container"></div>
+      </div>
+    </div>
+
+    <div class="zone-c">
+      <div class="zone-c-item">
+        <img src="../history/images/01 Investigate.jpg" alt="탐구" class="scale-img">
+        <div class="item-text">
+          <h3>탐구</h3>
+          <p>다양한 주제와 공간에 대한<br>지속적인 탐구</p>
+        </div>
+      </div>
+      
+      <div class="zone-c-item">
+        <img src="../history/images/02 Comprehend.jpg" alt="이해" class="scale-img">
+        <div class="item-text">
+          <h3>이해</h3>
+          <p>지역과 사람, 맥락을<br>깊이 이해</p>
+        </div>
+      </div>
+      
+      <div class="zone-c-item">
+        <img src="../history/images/03 Link.jpg" alt="연결" class="scale-img">
+        <div class="item-text">
+          <h3>연결</h3>
+          <p>사람과 공간, 프로그램을<br>섬세하게 연결</p>
+        </div>
+      </div>
+      
+      <div class="zone-c-item">
+        <img src="../history/images/04 Broaden.jpg" alt="확장" class="scale-img">
+        <div class="item-text">
+          <h3>확장</h3>
+          <p>작은 시도들이 모여<br>더 큰 가능성으로 확장</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="zone-footer">
+      <div class="footer-en">T H E &nbsp; R A B B I T &nbsp; A R C H I T E C T S</div>
+      <div class="footer-ko">토&nbsp;끼&nbsp;건&nbsp;축&nbsp;사&nbsp;사&nbsp;무&nbsp;소</div>
+    </div>
+
+  </div>
+
+  <!-- 💡 zone-footer 아래쪽에 안내 문구 태그를 추가합니다 -->
+<div class="esc-guide">프로젝트를 클릭하면 상세내용으로 연결됩니다.</div>
+  
+  <div class="admin-trigger" id="admin-trigger">...</div>
+
+  <div class="admin-modal" id="admin-modal">
+    <div class="admin-panel">
+      <div class="admin-header">
+        <h2>프로젝트 관리</h2>
+        <button class="close-btn" id="close-admin-btn">&times;</button>
+      </div>
+
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Period *</label>
+          <select id="project-period">
+            <option value="">선택</option>
+            <option>2025 H2</option>
+            <option>2026 H1</option>
+            <option>2026 H2</option>
+            <option>2027 H1</option>
+            <option>2027 H2</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Type *</label>
+          <select id="project-type">
+            <option value="">선택</option>
+            <option value="type1">type1 (주업)</option>
+            <option value="type2">type2 (부업)</option>
+            <option value="type3">type3 (기타)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Date *</label>
+          <input type="text" id="project-date" placeholder="2026.01">
+        </div>
+
+        <div class="form-group desc-group">
+          <label>Description * (작성 시 줄바꿈 그대로 반영)</label>
+          <textarea id="project-desc" rows="3" placeholder="예: 거창군 지역활력타운&#10;다누리복합문화센터&#10;건립사업 설계공모"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>Rank</label>
+          <input type="text" id="project-rank" placeholder="랭크를 적으시오">
+        </div>
+
+        <div class="form-group desc-group">
+          <label>URL (클릭 시 연결할 주소 — 없으면 비워두세요)</label>
+          <input type="text" id="project-url" placeholder="https://example.com">
+        </div>
+      </div>
+
+      <div class="button-row">
+        <button id="add-project-btn">프로젝트 추가</button>
+        <button id="update-project-btn">프로젝트 수정</button>
+        <button id="delete-project-btn">프로젝트 삭제</button>
+      </div>
+
+      <div class="project-list-wrap">
+        <select id="project-select" size="8"></select>
+      </div>
+    </div>
+  </div>
+
+  <!-- 📱 핸드폰 세로 모드 안내 오버레이 -->
+  <div id="rotate-overlay" style="
+    display:none;
+    position:fixed; inset:0; z-index:99999;
+    background:#f7f3ef;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    font-family:'NanumBarunGothic',sans-serif;
+    color:#665647;
+    text-align:center;
+  ">
+    <div style="font-size:60px; margin-bottom:20px; animation:rotateHint 1.5s ease-in-out infinite;">↻</div>
+    <div style="font-family:'NanumBarunGothicBold',sans-serif; font-size:20px; margin-bottom:10px;">화면을 가로로 돌려주세요</div>
+    <div style="font-size:14px; line-height:1.6; opacity:0.7;">로드맵은 가로 모드에서<br>더 잘 보입니다</div>
+  </div>
+  <style>
+    @keyframes rotateHint {
+      0%   { transform: rotate(0deg);   }
+      40%  { transform: rotate(90deg);  }
+      60%  { transform: rotate(90deg);  }
+      100% { transform: rotate(0deg);   }
+    }
+  </style>
+
+  <script type="module" src="history.js"></script>
+
+  <!-- 데스크탑 / 태블릿 / 핸드폰 통합 스케일 핸들러
+       - 데스크탑 (1850×980 초과)   : JS 미개입, CSS 기본값 유지
+       - 태블릿 (933px ~ 1850px)    : 전체 scale 축소, 화면 중앙 고정, 스크롤 없음
+       - 핸드폰 가로 (≤932px, 가로) : 가로 width에 맞춰 scale, 세로 스크롤
+       - 핸드폰 세로 (≤932px, 세로) : "가로로 돌려주세요" 안내 오버레이 표시 -->
+  <script>
+    (function() {
+      var DESIGN_W  = 1800;
+      // zone-a: margin-top:-100px(위 돌출), zone-footer: bottom:-100px(아래 돌출)
+      // 실제 시각적 콘텐츠 높이 = 960 + 100 + 100 = 1160px
+      var VISUAL_H  = 1160;
+      // 핸드폰 판별: landscape 기준 짧은 쪽(높이)이 500px 이하
+      var PHONE_H_LIMIT = 500;
+
+      var overlay = document.getElementById('rotate-overlay');
+
+      function isPhone() {
+        var short = Math.min(window.innerWidth, window.innerHeight);
+        return short <= PHONE_H_LIMIT;
+      }
+
+      function applyScale() {
+        var wrapper = document.querySelector('.timeline-wrapper');
+        if (!wrapper) return;
+
+        var vw = window.innerWidth;
+        var vh = window.innerHeight;
+        var isLandscape = vw > vh;
+
+        // ── 핸드폰 ──────────────────────────────────────────────
+        if (isPhone()) {
+          if (!isLandscape) {
+            // 세로 모드: 안내 오버레이 표시
+            overlay.style.display = 'flex';
+            wrapper.style.setProperty('visibility', 'hidden', 'important');
+            return;
+          }
+
+          // 가로 모드: 가로 너비에 맞춰 scale, 세로는 스크롤
+          overlay.style.display = 'none';
+          wrapper.style.setProperty('visibility', 'visible', 'important');
+
+          var scale = (vw * 0.98) / DESIGN_W;
+          var renderedH = VISUAL_H * scale;
+
+          // body: 세로 스크롤 허용, 가로 스크롤 차단
+          document.body.style.setProperty('overflow-x', 'hidden', 'important');
+          document.body.style.setProperty('overflow-y', 'auto',   'important');
+          document.body.style.setProperty('height',     'auto',   'important');
+          // 스크롤 가능 영역을 렌더된 콘텐츠 높이만큼 확보
+          document.body.style.setProperty('min-height', renderedH + 'px', 'important');
+
+          // wrapper: 위에서 아래로 자연스럽게 스크롤되도록 absolute + top:0
+          wrapper.style.setProperty('position',         'absolute',                                'important');
+          wrapper.style.setProperty('top',              '0',                                       'important');
+          wrapper.style.setProperty('left',             '50%',                                     'important');
+          wrapper.style.setProperty('transform-origin', 'top center',                              'important');
+          wrapper.style.setProperty('transform',        'translateX(-50%) scale(' + scale + ')',   'important');
+          wrapper.style.setProperty('overflow',         'visible',                                 'important');
+          return;
+        }
+
+        // ── 태블릿 / 데스크탑 ────────────────────────────────────
+        overlay.style.display = 'none';
+        wrapper.style.setProperty('visibility', 'visible', 'important');
+
+        // 핸드폰 → 태블릿 전환 시 body 스크롤 초기화
+        document.body.style.removeProperty('overflow-x');
+        document.body.style.removeProperty('overflow-y');
+        document.body.style.removeProperty('height');
+        document.body.style.removeProperty('min-height');
+
+        // 데스크탑: JS 미개입
+        if (vw > 1850 && vh > 980) {
+          wrapper.style.removeProperty('position');
+          wrapper.style.removeProperty('top');
+          wrapper.style.removeProperty('left');
+          wrapper.style.removeProperty('transform-origin');
+          wrapper.style.removeProperty('transform');
+          wrapper.style.removeProperty('overflow');
+          wrapper.style.removeProperty('visibility');
+          return;
+        }
+
+        // 태블릿: 가로/세로 모두 화면 안에 들어오도록 scale, 중앙 고정
+        var scaleW = (vw * 0.96) / DESIGN_W;
+        var scaleH = (vh * 0.94) / VISUAL_H;
+        var scale  = Math.min(scaleW, scaleH);
+
+        wrapper.style.setProperty('position',         'fixed',                                          'important');
+        wrapper.style.setProperty('top',              '50%',                                            'important');
+        wrapper.style.setProperty('left',             '50%',                                            'important');
+        wrapper.style.setProperty('transform-origin', 'center center',                                  'important');
+        wrapper.style.setProperty('transform',        'translate(-50%, -50%) scale(' + scale + ')',     'important');
+        wrapper.style.setProperty('overflow',         'visible',                                        'important');
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', applyScale);
+      } else {
+        applyScale();
+      }
+
+      window.addEventListener('resize', applyScale);
+      window.addEventListener('orientationchange', function() {
+        setTimeout(applyScale, 300);
+      });
+    })();
+  </script>
+</body>
+</html>

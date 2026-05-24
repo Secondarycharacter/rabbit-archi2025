@@ -1,0 +1,486 @@
+@font-face {
+  font-family: 'NanumBarunGothic';
+  src: url('../fonts/NanumBarunGothic.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'NanumBarunGothicBold';
+  src: url('../fonts/NanumBarunGothicBold.ttf') format('truetype');
+  font-weight: bold;
+  font-style: normal;
+}
+
+*{
+  margin:0;
+  padding:0;
+  box-sizing:border-box;
+}
+
+body{
+  background:#f7f3ef;
+  font-family:'NanumBarunGothic', sans-serif;
+  color:#665647;
+  overflow: hidden;
+}
+
+/* ── 타임라인 화면 대형 컨테이너 ── */
+.timeline-wrapper {
+  display: flex;
+  flex-direction: column;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 1800px; /* 조건 1: 메인라인 길이에 맞추어 전체 가로폭 1800px 조정 */
+  height: 960px;
+  justify-content: space-between;
+  overflow: visible; /* zone-a 위 돌출(-100px), footer 아래 돌출(-100px) 클립 방지 */
+}
+
+/* 이미지 공통 원본 대비 0.9배 리사이징 적용 */
+.scale-img {
+  width: auto;
+  height: auto;
+  transform: scale(0.9);
+  transform-origin: top left;
+  display: block;
+}
+
+/* ==========================================
+   A 영역 스타일 (상단 삼등분)
+   ========================================== */
+
+/* zone-a1(타이틀), zone-a2(본문), zone-a3(우측그림)을 한 번에 묶어서 위로 올립니다 */
+.zone-a1, .zone-a2, .zone-a3 {
+  margin-top: -100px !important; 
+}
+
+.zone-a {
+  display: flex;
+  height: 25%;
+  width: 100%;
+  position: relative; /* 자식 요소들의 z-index 기준점이 됩니다 */
+}
+.zone-a1 {
+  width: 33.333%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+.roadmap-title {
+  font-family: 'NanumBarunGothicBold', sans-serif;
+  font-size: 54pt; /* 조건 6: 54pt, BOLD */
+  line-height: 1.1;
+  margin-bottom: 12px;
+}
+.roadmap-sub-desc {
+  width: 600px; /* 조건 7: 가로폭 범위 600px */
+  font-size: 15pt; /* 조건 7: 18pt */
+  line-height: 1.5;
+  word-break: keep-all; /* 단어 단위 줄바꿈 */
+}
+.zone-a2 {
+  width: 33.333%;
+  display: flex;
+  align-items: flex-start;
+  padding-top: 50px;
+  padding-left: 450px;
+  position: relative; /* z-index를 적용하기 위해 필수 */
+  z-index: 2;        /* A3보다 높은 숫자를 주어 앞으로 가져옵니다 */
+}
+.roadmap-main-desc {
+  width: autopx; /* 조건 8: 가로폭 범위 500px */
+  font-size: 15pt; /* 조건 8: 15pt */
+  line-height: 1.5;
+  white-space: nowrap;
+  word-break: keep-all; /* 단어 단위 줄바꿈 */
+}
+.zone-a3 {
+  width: 33.333%;
+  position: relative; /* z-index를 적용하기 위해 필수 */
+  z-index: 1;        /* A2보다 낮은 숫자를 주어 뒤로 보냅니다 */
+}
+.zone-a3 .scale-img {
+  transform: scale(0.55);
+  transform-origin: top right;
+  float: right;
+  display: block;
+}
+
+/* ==========================================
+   B 영역 스타일 (중간 타임라인 레벨)
+   ========================================== */
+
+/* ── B 영역 상단 추가 문구 스타일 ── */
+.zone-b-header {
+  width: 100%;
+  text-align: center;      /* 글씨 가운데 정렬 */
+  margin-bottom: 25px;     /* 아래쪽 반기 선택 버튼(period-nav)과의 간격 조절 */
+}
+
+.b-header-title {
+  font-family: 'NanumBarunGothicBold', sans-serif;
+  font-size: 24px;         /* 첫째줄 크기 */
+  font-weight: bold;       /* 첫째줄 굵게 */
+  color: #665647;
+  margin-bottom: 6px;      /* 첫째줄과 둘째줄 사이의 간격 */
+}
+
+.b-header-subtitle {
+  font-family: 'NanumBarunGothicBold', sans-serif;
+  font-size: 18px;         /* 둘째줄 크기 */
+  font-weight: bold;       /* 둘째줄 굵게 */
+  color: #665647;
+}
+
+.zone-b {
+  position: relative;
+  height: 40%;
+  width: 100%;
+  margin-bottom: 25px;
+  
+}
+.timeline {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+/* 반기 내비게이션 */
+.period-nav{
+  position:absolute;
+  top:15px;
+  left:0;
+  width:1800px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:24px;
+  z-index:10;
+}
+.period-label-wrap{
+  min-width:140px;
+  text-align:center;
+}
+.period-label{
+  font-size:24px;
+  font-weight:600;
+  color:#665647;
+}
+.period-label.fade-out{ opacity:0; }
+.nav-btn{
+  background:none;
+  border:none;
+  font-size:32px;
+  color:#665647;
+  cursor:pointer;
+  padding:0 10px;
+  transition:transform 0.2s ease;
+}
+.nav-btn:hover{ transform:scale(1.2); }
+
+/* 중심 축선 (메인라인) - 1800px 축소 */
+.main-line{
+  position:absolute;
+  top:75px;
+  left:0;
+  width:1800px; /* 조건 1: 메인라인 길이 1800px */
+  height:4px;
+  background-color:#665647;
+}
+.edge{
+  position:absolute;
+  top:-10px;
+  width:24px;
+  height:24px;
+  background-color:#665647;
+  border-radius:50%;
+}
+.edge.left{left:-2px;}
+.edge.right{right:-2px;}
+
+/* 과일 컨테이너 */
+#fruit-container{
+  position:absolute;
+  top:-25px;
+  left:0;
+  width:1800px;
+  height:380px;
+  pointer-events: none;
+}
+.fruit{
+  position:absolute;
+  transform-origin: top center;
+  pointer-events: auto;
+}
+.hook{
+  width:14px;
+  height:14px;
+  border:3px solid #665647;
+  border-radius:50%;
+  background-color:#f7f3ef;
+  position:absolute;
+  left:50%;
+  transform:translateX(-50%);
+  top:0;
+}
+.stem{
+  width:2px;
+  height:60px;
+  background-color:#665647;
+  position:absolute;
+  left:50%;
+  transform:translateX(-50%);
+  top:11px;
+}
+
+/* ── TYPE1 과일 (속 빈 원) ── */
+.fruit.type1 .fruit-body {
+  position: absolute;
+  top: 56px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 180px; 
+  height: 180px;
+  border-radius: 50%;
+  border: 3px solid #665647;
+  background-color: #f7f3ef;
+  color: #665647;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 16px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* ── TYPE2 과일 (속이 꽉 찬 원) ── */
+.fruit.type2 .fruit-body {
+  position: absolute;
+  top: 56px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  border: 2px solid #665647;
+  background-color: #665647;
+  color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 4px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* ── TYPE3 과일 (기타) ── */
+.fruit.type3 .fruit-body {
+  position: absolute;
+  top: 56px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100px;         
+  height: 100px;        
+  border-radius: 50%;
+  border: 1px solid #665647;
+  background-color: #e2dcd5;   /* type3만의 배경색 */
+  color: #665647;              /* 글자 색상 */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 10px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* 폰트 크기 세팅 */
+.fruit.type1 .date { font-size: 18px; font-weight: bold; margin-bottom: 5px; }
+.fruit.type1 .desc { font-size: 14px; line-height: 1.5; word-break: keep-all; }
+.fruit.type1 .rank {
+  font-size: 13px; font-weight: bold; margin-top: 5px; padding: 2px 8px;
+  border-radius: 11px; background-color: #665647; color: #fff;
+}
+
+/* 조건 3: TYPE2 글씨 크기 1.5배 확대 조정 */
+.fruit.type2 .date { font-size: 14px; font-weight: bold; color: #e2dcd5; margin-bottom: 3px; }
+.fruit.type2 .desc { font-size: 12px; line-height: 1.4; word-break: keep-all; }
+.fruit.type2 .rank {
+  font-size: 11px; font-weight: bold; margin-top: 5px; padding: 2px 8px;
+  border-radius: 10px; background-color: #fff; color: #665647;
+}
+
+/* type3 전용 글씨 크기 제어 */
+.fruit.type3 .date { font-size: 14px; font-weight: bold; margin-bottom: 3px; }
+.fruit.type3 .desc { font-size: 12px; line-height: 1.4; word-break: keep-all; }
+.fruit.type3 .rank {
+  font-size: 11px; font-weight: bold; margin-top: 5px; padding: 2px 8px;
+  border-radius: 10px; background-color: #665647; color: #fff;
+}
+
+.fruit:hover .fruit-body {
+  transform: translateX(-50%) scale(1.1);
+  box-shadow: 0 4px 16px rgba(102,86,71,0.2);
+}
+
+/* ==========================================
+   C 영역 스타일 (하단 사등분)
+   ========================================== */
+.zone-c {
+  display: flex;
+  height: 35%;
+  width: 100%;
+  margin-left: 100px;
+}
+.zone-c-item {
+  width: 25%;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.zone-c-item .scale-img {
+  flex-shrink: 0;
+  padding-top: 125px;
+}
+.item-text {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  text-align: left; /* 조건 10,11,12,13: 왼쪽 정렬 */
+  padding-top: 125px;
+}
+.item-text h3 {
+  font-family: 'NanumBarunGothicBold', sans-serif;
+  font-size: 18px; /* 조건 10,11,12,13: 18px, BOLD */
+  color: #665647;
+  margin-bottom: 6px;
+}
+.item-text p {
+  font-size: 15px; /* 조건 10,11,12,13: 12px */
+  line-height: 1.4;
+  color: #665647;
+}
+.zone-footer {
+  /* 💡 플렉스 박스의 자동 정렬 규칙을 깨부수고 독립시킵니다 */
+  position: absolute; 
+  
+  /* 💡 전체 틀(.timeline-wrapper)의 맨 바닥면으로부터 딱 5px만 띄웁니다 */
+  bottom: -100px; 
+  left: 0;
+  width: 100%; /*[cite: 2] */
+  text-align: center; /*[cite: 2] */
+  
+  /* 💡 absolute 환경이 되었으므로 기존의 무시되던 마진은 지워줍니다 */
+}
+.footer-en {
+  font-family: 'NanumBarunGothicBold', sans-serif;
+  font-size: 24pt; /* 조건 14: 24pt, BOLD */
+  letter-spacing: 2px;
+  margin-bottom: 4px;
+}
+.footer-ko {
+  font-family: 'NanumBarunGothicBold', sans-serif;
+  font-size: 20pt; /* 조건 14: 20pt, BOLD */
+}
+
+/* ── 빈 반기(Period) 안내 문구 스타일 ── */
+.empty-period-message {
+  position: absolute;
+  top: 160px; /* 💡 B존 안의 메인라인(top: 100px) 아래쪽에 이쁘게 배치되도록 조정된 높이 */
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  
+  font-family: 'NanumBarunGothicBold', sans-serif;
+  font-size: 20px;
+  line-height: 1.8;
+  color: #8c7e72;
+  font-weight: bold;
+  
+  /* 전환 시 부드럽게 나타나는 애니메이션 효과 */
+  animation: fadeInPeriodMsg 0.4s ease-out forwards;
+}
+
+@keyframes fadeInPeriodMsg {
+  from { opacity: 0; transform: translate(-50%, -10px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+/* ── 관리자 패널 ── */
+.admin-trigger{
+  position:fixed; bottom:20px; right:20px; width:40px; height:40px;
+  background-color:#665647; color:#fff; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  cursor:pointer; font-size:20px; opacity:0.3; transition: opacity 0.2s ease; z-index:100;
+}
+.admin-trigger:hover{ opacity:1; }
+.admin-modal{
+  position:fixed; top:0; left:0; width:100vw; height:100vh;
+  background-color:rgba(0,0,0,0.4); display:flex; align-items:center; justify-content:center;
+  opacity:0; pointer-events:none; transition: opacity 0.3s ease; z-index:1000;
+}
+.admin-modal.active{ opacity:1; pointer-events:auto; }
+.admin-panel{ width:750px; background:#fff; border-radius:16px; padding:24px; box-shadow:0 10px 30px rgba(0,0,0,0.15); }
+.admin-header{ display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; border-bottom:2px solid #f2ece6; padding-bottom:12px; }
+.close-btn{ background:none; border:none; font-size:28px; color:#aaa; cursor:pointer; }
+.form-grid{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.form-grid .form-group.desc-group { grid-column: span 3; }
+.form-group{ display: flex; flex-direction: column; gap: 6px; }
+.form-group label{ font-size: 13px; color: #665647; }
+.form-group input, .form-group select, .form-group textarea{ height: 40px; padding: 0 12px; border: 1px solid #ccc; border-radius: 8px; font-size: 14px; }
+.form-group textarea { height: auto; padding: 10px 12px; resize: none; }
+.button-row{ display:flex; justify-content:flex-end; gap:10px; margin-top:20px; border-top:1px solid #eee; padding-top:16px; }
+.button-row button{ padding:10px 20px; border:none; border-radius:8px; font-size:14px; font-weight:bold; cursor:pointer; }
+#add-project-btn{background-color:#665647;color:#fff;}
+#update-project-btn{background-color:#8c7b6c;color:#fff;}
+#delete-project-btn{background-color:#d9534f;color:#fff;}
+.project-list-wrap { margin-top: 15px; }
+.project-list-wrap select { width: 100%; border-radius: 8px; padding: 8px; border: 1px solid #ccc; }
+
+/* ── ESC 안내 문구 스타일 및 깜빡임 효과 ── */
+.esc-guide {
+  position: absolute;
+  bottom: 15px;      /* 화면 맨 바닥에서 15px 띄움 (취향껏 조절) */
+  left: 50%;
+  transform: translateX(-50%);
+  
+  font-family: 'NanumBarunGothicBold', sans-serif;
+  font-size: 14px;
+  color: #8c7e72;    /* 로드맵 테마에 어울리는 브라운 계열 톤 */
+  letter-spacing: 1px;
+  z-index: 100;
+  
+  /* 💡 blink 애니메이션을 1.5초 간격으로 무한(infinite) 반복 실행 */
+  animation: blink 1.5s infinite ease-in-out; 
+}
+
+/* 💡 투명도를 100%에서 20%로 부드럽게 오가며 깜빡이는 규칙 */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.2; }
+}
+
+/* ==========================================
+   아이패드, 갤럭시탭 등 태블릿 화면 맞춤
+   ※ 실제 스케일 계산은 history.html 내 JS가 담당합니다.
+      JS가 setProperty('important')로 강제 적용하므로
+      CSS 미디어쿼리와 충돌 없이 모든 해상도를 커버합니다.
+   ========================================== */
+
+/* JS 스케일 적용 시 wrapper가 fixed + center로 고정되도록 기반 설정 */
+@media screen and (max-width: 1850px), screen and (max-height: 980px) {
+  body {
+    overflow: hidden;
+  }
+  .timeline-wrapper {
+    /* JS가 position/top/left/transform-origin/transform을 inline으로 덮어씁니다 */
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform-origin: center center;
+  }
+}
