@@ -229,22 +229,45 @@
           wrapper.style.setProperty('visibility', 'visible', 'important');
 
           var scale = (vw * 0.98) / DESIGN_W;
+
+          // zone-a의 margin-top:-100px 이 위로 돌출되는 양 (scale 후)
+          // top:0 기준이면 이 만큼이 body 위쪽 밖으로 잘려 스크롤로도 못 봄
+          // → top을 돌출량만큼 내려서 zone-a 상단이 정확히 body 상단(0)에 맞게 함
+          var overflowTop = 100 * scale;
+          // footer도 아래로 100px 돌출되므로 전체 렌더 높이는 VISUAL_H * scale
           var renderedH = VISUAL_H * scale;
 
           // body: 세로 스크롤 허용, 가로 스크롤 차단
           document.body.style.setProperty('overflow-x', 'hidden', 'important');
           document.body.style.setProperty('overflow-y', 'auto',   'important');
           document.body.style.setProperty('height',     'auto',   'important');
-          // 스크롤 가능 영역을 렌더된 콘텐츠 높이만큼 확보
+          // 스크롤 가능 영역을 렌더된 콘텐츠 전체 높이만큼 확보
           document.body.style.setProperty('min-height', renderedH + 'px', 'important');
 
-          // wrapper: 위에서 아래로 자연스럽게 스크롤되도록 absolute + top:0
-          wrapper.style.setProperty('position',         'absolute',                                'important');
-          wrapper.style.setProperty('top',              '0',                                       'important');
-          wrapper.style.setProperty('left',             '50%',                                     'important');
-          wrapper.style.setProperty('transform-origin', 'top center',                              'important');
-          wrapper.style.setProperty('transform',        'translateX(-50%) scale(' + scale + ')',   'important');
-          wrapper.style.setProperty('overflow',         'visible',                                 'important');
+          // wrapper: top을 overflowTop만큼 내려 zone-a 상단이 보이도록 함
+          wrapper.style.setProperty('position',         'absolute',                              'important');
+          wrapper.style.setProperty('top',              overflowTop + 'px',                      'important');
+          wrapper.style.setProperty('left',             '50%',                                   'important');
+          wrapper.style.setProperty('transform-origin', 'top center',                            'important');
+          wrapper.style.setProperty('transform',        'translateX(-50%) scale(' + scale + ')', 'important');
+          wrapper.style.setProperty('overflow',         'visible',                               'important');
+
+          // .esc-guide: 핸드폰 가로모드에서는 스크롤 콘텐츠 맨 아래에 붙도록
+          // position:fixed/absolute 대신 body 하단에 고정된 느낌을 주되
+          // 스크롤과 함께 footer 아래에 자연스럽게 위치하도록 처리
+          var escGuide = document.querySelector('.esc-guide');
+          if (escGuide) {
+            // footer 아래 돌출(100px*scale) + 약간의 여백(8px) 위치에 표시
+            var escTop = overflowTop + (960 * scale) + (100 * scale) + 8;
+            escGuide.style.setProperty('position',   'absolute',         'important');
+            escGuide.style.setProperty('top',        escTop + 'px',      'important');
+            escGuide.style.setProperty('bottom',     'auto',             'important');
+            escGuide.style.setProperty('left',       '50%',              'important');
+            escGuide.style.setProperty('transform',  'translateX(-50%)', 'important');
+            escGuide.style.setProperty('width',      'max-content',      'important');
+            // body min-height를 esc-guide까지 포함하도록 확장
+            document.body.style.setProperty('min-height', (escTop + 30) + 'px', 'important');
+          }
           return;
         }
 
@@ -252,11 +275,21 @@
         overlay.style.display = 'none';
         wrapper.style.setProperty('visibility', 'visible', 'important');
 
-        // 핸드폰 → 태블릿 전환 시 body 스크롤 초기화
+        // 핸드폰 → 태블릿 전환 시 body 스크롤 및 esc-guide 초기화
         document.body.style.removeProperty('overflow-x');
         document.body.style.removeProperty('overflow-y');
         document.body.style.removeProperty('height');
         document.body.style.removeProperty('min-height');
+
+        var escGuide = document.querySelector('.esc-guide');
+        if (escGuide) {
+          escGuide.style.removeProperty('position');
+          escGuide.style.removeProperty('top');
+          escGuide.style.removeProperty('bottom');
+          escGuide.style.removeProperty('left');
+          escGuide.style.removeProperty('transform');
+          escGuide.style.removeProperty('width');
+        }
 
         // 데스크탑: JS 미개입
         if (vw > 1850 && vh > 980) {
