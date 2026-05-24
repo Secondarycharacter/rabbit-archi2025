@@ -327,16 +327,6 @@ body{
   box-shadow: 0 4px 16px rgba(102,86,71,0.2);
 }
 
-/* URL 연결 아이콘 */
-.fruit .url-indicator {
-  font-size: 11px;
-  margin-top: 4px;
-  opacity: 0.6;
-}
-.fruit[style*="cursor: pointer"]:hover .url-indicator {
-  opacity: 1;
-}
-
 /* ==========================================
    C 영역 스타일 (하단 사등분)
    ========================================== */
