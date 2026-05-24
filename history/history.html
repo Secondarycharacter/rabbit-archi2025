@@ -228,52 +228,23 @@
           overlay.style.display = 'none';
           wrapper.style.setProperty('visibility', 'visible', 'important');
 
-          // 0.98 → 0.96: 좌우 여백 확보해 왼쪽 잘림 방지
-          var scale = (vw * 0.96) / DESIGN_W;
-
-          // zone-a margin-top:-100px 위 돌출분 (scale 반영)
-          var overflowTop = 100 * scale;
-
-          // C영역 아래 여백(footer 돌출 100px + esc-guide ~30px)과 대칭이 되도록
-          // 위쪽에도 동일한 여백(overflowTop + escGuideH)을 패딩으로 추가
-          var escGuideH = 30;
-          var paddingTop = overflowTop + escGuideH;  // 위 여백 = 아래 여백과 대칭
-
-          // wrapper.top = paddingTop → zone-a 상단이 paddingTop 위치에 배치
-          // (0에 딱 붙지 않고 escGuideH만큼 여유)
-          var wrapperTop = paddingTop;
-
-          // footer 하단(body 기준) = wrapperTop + (960 + 100)*scale
-          var footerBottom = wrapperTop + (DESIGN_H + 100) * scale;
-          // esc-guide top = footer 하단 + 8px 간격
-          var escTop = footerBottom + 8;
-          // body 전체 높이 = esc-guide 하단 + 여백
-          var bodyMinH = escTop + escGuideH + paddingTop;
+          var scale = (vw * 0.98) / DESIGN_W;
+          var renderedH = VISUAL_H * scale;
 
           // body: 세로 스크롤 허용, 가로 스크롤 차단
           document.body.style.setProperty('overflow-x', 'hidden', 'important');
           document.body.style.setProperty('overflow-y', 'auto',   'important');
           document.body.style.setProperty('height',     'auto',   'important');
-          document.body.style.setProperty('min-height', bodyMinH + 'px', 'important');
+          // 스크롤 가능 영역을 렌더된 콘텐츠 높이만큼 확보
+          document.body.style.setProperty('min-height', renderedH + 'px', 'important');
 
-          // wrapper 배치
-          wrapper.style.setProperty('position',         'absolute',                              'important');
-          wrapper.style.setProperty('top',              wrapperTop + 'px',                       'important');
-          wrapper.style.setProperty('left',             '50%',                                   'important');
-          wrapper.style.setProperty('transform-origin', 'top center',                            'important');
-          wrapper.style.setProperty('transform',        'translateX(-50%) scale(' + scale + ')', 'important');
-          wrapper.style.setProperty('overflow',         'visible',                               'important');
-
-          // esc-guide: footer 바로 아래, 스크롤 콘텐츠의 일부로 배치
-          var escGuide = document.querySelector('.esc-guide');
-          if (escGuide) {
-            escGuide.style.setProperty('position',   'absolute',         'important');
-            escGuide.style.setProperty('top',        escTop + 'px',      'important');
-            escGuide.style.setProperty('bottom',     'auto',             'important');
-            escGuide.style.setProperty('left',       '50%',              'important');
-            escGuide.style.setProperty('transform',  'translateX(-50%)', 'important');
-            escGuide.style.setProperty('width',      'max-content',      'important');
-          }
+          // wrapper: 위에서 아래로 자연스럽게 스크롤되도록 absolute + top:0
+          wrapper.style.setProperty('position',         'absolute',                                'important');
+          wrapper.style.setProperty('top',              '0',                                       'important');
+          wrapper.style.setProperty('left',             '50%',                                     'important');
+          wrapper.style.setProperty('transform-origin', 'top center',                              'important');
+          wrapper.style.setProperty('transform',        'translateX(-50%) scale(' + scale + ')',   'important');
+          wrapper.style.setProperty('overflow',         'visible',                                 'important');
           return;
         }
 
@@ -281,21 +252,11 @@
         overlay.style.display = 'none';
         wrapper.style.setProperty('visibility', 'visible', 'important');
 
-        // 핸드폰 → 태블릿 전환 시 body 스크롤 및 esc-guide 초기화
+        // 핸드폰 → 태블릿 전환 시 body 스크롤 초기화
         document.body.style.removeProperty('overflow-x');
         document.body.style.removeProperty('overflow-y');
         document.body.style.removeProperty('height');
         document.body.style.removeProperty('min-height');
-
-        var escGuide = document.querySelector('.esc-guide');
-        if (escGuide) {
-          escGuide.style.removeProperty('position');
-          escGuide.style.removeProperty('top');
-          escGuide.style.removeProperty('bottom');
-          escGuide.style.removeProperty('left');
-          escGuide.style.removeProperty('transform');
-          escGuide.style.removeProperty('width');
-        }
 
         // 데스크탑: JS 미개입
         if (vw > 1850 && vh > 980) {
@@ -320,19 +281,6 @@
         wrapper.style.setProperty('transform-origin', 'center center',                                  'important');
         wrapper.style.setProperty('transform',        'translate(-50%, -50%) scale(' + scale + ')',     'important');
         wrapper.style.setProperty('overflow',         'visible',                                        'important');
-
-        // 태블릿: esc-guide를 footer 바로 아래에 fixed로 배치 (겹침 방지)
-        // footer 하단 화면 좌표 = vh/2 + (DESIGN_H/2 + 100)*scale
-        var footerBottomScreen = vh / 2 + (DESIGN_H / 2 + 100) * scale;
-        var escGuideTablet = document.querySelector('.esc-guide');
-        if (escGuideTablet) {
-          escGuideTablet.style.setProperty('position',   'fixed',            'important');
-          escGuideTablet.style.setProperty('top',        (footerBottomScreen + 6) + 'px', 'important');
-          escGuideTablet.style.setProperty('bottom',     'auto',             'important');
-          escGuideTablet.style.setProperty('left',       '50%',              'important');
-          escGuideTablet.style.setProperty('transform',  'translateX(-50%)', 'important');
-          escGuideTablet.style.setProperty('width',      'max-content',      'important');
-        }
       }
 
       if (document.readyState === 'loading') {
