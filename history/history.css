@@ -439,6 +439,28 @@ body{
 #update-project-btn{background-color:#8c7b6c;color:#fff;}
 #delete-project-btn{background-color:#d9534f;color:#fff;}
 .project-list-wrap { margin-top: 15px; }
+.project-period-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.project-period-filter button {
+  border: 1px solid #d5c9be;
+  border-radius: 999px;
+  background: #f7f3ef;
+  color: #665647;
+  cursor: pointer;
+  font-family: 'NanumBarunGothicBold', sans-serif;
+  font-size: 13px;
+  padding: 7px 12px;
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+.project-period-filter button.active {
+  background: #665647;
+  border-color: #665647;
+  color: #fff;
+}
 .project-list-wrap select { width: 100%; border-radius: 8px; padding: 8px; border: 1px solid #ccc; }
 
 /* ── ESC 안내 문구 스타일 및 깜빡임 효과 ── */

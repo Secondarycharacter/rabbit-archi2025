@@ -51,12 +51,58 @@ async function deleteProjectFromFirestore(id) {
 
 let projects = [];
 const periods = ['2025 H2', '2026 H1', '2026 H2', '2027 H1', '2027 H2'];
-let currentIndex = 1;
+
+function getKstDateParts(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(date);
+
+  const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+  return {
+    year: Number(values.year),
+    month: Number(values.month),
+    day: Number(values.day)
+  };
+}
+
+function getCurrentPeriodByKST(date = new Date()) {
+  const { year, month } = getKstDateParts(date);
+  return `${year} ${month <= 6 ? 'H1' : 'H2'}`;
+}
+
+function getPeriodSortValue(period) {
+  const [year, half] = period.split(' ');
+  return Number(year) * 2 + (half === 'H2' ? 1 : 0);
+}
+
+function getCurrentPeriodIndexByKST() {
+  const currentPeriod = getCurrentPeriodByKST();
+  const exactIndex = periods.indexOf(currentPeriod);
+
+  if (exactIndex !== -1) {
+    return exactIndex;
+  }
+
+  const currentValue = getPeriodSortValue(currentPeriod);
+  const firstValue = getPeriodSortValue(periods[0]);
+  const lastValue = getPeriodSortValue(periods[periods.length - 1]);
+
+  if (currentValue <= firstValue) return 0;
+  if (currentValue >= lastValue) return periods.length - 1;
+  return 0;
+}
+
+let currentIndex = getCurrentPeriodIndexByKST();
 
 const label = document.getElementById('period-label');
 const btnPrev = document.getElementById('btn-prev');
 const btnNext = document.getElementById('btn-next');
 const container = document.getElementById('fruit-container');
+
+label.textContent = periods[currentIndex];
 
 function sortProjects() {
   projects.sort((a, b) => {
@@ -217,8 +263,8 @@ if (hashedInput === adminHash) {
         // 🎯 2. CSS 스위치 규격에 맞춰 'active' 클래스를 붙여줍니다.
         adminModal.classList.add('active');
         
-        // 🎯 3. 관리자 창 내부의 기존 등록된 프로젝트 리스트를 새로고침 해줍니다.
-        refreshProjectList(); 
+        // 🎯 3. 관리자 창 내부의 기존 등록된 프로젝트 리스트를 현재 반기로 보여줍니다.
+        setAdminPeriodFilter(getCurrentPeriodByKST()); 
         
         console.log("🖥️ 관리자 패널 표시 완료");
       } else {
@@ -247,14 +293,28 @@ const urlInput  = document.getElementById('project-url');
 const addBtn = document.getElementById('add-project-btn');
 const updateBtn = document.getElementById('update-project-btn');
 const deleteBtn = document.getElementById('delete-project-btn');
+const projectPeriodFilter = document.getElementById('project-period-filter');
 const projectSelect = document.getElementById('project-select');
 
 let selectedProjectIndex = null;
+let adminPeriodFilter = periods[currentIndex];
 
 function refreshProjectList() {
   projectSelect.innerHTML = '';
   sortProjects();
-  projects.forEach((p, index) => {
+  const filteredProjects = projects
+    .map((project, index) => ({ project, index }))
+    .filter(({ project }) => project.period === adminPeriodFilter);
+
+  if (filteredProjects.length === 0) {
+    const option = document.createElement('option');
+    option.textContent = `${adminPeriodFilter}에 등록된 프로젝트가 없습니다.`;
+    option.disabled = true;
+    projectSelect.appendChild(option);
+    return;
+  }
+
+  filteredProjects.forEach(({ project: p, index }) => {
     const option = document.createElement('option');
     option.value = index;
     const listDisplayDesc = Array.isArray(p.desc) ? p.desc.join(' ') : p.desc;
@@ -266,6 +326,27 @@ function refreshProjectList() {
 function isValidDateFormat(dateStr) { return /^\d{4}\.\d{2}$/.test(dateStr); }
 function clearForm() { periodInput.value = ''; typeInput.value = ''; dateInput.value = ''; descInput.value = ''; rankInput.value = ''; urlInput.value = ''; selectedProjectIndex = null; }
 function parseDescValue(text) { return text.split('\n').map(line => line.trim()).filter(line => line !== ''); }
+
+function renderProjectPeriodFilter() {
+  projectPeriodFilter.innerHTML = '';
+  periods.forEach((period) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = period;
+    button.classList.toggle('active', period === adminPeriodFilter);
+    button.addEventListener('click', () => {
+      setAdminPeriodFilter(period);
+    });
+    projectPeriodFilter.appendChild(button);
+  });
+}
+
+function setAdminPeriodFilter(period) {
+  adminPeriodFilter = periods.includes(period) ? period : periods[currentIndex];
+  clearForm();
+  renderProjectPeriodFilter();
+  refreshProjectList();
+}
 
 function subscribeToFirestore() {
   const q = query(collection(db, COLLECTION));
@@ -282,7 +363,7 @@ addBtn.addEventListener('click', async () => {
   if (!isValidDateFormat(dateInput.value)) { alert('날짜는 YYYY.MM 형식으로 입력해주세요.'); return; }
   const descLines = parseDescValue(descInput.value);
   const newProject = { period: periodInput.value, type: typeInput.value, date: dateInput.value, desc: descLines, rank: rankInput.value, url: urlInput.value.trim() };
-  addBtn.disabled = true; try { await addProjectToFirestore(newProject); clearForm(); } catch (e) { alert('오류: ' + e.message); } finally { addBtn.disabled = false; }
+  addBtn.disabled = true; try { await addProjectToFirestore(newProject); setAdminPeriodFilter(newProject.period); } catch (e) { alert('오류: ' + e.message); } finally { addBtn.disabled = false; }
 });
 
 projectSelect.addEventListener('change', () => {
@@ -300,7 +381,7 @@ updateBtn.addEventListener('click', async () => {
   if (!p || !p._id) return;
   const descLines = parseDescValue(descInput.value);
   const updated = { period: periodInput.value, type: typeInput.value, date: dateInput.value, desc: descLines, rank: rankInput.value, url: urlInput.value.trim() };
-  updateBtn.disabled = true; try { await updateProjectInFirestore(p._id, updated); clearForm(); } catch (e) { alert('오류: ' + e.message); } finally { updateBtn.disabled = false; }
+  updateBtn.disabled = true; try { await updateProjectInFirestore(p._id, updated); setAdminPeriodFilter(updated.period); } catch (e) { alert('오류: ' + e.message); } finally { updateBtn.disabled = false; }
 });
 
 deleteBtn.addEventListener('click', async () => {
@@ -312,4 +393,5 @@ deleteBtn.addEventListener('click', async () => {
 });
 
 async function initApp() { await loadProjectsFromFirestore(); subscribeToFirestore(); }
+renderProjectPeriodFilter();
 initApp();

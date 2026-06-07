@@ -137,6 +137,30 @@ body {
   pointer-events: auto;
 }
 
+.visitor-counter {
+  position: absolute;
+  top: 40px;
+  left: 50px;
+  display: flex;
+  gap: 18px;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 13px;
+  letter-spacing: 1px;
+  z-index: 100;
+}
+
+.visitor-counter span {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.visitor-counter strong {
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+}
+
 .roadmap-overlay {
   position: fixed;
   inset: 0;
@@ -192,6 +216,17 @@ body {
     font-size: 16px;
   }
 
+  .visitor-counter {
+    top: 24px;
+    left: 30px;
+    font-size: 12px;
+    gap: 12px;
+  }
+
+  .visitor-counter strong {
+    font-size: 14px;
+  }
+
   .uc-animation img {
     width: 120px;
   }
@@ -221,6 +256,17 @@ body {
     top: 12px;
     right: 16px;
     font-size: 14px;
+  }
+
+  .visitor-counter {
+    top: 12px;
+    left: 16px;
+    font-size: 10px;
+    gap: 8px;
+  }
+
+  .visitor-counter strong {
+    font-size: 12px;
   }
 
   .uc-animation img {
@@ -260,6 +306,11 @@ body {
 
 <div class="page-container">
 
+  <div class="visitor-counter" id="visitorCounter" aria-live="polite">
+    <span>누적 <strong id="totalVisitorCount">--</strong></span>
+    <span>오늘 <strong id="todayVisitorCount">--</strong></span>
+  </div>
+
   <div class="logo-wrapper">
     <div class="logo-frame">
       <img src="images/CI/01 CI_index.png" alt="CI">
@@ -286,13 +337,33 @@ body {
 
 
 
-<script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, doc, getDoc, setDoc, increment, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBMQkGSc2RwKjAe7h5EcvWWdoJbS5_JjWs",
+  authDomain: "rabbit-archi2025-c40a6.firebaseapp.com",
+  projectId: "rabbit-archi2025-c40a6",
+  storageBucket: "rabbit-archi2025-c40a6.firebasestorage.app",
+  messagingSenderId: "577448559589",
+  appId: "1:577448559589:web:5b984b45bff89303dd650c"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const VISIT_STATS_COLLECTION = 'siteStats';
+const VISIT_STATS_DOC = 'visits';
+const TOTAL_VISIT_COUNTED_KEY = 'rabbitTotalVisitCounted';
+const DAILY_VISIT_COUNTED_PREFIX = 'rabbitDailyVisitCounted:';
 
 const welcomeMessage = document.getElementById('welcomeMessage');
 const maintenanceMessage = document.getElementById('maintenanceMessage');
 const ucAnimationContainer = document.getElementById('ucAnimation');
 const ucAnimationImage = document.getElementById('ucAnimationImage');
 const roadmapMenu = document.getElementById('roadmapMenu');
+const totalVisitorCount = document.getElementById('totalVisitorCount');
+const todayVisitorCount = document.getElementById('todayVisitorCount');
 
 const welcomeText =
 '토끼건축사사무소는 공간의 울림과 사람의 이야기에 귀 기울이고,<br>공간의 본질을 탐구하며, 새로운 도약을 꿈꾸는 건축사사무소입니다.';
@@ -364,6 +435,85 @@ function showWelcomeSequence() {
   }, 1500);
 }
 
+function getKstDateKey(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(date);
+
+  const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+function formatVisitorCount(value) {
+  const count = Number(value);
+  return Number.isFinite(count) ? count.toLocaleString('ko-KR') : '--';
+}
+
+function safeGetStorage(key) {
+  try {
+    return window.localStorage.getItem(key);
+  } catch (error) {
+    return null;
+  }
+}
+
+function safeSetStorage(key, value) {
+  try {
+    window.localStorage.setItem(key, value);
+  } catch (error) {
+    console.warn('방문자 카운트 저장소 접근 실패:', error);
+  }
+}
+
+function renderVisitorCounts(data, todayKey) {
+  totalVisitorCount.textContent = formatVisitorCount(data?.totalVisitors ?? 0);
+  todayVisitorCount.textContent = formatVisitorCount(data?.dailyVisitors?.[todayKey] ?? 0);
+}
+
+async function updateVisitorCounter() {
+  const todayKey = getKstDateKey();
+  const todayStorageKey = `${DAILY_VISIT_COUNTED_PREFIX}${todayKey}`;
+  const shouldCountTotal = safeGetStorage(TOTAL_VISIT_COUNTED_KEY) !== 'true';
+  const shouldCountToday = safeGetStorage(todayStorageKey) !== 'true';
+  const statsRef = doc(db, VISIT_STATS_COLLECTION, VISIT_STATS_DOC);
+
+  try {
+    if (shouldCountTotal || shouldCountToday) {
+      const updates = {
+        lastVisitedAt: serverTimestamp()
+      };
+
+      if (shouldCountTotal) {
+        updates.totalVisitors = increment(1);
+      }
+
+      if (shouldCountToday) {
+        updates.dailyVisitors = {
+          [todayKey]: increment(1)
+        };
+      }
+
+      await setDoc(statsRef, updates, { merge: true });
+
+      if (shouldCountTotal) {
+        safeSetStorage(TOTAL_VISIT_COUNTED_KEY, 'true');
+      }
+      if (shouldCountToday) {
+        safeSetStorage(todayStorageKey, 'true');
+      }
+    }
+
+    const snapshot = await getDoc(statsRef);
+    renderVisitorCounts(snapshot.exists() ? snapshot.data() : {}, todayKey);
+  } catch (error) {
+    console.error('방문자 카운트 업데이트 실패:', error);
+    renderVisitorCounts({}, todayKey);
+  }
+}
+
 // GitHub Pages 구조: index.html(루트) → history/history.html
 roadmapMenu.addEventListener('click', () => {
   window.location.href = 'history/history.html';
@@ -371,6 +521,7 @@ roadmapMenu.addEventListener('click', () => {
 
 window.addEventListener('DOMContentLoaded', () => {
   console.log('인덱스 페이지 로드 완료');
+  updateVisitorCounter();
   showWelcomeSequence();
 });
 
