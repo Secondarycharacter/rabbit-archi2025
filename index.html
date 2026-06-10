@@ -117,11 +117,20 @@ body {
   animation: fadeBlink 1.5s ease-in-out infinite;
 }
 
-/* ROADMAP MENU */
-.roadmap-menu {
+/* TOP MENU */
+.top-menu {
   position: absolute;
   top: 40px;
   right: 50px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+  z-index: 100;
+}
+
+.roadmap-menu,
+.metaverse-menu {
   color: #fff;
   font-size: 18px;
   letter-spacing: 2px;
@@ -129,10 +138,10 @@ body {
   opacity: 0;
   pointer-events: none;
   transition: opacity 1s ease;
-  z-index: 100;
 }
 
-.roadmap-menu.show {
+.roadmap-menu.show,
+.metaverse-menu.show {
   opacity: 1;
   pointer-events: auto;
 }
@@ -210,9 +219,13 @@ body {
     padding: 0 20px;
   }
 
-  .roadmap-menu {
+  .top-menu {
     top: 24px;
     right: 30px;
+  }
+
+  .roadmap-menu,
+  .metaverse-menu {
     font-size: 16px;
   }
 
@@ -252,9 +265,14 @@ body {
     max-width: 80vw;
   }
 
-  .roadmap-menu {
+  .top-menu {
     top: 12px;
     right: 16px;
+    gap: 8px;
+  }
+
+  .roadmap-menu,
+  .metaverse-menu {
     font-size: 14px;
   }
 
@@ -331,7 +349,10 @@ body {
     </div>
   </div>
 
-  <div class="roadmap-menu" id="roadmapMenu">HISTORY</div>
+  <div class="top-menu">
+    <div class="roadmap-menu" id="roadmapMenu">HISTORY</div>
+    <div class="metaverse-menu" id="metaverseMenu">METAVERSE</div>
+  </div>
 
 </div>
 
@@ -362,6 +383,7 @@ const maintenanceMessage = document.getElementById('maintenanceMessage');
 const ucAnimationContainer = document.getElementById('ucAnimation');
 const ucAnimationImage = document.getElementById('ucAnimationImage');
 const roadmapMenu = document.getElementById('roadmapMenu');
+const metaverseMenu = document.getElementById('metaverseMenu');
 const totalVisitorCount = document.getElementById('totalVisitorCount');
 const todayVisitorCount = document.getElementById('todayVisitorCount');
 
@@ -431,6 +453,7 @@ function showWelcomeSequence() {
     startUcAnimation();
     setTimeout(() => {
       roadmapMenu.classList.add('show');
+      metaverseMenu.classList.add('show');
     }, 2000);
   }, 1500);
 }
@@ -517,6 +540,10 @@ async function updateVisitorCounter() {
 // GitHub Pages 구조: index.html(루트) → history/history.html
 roadmapMenu.addEventListener('click', () => {
   window.location.href = 'history/history.html';
+});
+
+metaverseMenu.addEventListener('click', () => {
+  window.location.href = 'metaverse/index.html';
 });
 
 window.addEventListener('DOMContentLoaded', () => {

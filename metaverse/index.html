@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Metaverse Architecture Tour</title>
+  <link rel="stylesheet" href="./styles/main.css">
+</head>
+<body>
+  <main class="game-shell">
+    <canvas id="gameCanvas" tabindex="0" aria-label="3D architecture tour canvas"></canvas>
+
+    <section class="hud" aria-live="polite">
+      <div class="hud__top">
+        <div>
+          <strong id="projectTitle">Architecture Metaverse</strong>
+          <span id="floorLabel">Orbit View</span>
+        </div>
+        <div class="hud__actions">
+          <button id="debugToggleButton" type="button">Debug</button>
+          <button id="lockPointerButton" type="button">Click to Play</button>
+        </div>
+      </div>
+
+      <div class="hud__center" id="crosshair">+</div>
+
+      <div class="hud__bottom">
+        <p id="statusMessage">Loading building model...</p>
+        <div class="hud__stats">
+          <span id="healthLabel">Human scale</span>
+          <span id="monsterLabel">Model collision</span>
+        </div>
+      </div>
+    </section>
+
+    <aside class="debug-panel" id="debugPanel" hidden>
+      <h2>Model Test</h2>
+      <dl>
+        <div>
+          <dt>Status</dt>
+          <dd id="modelStatus">Waiting</dd>
+        </div>
+        <div>
+          <dt>Source</dt>
+          <dd id="modelSource">-</dd>
+        </div>
+        <div>
+          <dt>Stats</dt>
+          <dd id="modelStats">-</dd>
+        </div>
+        <div>
+          <dt>Player</dt>
+          <dd id="playerDebug">-</dd>
+        </div>
+        <div>
+          <dt>Input</dt>
+          <dd id="inputDebug">-</dd>
+        </div>
+      </dl>
+      <button id="copyDebugButton" type="button">Copy Debug</button>
+      <h3>Meshes</h3>
+      <ol id="meshList"></ol>
+    </aside>
+
+    <noscript>
+      This prototype needs JavaScript enabled.
+    </noscript>
+  </main>
+
+  <script src="https://cdn.babylonjs.com/babylon.js"></script>
+  <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+  <script type="module" src="./src/first-person-tour.js"></script>
+</body>
+</html>
