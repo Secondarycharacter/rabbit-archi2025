@@ -10,6 +10,15 @@
   <main class="game-shell">
     <canvas id="gameCanvas" tabindex="0" aria-label="3D architecture tour canvas"></canvas>
 
+    <nav class="model-switcher is-hidden" id="modelSwitcher" aria-label="Building model navigation">
+      <button class="model-switcher__button model-switcher__button--left" id="previousModelButton" type="button" aria-label="Previous model">
+        ‹
+      </button>
+      <button class="model-switcher__button model-switcher__button--right" id="nextModelButton" type="button" aria-label="Next model">
+        ›
+      </button>
+    </nav>
+
     <section class="hud" aria-live="polite">
       <div class="hud__top">
         <div>

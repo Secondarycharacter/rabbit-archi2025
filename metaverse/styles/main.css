@@ -27,6 +27,55 @@ body {
   touch-action: none;
 }
 
+.model-switcher {
+  position: fixed;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity 0.2s ease;
+}
+
+.model-switcher.is-hidden {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.model-switcher__button {
+  position: absolute;
+  top: 50%;
+  width: 54px;
+  height: 54px;
+  border: 1px solid rgba(255, 255, 255, 0.36);
+  border-radius: 50%;
+  background: rgba(6, 10, 18, 0.58);
+  color: #fff;
+  font-size: 44px;
+  line-height: 48px;
+  cursor: pointer;
+  pointer-events: auto;
+  transform: translateY(-50%);
+  transition: background 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
+}
+
+.model-switcher__button:hover {
+  background: rgba(54, 87, 150, 0.78);
+  transform: translateY(-50%) scale(1.05);
+}
+
+.model-switcher__button:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
+
+.model-switcher__button--left {
+  left: 28px;
+}
+
+.model-switcher__button--right {
+  right: 28px;
+}
+
 .hud {
   position: fixed;
   inset: 0;

@@ -1,5 +1,19 @@
 const MODEL_ROOT = "./assets/models/";
-const MODEL_FILE = "Glocal_Jinju.glb";
+const MODEL_CONFIGS = [
+  {
+    file: "Glocal_Jinju.glb",
+    label: "Glocal Jinju"
+  },
+  {
+    file: "Angji.glb",
+    label: "앵지",
+    moveSpeedMultiplier: 3,
+    tourCamera: {
+      position: { x: -46.61, y: 24.44, z: 30.49 },
+      target: { x: 0, y: 6.81, z: 0 }
+    }
+  }
+];
 const MODEL_UNIT_SCALE = 1;
 const MODEL_ROTATION_X = 0;
 const CLAY_PREVIEW = false;
@@ -13,11 +27,14 @@ const GROUND_RAY_DOWN = 120;
 const TOUR_COLLISION_PADDING = 0.25;
 const TOUR_BODY_COLLISION_HEIGHT_OFFSETS = [-0.2, -0.8, -1.22];
 const TOUR_LATERAL_COLLISION_OFFSETS = [-PLAYER_RADIUS * 0.75, 0, PLAYER_RADIUS * 0.75];
-const MAX_STEP_UP = 0.75;
+const LOCAL_COLLISION_RADIUS = 26;
+const LOCAL_GROUND_RADIUS = 34;
+const LOCAL_MESH_UPDATE_DISTANCE = 2.5;
+const MAX_STEP_UP = 0.32;
 const MAX_STEP_DOWN = 0.85;
 const MIN_STEP_DOWN = 0.025;
 const MIN_STEP_UP = 0.035;
-const STEP_PROBE_DISTANCES = [0.12, 0.2, 0.32, 0.45, 0.62, 0.82, 1.05, 1.3];
+const STEP_PROBE_DISTANCES = [0.12, 0.2, 0.32, 0.45, 0.62];
 const STAIR_MATERIAL_KEYWORDS = ["polishedconcreteold"];
 const STAIR_NODE_KEYWORDS = ["3dgeom126", "3dgeom292", "3dgeom599", "3dgeom600"];
 const FLOOR_MATERIAL_KEYWORDS = ["colorm00", "m00", "colord05", "d05"];
@@ -43,6 +60,7 @@ const FLOOR_NODE_KEYWORDS = [
   "3dgeom2355"
 ];
 const GROUND_NORMAL_MIN_Y = 0.55;
+const CLASSIFIED_GROUND_NORMAL_MIN_Y = 0.18;
 const WALL_NORMAL_MAX_Y = 0.9;
 const MIN_COLLISION_DISTANCE = 0.04;
 const ORBIT_WALL_PADDING = 1.2;
@@ -50,12 +68,20 @@ const GROUND_SNAP_TOLERANCE = 0.08;
 const MAX_FALL_SPEED = 0.85;
 const STEP_SMOOTHING = 0.35;
 const STEP_SETTLE_EPSILON = 0.015;
+const GROUND_GRACE_MS = 180;
+const GROUND_GRACE_VERTICAL_TOLERANCE = 0.18;
+const STAIR_GROUND_GRACE_MS = 420;
+const STAIR_GROUND_GRACE_VERTICAL_TOLERANCE = 0.38;
 const GROUND_PROBE_OFFSETS = [
   [0, 0],
   [PLAYER_RADIUS * 0.55, 0],
   [-PLAYER_RADIUS * 0.55, 0],
   [0, PLAYER_RADIUS * 0.55],
   [0, -PLAYER_RADIUS * 0.55],
+  [PLAYER_RADIUS * 0.85, 0],
+  [-PLAYER_RADIUS * 0.85, 0],
+  [0, PLAYER_RADIUS * 0.85],
+  [0, -PLAYER_RADIUS * 0.85],
   [PLAYER_RADIUS * 0.4, PLAYER_RADIUS * 0.4],
   [PLAYER_RADIUS * 0.4, -PLAYER_RADIUS * 0.4],
   [-PLAYER_RADIUS * 0.4, PLAYER_RADIUS * 0.4],
@@ -95,6 +121,9 @@ const playerDebug = document.getElementById("playerDebug");
 const inputDebug = document.getElementById("inputDebug");
 const meshList = document.getElementById("meshList");
 const copyDebugButton = document.getElementById("copyDebugButton");
+const modelSwitcher = document.getElementById("modelSwitcher");
+const previousModelButton = document.getElementById("previousModelButton");
+const nextModelButton = document.getElementById("nextModelButton");
 
 canvas.tabIndex = 0;
 
@@ -102,7 +131,7 @@ projectTitle.textContent = "First Person Architecture Tour";
 floorLabel.textContent = "Orbit View";
 healthLabel.textContent = "Human scale";
 monsterLabel.textContent = "Object collision";
-statusMessage.textContent = `Loading ${MODEL_FILE}...`;
+statusMessage.textContent = `Loading ${MODEL_CONFIGS.map((model) => model.file).join(", ")}...`;
 
 debugToggleButton.addEventListener("click", () => {
   debugPanel.hidden = !debugPanel.hidden;
@@ -164,6 +193,37 @@ function getMeshBounds(BABYLON, mesh) {
   const maxDimension = Math.max(size.x, size.y, size.z);
 
   return { min, max, size, center, maxDimension };
+}
+
+function getCachedMeshBounds(BABYLON, mesh) {
+  const cachedBounds = mesh.metadata?.tourBounds;
+
+  if (cachedBounds) {
+    return cachedBounds;
+  }
+
+  const bounds = getMeshBounds(BABYLON, mesh);
+  mesh.metadata = { ...(mesh.metadata || {}), tourBounds: bounds };
+  return bounds;
+}
+
+function isMeshNearPosition(BABYLON, mesh, position, radius) {
+  const bounds = getCachedMeshBounds(BABYLON, mesh);
+
+  if (!bounds) {
+    return true;
+  }
+
+  const clampedX = Math.max(bounds.min.x, Math.min(position.x, bounds.max.x));
+  const clampedY = Math.max(bounds.min.y, Math.min(position.y, bounds.max.y));
+  const clampedZ = Math.max(bounds.min.z, Math.min(position.z, bounds.max.z));
+  const closest = new BABYLON.Vector3(clampedX, clampedY, clampedZ);
+
+  return BABYLON.Vector3.DistanceSquared(position, closest) <= radius * radius;
+}
+
+function getMeshesNearPosition(BABYLON, meshes, position, radius) {
+  return meshes.filter((mesh) => isMeshNearPosition(BABYLON, mesh, position, radius));
 }
 
 function combineBounds(BABYLON, boundsList) {
@@ -604,11 +664,12 @@ function getValidGroundHit(hit) {
     return null;
   }
 
+  const normal = hit.getNormal?.(true);
+
   if (isFloorSurface(hit.pickedMesh) || isStairSurface(hit.pickedMesh)) {
-    return hit;
+    return !normal || Math.abs(normal.y) >= CLASSIFIED_GROUND_NORMAL_MIN_Y ? hit : null;
   }
 
-  const normal = hit.getNormal?.(true);
   return !normal || normal.y >= GROUND_NORMAL_MIN_Y ? hit : null;
 }
 
@@ -628,13 +689,13 @@ function getBlockingBodyHit(hit) {
     return null;
   }
 
-  if (isLikelyWalkableSurface(hit.pickedMesh)) {
-    return null;
-  }
-
   const normal = hit.getNormal?.(true);
 
   if (normal && normal.y > WALL_NORMAL_MAX_Y) {
+    return null;
+  }
+
+  if (!normal && isLikelyWalkableSurface(hit.pickedMesh)) {
     return null;
   }
 
@@ -700,7 +761,7 @@ function getLandingGroundPoseAtPosition(BABYLON, scene, position, groundMeshSet,
       hit: candidate,
       eyeY: candidate.pickedPoint.y + EYE_HEIGHT
     }))
-    .filter((candidate) => candidate.eyeY <= referenceEyeY + GROUND_RAY_UP)
+    .filter((candidate) => candidate.eyeY <= referenceEyeY + GROUND_SNAP_TOLERANCE)
     .sort((a, b) => b.eyeY - a.eyeY)[0];
 
   if (!landingCandidate) {
@@ -827,6 +888,7 @@ function findStepUpPose(BABYLON, scene, previousPosition, movement, groundMeshSe
     }
 
     return {
+      hit: stepPose.hit,
       eyeY: stepPose.eyeY,
       verticalDelta: stepPose.verticalDelta,
       probeDistance
@@ -847,30 +909,35 @@ function applyStepUp(BABYLON, camera, movement, stepPose) {
     reason: `step ${stepPose.verticalDelta.toFixed(2)}`,
     distance: BABYLON.Vector3.Distance(previousPosition, camera.position),
     previousPosition,
-    stepTargetY: stepPose.eyeY
+    stepTargetY: stepPose.eyeY,
+    stepTargetHit: stepPose.hit
   };
 }
 
-function tryMoveWithCollision(BABYLON, scene, camera, movement, collisionMeshSet, modelBounds, groundMeshSet) {
+function tryMoveWithCollision(BABYLON, scene, camera, movement, collisionMeshSet, modelBounds, groundMeshSet, options = {}) {
   const previousPosition = camera.position.clone();
   const desiredPosition = previousPosition.add(movement);
-  const leadingStepPose = findStepUpPose(BABYLON, scene, previousPosition, movement, groundMeshSet);
+  const canStepUp = options.allowStepUp !== false;
+  const initialCollisionHit = findBodyCollision(BABYLON, scene, previousPosition, movement, collisionMeshSet, modelBounds);
+  const leadingStepPose = canStepUp ? findStepUpPose(BABYLON, scene, previousPosition, movement, groundMeshSet) : null;
 
   if (leadingStepPose) {
-    return applyStepUp(BABYLON, camera, movement, leadingStepPose);
+    if (!initialCollisionHit || isLowStepCollision(initialCollisionHit)) {
+      return applyStepUp(BABYLON, camera, movement, leadingStepPose);
+    }
+
+    return {
+      moved: false,
+      reason: `wall:${initialCollisionHit.pickedMesh?.name || initialCollisionHit.pickedMesh?.id || "object"}`,
+      distance: 0,
+      previousPosition
+    };
   }
 
   const groundPose = getGroundPoseAtPosition(BABYLON, scene, desiredPosition, groundMeshSet, previousPosition.y);
 
   if (!groundPose) {
-    const collisionHit = findBodyCollision(BABYLON, scene, previousPosition, movement, collisionMeshSet, modelBounds);
-    const stepPose = findStepUpPose(BABYLON, scene, previousPosition, movement, groundMeshSet);
-
-    if (stepPose) {
-      return applyStepUp(BABYLON, camera, movement, stepPose);
-    }
-
-    if (!collisionHit) {
+    if (!initialCollisionHit) {
       camera.position.set(desiredPosition.x, previousPosition.y, desiredPosition.z);
       return {
         moved: true,
@@ -882,7 +949,7 @@ function tryMoveWithCollision(BABYLON, scene, camera, movement, collisionMeshSet
 
     return {
       moved: false,
-      reason: `wall:${collisionHit.pickedMesh?.name || collisionHit.pickedMesh?.id || "object"}`,
+      reason: `wall:${initialCollisionHit.pickedMesh?.name || initialCollisionHit.pickedMesh?.id || "object"}`,
       distance: 0,
       previousPosition
     };
@@ -891,13 +958,34 @@ function tryMoveWithCollision(BABYLON, scene, camera, movement, collisionMeshSet
   const verticalDelta = groundPose.eyeY - previousPosition.y;
 
   if (verticalDelta >= MIN_STEP_UP && verticalDelta <= MAX_STEP_UP) {
+    if (!canStepUp) {
+      camera.position.set(desiredPosition.x, previousPosition.y, desiredPosition.z);
+
+      return {
+        moved: true,
+        reason: "step wait",
+        distance: BABYLON.Vector3.Distance(previousPosition, camera.position),
+        previousPosition
+      };
+    }
+
+    if (initialCollisionHit && !isLowStepCollision(initialCollisionHit)) {
+      return {
+        moved: false,
+        reason: `wall:${initialCollisionHit.pickedMesh?.name || initialCollisionHit.pickedMesh?.id || "object"}`,
+        distance: 0,
+        previousPosition
+      };
+    }
+
     camera.position.set(desiredPosition.x, groundPose.eyeY, desiredPosition.z);
 
     return {
       moved: true,
       reason: `step ${verticalDelta.toFixed(2)}`,
       distance: BABYLON.Vector3.Distance(previousPosition, camera.position),
-      previousPosition
+      previousPosition,
+      groundHit: groundPose.hit
     };
   }
 
@@ -908,17 +996,16 @@ function tryMoveWithCollision(BABYLON, scene, camera, movement, collisionMeshSet
       moved: true,
       reason: `stepDown ${Math.abs(verticalDelta).toFixed(2)}`,
       distance: BABYLON.Vector3.Distance(previousPosition, camera.position),
-      previousPosition
+      previousPosition,
+      groundHit: groundPose.hit
     };
   }
 
   if (verticalDelta > MAX_STEP_UP) {
-    const collisionHit = findBodyCollision(BABYLON, scene, previousPosition, movement, collisionMeshSet, modelBounds);
-
-    if (collisionHit) {
+    if (initialCollisionHit) {
       return {
         moved: false,
-        reason: `wall:${collisionHit.pickedMesh?.name || collisionHit.pickedMesh?.id || "too high"}`,
+        reason: `wall:${initialCollisionHit.pickedMesh?.name || initialCollisionHit.pickedMesh?.id || "too high"}`,
         distance: 0,
         previousPosition
       };
@@ -935,12 +1022,10 @@ function tryMoveWithCollision(BABYLON, scene, camera, movement, collisionMeshSet
   }
 
   if (verticalDelta < -MAX_STEP_DOWN) {
-    const collisionHit = findBodyCollision(BABYLON, scene, previousPosition, movement, collisionMeshSet, modelBounds);
-
-    if (collisionHit) {
+    if (initialCollisionHit) {
       return {
         moved: false,
-        reason: `wall:${collisionHit.pickedMesh?.name || collisionHit.pickedMesh?.id || "drop"}`,
+        reason: `wall:${initialCollisionHit.pickedMesh?.name || initialCollisionHit.pickedMesh?.id || "drop"}`,
         distance: 0,
         previousPosition
       };
@@ -961,9 +1046,9 @@ function tryMoveWithCollision(BABYLON, scene, camera, movement, collisionMeshSet
   });
 
   if (collisionHit) {
-    const stepPose = findStepUpPose(BABYLON, scene, previousPosition, movement, groundMeshSet);
+    const stepPose = canStepUp ? findStepUpPose(BABYLON, scene, previousPosition, movement, groundMeshSet) : null;
 
-    if (stepPose) {
+    if (stepPose && isLowStepCollision(collisionHit)) {
       return applyStepUp(BABYLON, camera, movement, stepPose);
     }
 
@@ -981,7 +1066,8 @@ function tryMoveWithCollision(BABYLON, scene, camera, movement, collisionMeshSet
     moved: true,
     reason: verticalDelta > 0.05 ? `step ${verticalDelta.toFixed(2)}` : "-",
     distance: BABYLON.Vector3.Distance(previousPosition, camera.position),
-    previousPosition
+    previousPosition,
+    groundHit: groundPose.hit
   };
 }
 
@@ -1016,15 +1102,23 @@ function keepOrbitCameraOutsideWalls(BABYLON, scene, orbitCamera, collisionMeshS
   return null;
 }
 
-function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, walkableGroundMeshes, collisionMeshes, model) {
-  const groundMeshSet = new Set(walkableGroundMeshes);
-  const collisionMeshSet = new Set(collisionMeshes);
+function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, initialModelState, options = {}) {
+  let activeGroundMeshes = initialModelState.walkableGroundMeshes;
+  let activeCollisionMeshes = initialModelState.collisionMeshes;
+  let groundMeshSet = new Set(activeGroundMeshes);
+  let collisionMeshSet = new Set(activeCollisionMeshes);
+  let localGroundMeshSet = groundMeshSet;
+  let localCollisionMeshSet = collisionMeshSet;
+  let lastLocalMeshPosition = null;
+  let activeModelState = initialModelState;
   const keys = new Set();
   const inputDiagnostics = createInputDiagnostics();
   let walkMode = false;
   let isGrounded = false;
   let verticalVelocity = 0;
   let stepTargetY = null;
+  let stepTargetHit = null;
+  let lastStableGroundPose = null;
   let yaw = walkCamera.rotation.y;
   let pitch = walkCamera.rotation.x;
   let currentLabel = "orbit view";
@@ -1034,6 +1128,49 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, wal
 
   function clearMovementKeys() {
     keys.clear();
+  }
+
+  function setModelState(nextModelState) {
+    activeGroundMeshes = nextModelState.walkableGroundMeshes;
+    activeCollisionMeshes = nextModelState.collisionMeshes;
+    groundMeshSet = new Set(activeGroundMeshes);
+    collisionMeshSet = new Set(activeCollisionMeshes);
+    localGroundMeshSet = groundMeshSet;
+    localCollisionMeshSet = collisionMeshSet;
+    lastLocalMeshPosition = null;
+    activeModelState = nextModelState;
+    clearMovementKeys();
+    verticalVelocity = 0;
+    stepTargetY = null;
+    stepTargetHit = null;
+    lastStableGroundPose = null;
+
+    if (walkMode) {
+      snapToGround();
+    }
+  }
+
+  function refreshLocalMeshSets(force = false) {
+    if (!walkMode) {
+      localGroundMeshSet = groundMeshSet;
+      localCollisionMeshSet = collisionMeshSet;
+      return;
+    }
+
+    if (
+      !force
+      && lastLocalMeshPosition
+      && BABYLON.Vector3.DistanceSquared(walkCamera.position, lastLocalMeshPosition) < LOCAL_MESH_UPDATE_DISTANCE * LOCAL_MESH_UPDATE_DISTANCE
+    ) {
+      return;
+    }
+
+    lastLocalMeshPosition = walkCamera.position.clone();
+    const nearbyCollisionMeshes = getMeshesNearPosition(BABYLON, activeCollisionMeshes, walkCamera.position, LOCAL_COLLISION_RADIUS);
+    const nearbyGroundMeshes = getMeshesNearPosition(BABYLON, activeGroundMeshes, walkCamera.position, LOCAL_GROUND_RADIUS);
+
+    localCollisionMeshSet = nearbyCollisionMeshes.length > 0 ? new Set(nearbyCollisionMeshes) : collisionMeshSet;
+    localGroundMeshSet = nearbyGroundMeshes.length > 0 ? new Set(nearbyGroundMeshes) : groundMeshSet;
   }
 
   function updateInputDebug() {
@@ -1053,6 +1190,8 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, wal
       `moveDist ${inputDiagnostics.lastMoveDistance}`,
       `collision ${inputDiagnostics.lastCollision}`,
       `ground ${inputDiagnostics.lastGround}`,
+      `local collision ${localCollisionMeshSet.size}/${collisionMeshSet.size}`,
+      `local ground ${localGroundMeshSet.size}/${groundMeshSet.size}`,
       `blocked ${inputDiagnostics.movementBlocked ? "yes" : "no"}`,
       `activeKeys ${Array.from(keys).join(",") || "-"}`
     ].join(" / ");
@@ -1106,7 +1245,8 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, wal
   }
 
   function snapToGround() {
-    const hit = findGroundHit(BABYLON, scene, walkCamera.position, groundMeshSet);
+    refreshLocalMeshSets(true);
+    const hit = findGroundHit(BABYLON, scene, walkCamera.position, localGroundMeshSet);
 
     if (!hit?.pickedPoint) {
       isGrounded = false;
@@ -1118,26 +1258,62 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, wal
     if (nextY <= walkCamera.position.y + 0.6) {
       walkCamera.position.y = nextY;
       isGrounded = true;
+      rememberStableGround(hit, nextY);
     }
+  }
+
+  function rememberStableGround(hit, eyeY) {
+    lastStableGroundPose = {
+      hit,
+      eyeY,
+      isStair: Boolean(hit?.pickedMesh && isStairSurface(hit.pickedMesh)),
+      time: performance.now()
+    };
+  }
+
+  function tryUseGroundGrace() {
+    if (!lastStableGroundPose) {
+      return false;
+    }
+
+    const age = performance.now() - lastStableGroundPose.time;
+    const verticalGap = Math.abs(walkCamera.position.y - lastStableGroundPose.eyeY);
+    const maxAge = lastStableGroundPose.isStair ? STAIR_GROUND_GRACE_MS : GROUND_GRACE_MS;
+    const maxVerticalGap = lastStableGroundPose.isStair
+      ? STAIR_GROUND_GRACE_VERTICAL_TOLERANCE
+      : GROUND_GRACE_VERTICAL_TOLERANCE;
+
+    if (age > maxAge || verticalGap > maxVerticalGap) {
+      return false;
+    }
+
+    walkCamera.position.y = lastStableGroundPose.eyeY;
+    verticalVelocity = 0;
+    isGrounded = true;
+    inputDiagnostics.lastGround = `grace:${getSurfaceDebugName(lastStableGroundPose.hit)}`;
+    return true;
   }
 
   function applyGravity(deltaScale) {
     if (typeof stepTargetY === "number") {
       const nextY = walkCamera.position.y + (stepTargetY - walkCamera.position.y) * Math.min(STEP_SMOOTHING * deltaScale, 1);
+      const targetHit = stepTargetHit;
 
       if (Math.abs(stepTargetY - nextY) <= STEP_SETTLE_EPSILON) {
         walkCamera.position.y = stepTargetY;
         stepTargetY = null;
+        stepTargetHit = null;
       } else {
         walkCamera.position.y = nextY;
       }
 
       verticalVelocity = 0;
       isGrounded = true;
+      rememberStableGround(targetHit, walkCamera.position.y);
       return;
     }
 
-    const groundPose = getLandingGroundPoseAtPosition(BABYLON, scene, walkCamera.position, groundMeshSet, walkCamera.position.y);
+    const groundPose = getLandingGroundPoseAtPosition(BABYLON, scene, walkCamera.position, localGroundMeshSet, walkCamera.position.y);
 
     if (groundPose) {
       const distanceToGround = walkCamera.position.y - groundPose.eyeY;
@@ -1146,6 +1322,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, wal
         walkCamera.position.y = groundPose.eyeY;
         verticalVelocity = 0;
         isGrounded = true;
+        rememberStableGround(groundPose.hit, groundPose.eyeY);
         inputDiagnostics.lastGround = getSurfaceDebugName(groundPose.hit);
         return;
       }
@@ -1154,9 +1331,14 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, wal
         walkCamera.position.y = groundPose.eyeY;
         verticalVelocity = 0;
         isGrounded = true;
+        rememberStableGround(groundPose.hit, groundPose.eyeY);
         inputDiagnostics.lastGround = getSurfaceDebugName(groundPose.hit);
         return;
       }
+    }
+
+    if (tryUseGroundGrace()) {
+      return;
     }
 
     const previousY = walkCamera.position.y;
@@ -1168,17 +1350,18 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, wal
       BABYLON,
       scene,
       walkCamera.position,
-      groundMeshSet,
+      localGroundMeshSet,
       previousY,
       walkCamera.position.y
     );
     const nextGroundPose = sweptGroundPose
-      || getLandingGroundPoseAtPosition(BABYLON, scene, walkCamera.position, groundMeshSet, walkCamera.position.y);
+      || getLandingGroundPoseAtPosition(BABYLON, scene, walkCamera.position, localGroundMeshSet, walkCamera.position.y);
 
     if (nextGroundPose && walkCamera.position.y <= nextGroundPose.eyeY + GROUND_SNAP_TOLERANCE) {
       walkCamera.position.y = nextGroundPose.eyeY;
       verticalVelocity = 0;
       isGrounded = true;
+      rememberStableGround(nextGroundPose.hit, nextGroundPose.eyeY);
       inputDiagnostics.lastGround = getSurfaceDebugName(nextGroundPose.hit);
     } else {
       inputDiagnostics.lastGround = "-";
@@ -1215,14 +1398,18 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, wal
     clearMovementKeys();
     canvas.focus();
     scene.activeCamera = walkCamera;
-    walkCamera.position.set(DEFAULT_TOUR_CAMERA.position.x, DEFAULT_TOUR_CAMERA.position.y, DEFAULT_TOUR_CAMERA.position.z);
-    walkCamera.setTarget(new BABYLON.Vector3(DEFAULT_TOUR_CAMERA.target.x, DEFAULT_TOUR_CAMERA.target.y, DEFAULT_TOUR_CAMERA.target.z));
+    const tourCamera = activeModelState.config?.tourCamera || DEFAULT_TOUR_CAMERA;
+    walkCamera.position.set(tourCamera.position.x, tourCamera.position.y, tourCamera.position.z);
+    walkCamera.setTarget(new BABYLON.Vector3(tourCamera.target.x, tourCamera.target.y, tourCamera.target.z));
     yaw = walkCamera.rotation.y;
     pitch = walkCamera.rotation.x;
     verticalVelocity = 0;
     stepTargetY = null;
+    stepTargetHit = null;
+    lastStableGroundPose = null;
     snapToGround();
     walkMode = true;
+    options.onModeChange?.("walk");
     currentLabel = "fixed tour start";
 
     if (shouldLockPointer) {
@@ -1243,6 +1430,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, wal
     floorLabel.textContent = "Orbit View";
     currentLabel = "orbit view";
     setStatus("Orbit view ready. Mouse rotates, wheel zooms. Click to Play starts walk mode.");
+    options.onModeChange?.("orbit");
     updateDebug();
   }
 
@@ -1338,7 +1526,9 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, wal
     }
 
     const deltaScale = Math.min(engine.getDeltaTime() / 16.6667, 2);
-    const speed = CONTROLLER_SETTINGS.moveSpeed * (keys.has("shift") ? CONTROLLER_SETTINGS.runMultiplier : 1) * deltaScale;
+    refreshLocalMeshSets();
+    const modelSpeedMultiplier = activeModelState.config?.moveSpeedMultiplier || 1;
+    const speed = CONTROLLER_SETTINGS.moveSpeed * modelSpeedMultiplier * (keys.has("shift") ? CONTROLLER_SETTINGS.runMultiplier : 1) * deltaScale;
     const axes = getFlatAxes();
     const movement = BABYLON.Vector3.Zero();
 
@@ -1350,10 +1540,21 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, wal
     if (movement.lengthSquared() > 0) {
       movement.normalize().scaleInPlace(speed);
       inputDiagnostics.lastMoveCommand = Array.from(keys).join(",") || "-";
-      const moveResult = tryMoveWithCollision(BABYLON, scene, walkCamera, movement, collisionMeshSet, model.bounds, groundMeshSet);
+      const moveResult = tryMoveWithCollision(BABYLON, scene, walkCamera, movement, localCollisionMeshSet, activeModelState.model.bounds, localGroundMeshSet, {
+        allowStepUp: typeof stepTargetY !== "number"
+      });
 
-      if (typeof moveResult.stepTargetY === "number" && (typeof stepTargetY !== "number" || moveResult.stepTargetY > stepTargetY)) {
-        stepTargetY = moveResult.stepTargetY;
+      if (typeof moveResult.stepTargetY === "number" && typeof stepTargetY !== "number") {
+        const targetDelta = moveResult.stepTargetY - walkCamera.position.y;
+
+        if (targetDelta >= MIN_STEP_UP && targetDelta <= MAX_STEP_UP) {
+          stepTargetY = moveResult.stepTargetY;
+          stepTargetHit = moveResult.stepTargetHit || null;
+        }
+      }
+
+      if (moveResult.moved && moveResult.groundHit) {
+        rememberStableGround(moveResult.groundHit, walkCamera.position.y);
       }
 
       inputDiagnostics.lastCollision = moveResult.reason;
@@ -1372,34 +1573,51 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, wal
 
   updateDebug();
 
-  return { enterWalkMode, enterOrbitMode };
+  return { enterWalkMode, enterOrbitMode, setModelState, isWalkMode: () => walkMode };
 }
 
-async function start() {
-  const BABYLON = window.BABYLON;
-  const engine = new BABYLON.Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true });
-  const scene = new BABYLON.Scene(engine);
-  scene.clearColor = new BABYLON.Color4(0.62, 0.72, 0.86, 1);
-  scene.collisionsEnabled = true;
+function setModelSlideOffset(BABYLON, modelState, offsetX) {
+  const nextPosition = modelState.baseRootPosition.add(new BABYLON.Vector3(offsetX, 0, 0));
+  modelState.model.root.position.copyFrom(nextPosition);
+}
 
-  const ambient = new BABYLON.HemisphericLight("ambientLight", new BABYLON.Vector3(0, 1, 0), scene);
-  ambient.intensity = 0.55;
-  ambient.groundColor = new BABYLON.Color3(0.35, 0.32, 0.28);
+function setModelStateEnabled(modelState, enabled) {
+  modelState.model.root.setEnabled(enabled);
+}
 
-  const sun = new BABYLON.DirectionalLight("sunLight", new BABYLON.Vector3(-0.45, -0.9, 0.25), scene);
-  sun.position = new BABYLON.Vector3(80, 120, -60);
-  sun.intensity = 2.4;
-  sun.diffuse = new BABYLON.Color3(1, 0.94, 0.82);
-  sun.specular = new BABYLON.Color3(1, 0.9, 0.75);
+function getSlideDistance(modelStates) {
+  const maxWidth = Math.max(...modelStates.map((state) => state.model.focusBounds.size.x || state.model.bounds.size.x || 1));
+  return Math.max(maxWidth * 1.35, 80);
+}
 
-  const fileName = `${MODEL_FILE}?v=${Date.now()}`;
+function renderModelDebug(modelState) {
+  const { config, meshes, model, collisionMeshes, walkableGroundMeshes, stairSurfaceMeshes, floorSurfaceMeshes } = modelState;
+
+  modelStatus.textContent = `Loaded ${config.label}`;
+  modelSource.textContent = `${MODEL_ROOT}${config.file}`;
+  modelStats.textContent = `${meshes.length} meshes / collision ${collisionMeshes.length} / walkable ${walkableGroundMeshes.length} / stairSurfaces ${stairSurfaceMeshes.length} / floorSurfaces ${floorSurfaceMeshes.length} / humanPassThrough ${modelState.humanPassThroughCount} / collisionFallback ${modelState.usedCollisionFallback ? "yes" : "no"} / scale ${model.scale.toExponential(3)} / full ${boundsToText(model.bounds)} / focus ${boundsToText(model.focusBounds)} / ${model.tourStartNode ? "Tour_Start found" : "Tour_Start not found"}`;
+  meshList.replaceChildren(
+    ...meshes.slice(0, 50).map((mesh) => {
+      const item = document.createElement("li");
+      item.textContent = mesh.name || mesh.id || "(unnamed mesh)";
+      return item;
+    })
+  );
+}
+
+async function loadTourModelState(BABYLON, scene, config) {
+  const fileName = `${config.file}?v=${Date.now()}`;
   const result = await BABYLON.SceneLoader.ImportMeshAsync("", MODEL_ROOT, fileName, scene);
   const meshes = getGeometryMeshes(result.meshes);
   const model = normalizeModel(BABYLON, scene, result, meshes);
 
+  model.root.name = `tour-building-root-${normalizeName(config.label)}`;
+
   let humanPassThroughCount = 0;
 
   meshes.forEach((mesh) => {
+    getCachedMeshBounds(BABYLON, mesh);
+
     const passThrough = isNonCollisionProp(mesh);
 
     if (passThrough) {
@@ -1410,6 +1628,7 @@ async function start() {
     mesh.checkCollisions = passThrough ? false : ENABLE_MODEL_COLLISIONS;
     mesh.metadata = { ...(mesh.metadata || {}), passThrough };
   });
+
   scene.materials.forEach((material) => {
     material.backFaceCulling = false;
   });
@@ -1452,26 +1671,151 @@ async function start() {
   stairSurfaceMeshes.forEach((mesh) => groundMeshMap.set(mesh.uniqueId, mesh));
   floorSurfaceMeshes.forEach((mesh) => groundMeshMap.set(mesh.uniqueId, mesh));
 
-  const walkableGroundMeshes = Array.from(groundMeshMap.values());
+  return {
+    config,
+    result,
+    meshes,
+    model,
+    baseRootPosition: model.root.position.clone(),
+    humanPassThroughCount,
+    usedCollisionFallback,
+    collisionMeshes,
+    walkableGroundMeshes: Array.from(groundMeshMap.values()),
+    stairSurfaceMeshes,
+    floorSurfaceMeshes
+  };
+}
+
+async function start() {
+  const BABYLON = window.BABYLON;
+  const engine = new BABYLON.Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true });
+  const scene = new BABYLON.Scene(engine);
+  scene.clearColor = new BABYLON.Color4(0.62, 0.72, 0.86, 1);
+  scene.collisionsEnabled = true;
+
+  const ambient = new BABYLON.HemisphericLight("ambientLight", new BABYLON.Vector3(0, 1, 0), scene);
+  ambient.intensity = 0.72;
+  ambient.groundColor = new BABYLON.Color3(0.48, 0.45, 0.4);
+
+  const sun = new BABYLON.DirectionalLight("sunLight", new BABYLON.Vector3(-0.45, -0.9, 0.25), scene);
+  sun.position = new BABYLON.Vector3(80, 120, -60);
+  sun.intensity = 1.8;
+  sun.diffuse = new BABYLON.Color3(1, 0.94, 0.82);
+  sun.specular = new BABYLON.Color3(1, 0.9, 0.75);
+
+  const cameraFillLight = new BABYLON.DirectionalLight("cameraFillLight", new BABYLON.Vector3(0, -0.35, 1), scene);
+  cameraFillLight.intensity = 1.35;
+  cameraFillLight.diffuse = new BABYLON.Color3(1, 0.96, 0.86);
+  cameraFillLight.specular = new BABYLON.Color3(0.24, 0.22, 0.18);
+
+  const modelStates = await Promise.all(MODEL_CONFIGS.map((config) => loadTourModelState(BABYLON, scene, config)));
+  const slideDistance = getSlideDistance(modelStates);
+  let activeModelIndex = 0;
+  let transitionState = null;
+  let isTransitioning = false;
+
+  modelStates.forEach((modelState, index) => {
+    setModelSlideOffset(BABYLON, modelState, index === activeModelIndex ? 0 : slideDistance);
+    setModelStateEnabled(modelState, index === activeModelIndex);
+  });
+
   const orbitCamera = createOrbitCamera(BABYLON, scene);
   const walkCamera = createWalkCamera(BABYLON, scene);
-  createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, walkableGroundMeshes, collisionMeshes, model);
+  let controls = null;
+
+  function updateModelSwitcherVisibility() {
+    const shouldShow = Boolean(controls && !controls.isWalkMode() && !isTransitioning && modelStates.length > 1);
+    modelSwitcher.classList.toggle("is-hidden", !shouldShow);
+    previousModelButton.disabled = isTransitioning;
+    nextModelButton.disabled = isTransitioning;
+  }
+
+  function easeOutCubic(value) {
+    return 1 - ((1 - value) ** 3);
+  }
+
+  function startModelTransition(direction) {
+    if (isTransitioning || controls?.isWalkMode() || modelStates.length < 2) {
+      return;
+    }
+
+    const nextModelIndex = (activeModelIndex + direction + modelStates.length) % modelStates.length;
+
+    if (nextModelIndex === activeModelIndex) {
+      return;
+    }
+
+    const currentModelState = modelStates[activeModelIndex];
+    const nextModelState = modelStates[nextModelIndex];
+    const nextStartOffset = direction > 0 ? slideDistance : -slideDistance;
+    const currentEndOffset = direction > 0 ? -slideDistance : slideDistance;
+
+    isTransitioning = true;
+    setModelStateEnabled(nextModelState, true);
+    setModelSlideOffset(BABYLON, nextModelState, nextStartOffset);
+    updateModelSwitcherVisibility();
+    setStatus(`Switching to ${nextModelState.config.label}...`);
+
+    transitionState = {
+      startedAt: performance.now(),
+      duration: 900,
+      currentModelState,
+      nextModelState,
+      nextModelIndex,
+      nextStartOffset,
+      currentEndOffset
+    };
+  }
+
+  function updateModelTransition() {
+    if (!transitionState) {
+      return;
+    }
+
+    const elapsed = performance.now() - transitionState.startedAt;
+    const progress = Math.min(elapsed / transitionState.duration, 1);
+    const eased = easeOutCubic(progress);
+    const currentOffset = transitionState.currentEndOffset * eased;
+    const nextOffset = transitionState.nextStartOffset * (1 - eased);
+
+    setModelSlideOffset(BABYLON, transitionState.currentModelState, currentOffset);
+    setModelSlideOffset(BABYLON, transitionState.nextModelState, nextOffset);
+
+    if (progress < 1) {
+      return;
+    }
+
+    setModelSlideOffset(BABYLON, transitionState.nextModelState, 0);
+    setModelSlideOffset(BABYLON, transitionState.currentModelState, transitionState.currentEndOffset);
+    setModelStateEnabled(transitionState.currentModelState, false);
+
+    activeModelIndex = transitionState.nextModelIndex;
+    controls.setModelState(transitionState.nextModelState);
+    renderModelDebug(transitionState.nextModelState);
+    setStatus(`${transitionState.nextModelState.config.label} orbit view ready. Mouse rotates, wheel zooms. Click to Play starts walk mode.`);
+
+    transitionState = null;
+    isTransitioning = false;
+    updateModelSwitcherVisibility();
+  }
+
+  controls = createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, modelStates[activeModelIndex], {
+    onModeChange: updateModelSwitcherVisibility
+  });
+  previousModelButton.addEventListener("click", () => startModelTransition(-1));
+  nextModelButton.addEventListener("click", () => startModelTransition(1));
   canvas.focus();
 
-  modelStatus.textContent = "Loaded";
-  modelSource.textContent = `${MODEL_ROOT}${MODEL_FILE}`;
-  modelStats.textContent = `${meshes.length} meshes / collision ${collisionMeshes.length} / walkable ${walkableGroundMeshes.length} / stairSurfaces ${stairSurfaceMeshes.length} / floorSurfaces ${floorSurfaceMeshes.length} / humanPassThrough ${humanPassThroughCount} / collisionFallback ${usedCollisionFallback ? "yes" : "no"} / scale ${model.scale.toExponential(3)} / full ${boundsToText(model.bounds)} / focus ${boundsToText(model.focusBounds)} / ${model.tourStartNode ? "Tour_Start found" : "Tour_Start not found"}`;
-  meshList.replaceChildren(
-    ...meshes.slice(0, 50).map((mesh) => {
-      const item = document.createElement("li");
-      item.textContent = mesh.name || mesh.id || "(unnamed mesh)";
-      return item;
-    })
-  );
+  renderModelDebug(modelStates[activeModelIndex]);
+  updateModelSwitcherVisibility();
 
   setStatus("Orbit view ready. Mouse rotates, wheel zooms. Click to Play starts walk mode.");
 
   engine.runRenderLoop(() => {
+    updateModelTransition();
+    const activeCamera = scene.activeCamera || orbitCamera;
+    const viewDirection = activeCamera.getForwardRay?.().direction || activeCamera.getDirection(BABYLON.Axis.Z);
+    cameraFillLight.direction = viewDirection.scale(-1).add(new BABYLON.Vector3(0, -0.35, 0)).normalize();
     scene.render();
   });
 
