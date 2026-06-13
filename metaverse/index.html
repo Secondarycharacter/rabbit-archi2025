@@ -26,6 +26,7 @@
           <span id="floorLabel">Orbit View</span>
         </div>
         <div class="hud__actions">
+          <button id="sunToggleButton" type="button">Sun</button>
           <button id="debugToggleButton" type="button">Debug</button>
           <button id="lockPointerButton" type="button">Click to Play</button>
         </div>
@@ -41,6 +42,20 @@
         </div>
       </div>
     </section>
+
+    <aside class="sun-panel" id="sunPanel" hidden>
+      <h2>Sun Position</h2>
+      <label>
+        <span>Season <strong id="seasonValue">Spring</strong></span>
+        <input id="seasonSlider" type="range" min="0" max="3" step="1" value="1">
+      </label>
+      <label>
+        <span>Time <strong id="timeValue">12:00</strong></span>
+        <input id="timeSlider" type="range" min="6" max="18" step="0.25" value="12">
+      </label>
+    </aside>
+
+    <div class="tour-reset-fade" id="tourResetFade" aria-hidden="true"></div>
 
     <aside class="debug-panel" id="debugPanel" hidden>
       <h2>Model Test</h2>

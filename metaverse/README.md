@@ -16,7 +16,11 @@ npm run start:metaverse
 - `model-viewer.html`: GLB 파일 단독 확인용 뷰어
 - `styles/main.css`: HUD와 디버그 패널 스타일
 - `src/first-person-tour.js`: 빌딩 모델 로딩, 오빗뷰, 투어모드, 충돌, 디버그 로직
-- `assets/models/Glocal_Jinju.glb`: 현재 테스트 빌딩 모델
+- `assets/models/Jinju.glb`: 진주 프로젝트 모델
+- `assets/models/Angji.glb`: 앵지 프로젝트 둘러보기 모델
+- `assets/models/Angji_tour.glb`: 앵지 프로젝트 투어모드 모델
+- `assets/models/Chungju.glb`: 충주 프로젝트 모델
+- `assets/models/Geochang.glb`: 거창 프로젝트 모델
 
 ## 조작
 
