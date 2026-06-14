@@ -1,4 +1,7 @@
+import { FIREBASE_CONFIG, OVERVIEW_ADMIN_PASSCODE } from "./firebase-config.js";
+
 const MODEL_ROOT = "./assets/models/";
+const DEFAULT_MODEL_FILE = "Angji.glb";
 const MODEL_CONFIGS = [
   {
     file: "Jinju.glb",
@@ -8,8 +11,11 @@ const MODEL_CONFIGS = [
     file: "Angji.glb",
     tourFile: "Angji_tour.glb",
     label: "앵지",
+    overviewId: "angji",
     moveSpeedMultiplier: 3,
     orbitCamera: {
+      position: { x: -105.81, y: 53.81, z: 49.34 },
+      target: { x: 1.52, y: 7.40, z: 4.64 },
       upperBetaDegrees: 82,
       minTargetY: 6.81,
       zoomOutMultiplier: 3
@@ -17,6 +23,27 @@ const MODEL_CONFIGS = [
     tourCamera: {
       position: { x: -46.61, y: 24.44, z: 30.49 },
       target: { x: 0, y: 6.81, z: 0 }
+    },
+    architectureOverview: {
+      title: "■ 설계개요",
+      rows: [
+        ["명    칭", "앵지밭골 시니어형 소규모체육관"],
+        ["대지위치", "창원시 마산회원구 회원동 760-1번지 외 32필지"],
+        ["지역지구", "자연녹지지역, 제1종일반주거지역,\n체육시설, 지구단위계획구역"],
+        ["대지면적", "6,729.00 ㎡"],
+        ["건축면적", "1,125.72 ㎡"],
+        ["연 면 적", "1,118.10 ㎡"],
+        ["구    조", "일반철골조 + 철근콘크리트조"],
+        ["주 용 도", "운동시설"],
+        ["건 폐 율", "16.73 % (법정 : 20%/60%이하)"],
+        ["용 적 률", "16.62 % (법정 : 100%/200%이하)"],
+        ["층    수", "지상 1층"],
+        ["최고높이", "10.3 m"],
+        ["외부마감", "목재사이딩, 외단열시스템, 복층유리"],
+        ["설비개요", "소화펌프, EHP, 태양광(70.4Kw / 36%이상)"],
+        ["조경개요", "132.40 ㎡ (대지면적의 17.32 %)"],
+        ["주차개요", "총 39대 (장애인주차 2대 포함)"]
+      ]
     }
   },
   {
@@ -119,7 +146,6 @@ const GROUND_NORMAL_MIN_Y = 0.55;
 const CLASSIFIED_GROUND_NORMAL_MIN_Y = 0.18;
 const WALL_NORMAL_MAX_Y = 0.9;
 const MIN_COLLISION_DISTANCE = 0.04;
-const ORBIT_WALL_PADDING = 1.2;
 const GROUND_SNAP_TOLERANCE = 0.08;
 const MAX_FALL_SPEED = 0.85;
 const STEP_SMOOTHING = 0.35;
@@ -159,8 +185,8 @@ const ORBIT_MOUSE_CONTROL_BACKUP = {
 };
 const ORBIT_MOUSE_CONTROL_SETTINGS = {
   rotateButtons: [1],
-  rotateSensitivity: 0.006,
-  shiftMiddlePanMultiplier: 2,
+  rotateSensitivity: 0.003,
+  shiftMiddlePanMultiplier: 1,
   zoomToMouseLocation: true
 };
 const DEFAULT_TOUR_CAMERA = {
@@ -177,7 +203,7 @@ const CONTROLLER_SETTINGS = {
   maxLookDegrees: 70
 };
 const FIREBALL_SETTINGS = {
-  cooldownMs: 3000,
+  cooldownMs: 500,
   maxActive: 3,
   speed: 0.85,
   radius: 0.18,
@@ -213,6 +239,27 @@ const modelSwitcher = document.getElementById("modelSwitcher");
 const previousModelButton = document.getElementById("previousModelButton");
 const nextModelButton = document.getElementById("nextModelButton");
 const tourResetFade = document.getElementById("tourResetFade");
+const projectOverview = document.getElementById("projectOverview");
+const overviewAdminButton = document.getElementById("overviewAdminButton");
+const overviewAdminPanel = document.getElementById("overviewAdminPanel");
+const overviewAdminCloseButton = document.getElementById("overviewAdminCloseButton");
+const overviewAdminPasscode = document.getElementById("overviewAdminPasscode");
+const overviewAdminForm = document.getElementById("overviewAdminForm");
+const overviewAdminRows = document.getElementById("overviewAdminRows");
+const overviewAdminAddRowButton = document.getElementById("overviewAdminAddRowButton");
+const overviewAdminStatus = document.getElementById("overviewAdminStatus");
+const PROJECT_OVERVIEWS_PATH = "./data/project-overviews.json";
+const OVERVIEW_LOCAL_STORAGE_KEY = "metaverseProjectOverviews";
+const FIRESTORE_OVERVIEW_COLLECTION = "metaverseProjectOverviews";
+const projectOverviewStore = new Map();
+const overviewFirebaseState = {
+  db: null,
+  firestore: null,
+  enabled: false,
+  unsubscribe: []
+};
+let isOverviewAdminUnlocked = false;
+let currentOverviewConfig = null;
 
 canvas.tabIndex = 0;
 
@@ -246,6 +293,288 @@ copyDebugButton.addEventListener("click", async () => {
 function setStatus(message) {
   statusMessage.textContent = message;
 }
+
+function getOverviewId(config) {
+  return config?.overviewId || normalizeName(config?.label || "");
+}
+
+function normalizeOverview(overview) {
+  if (!overview) {
+    return null;
+  }
+
+  const rows = Array.isArray(overview.rows)
+    ? overview.rows
+      .map((row) => [String(row?.[0] || "").trim(), String(row?.[1] || "").trim()])
+      .filter(([label]) => label)
+    : [];
+
+  return {
+    title: String(overview.title || "■ 설계개요"),
+    rows
+  };
+}
+
+function getProjectOverview(config) {
+  const overviewId = getOverviewId(config);
+  return projectOverviewStore.get(overviewId) || normalizeOverview(config?.architectureOverview) || null;
+}
+
+function setProjectOverview(config, overview) {
+  const overviewId = getOverviewId(config);
+
+  if (!overviewId) {
+    return;
+  }
+
+  projectOverviewStore.set(overviewId, normalizeOverview(overview));
+}
+
+function loadLocalOverviewOverrides() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(OVERVIEW_LOCAL_STORAGE_KEY) || "{}");
+    Object.entries(saved).forEach(([overviewId, overview]) => {
+      projectOverviewStore.set(overviewId, normalizeOverview(overview));
+    });
+  } catch {
+    // Ignore malformed local prototype data.
+  }
+}
+
+function saveLocalOverviewOverrides() {
+  const saved = {};
+  projectOverviewStore.forEach((overview, overviewId) => {
+    saved[overviewId] = overview;
+  });
+  localStorage.setItem(OVERVIEW_LOCAL_STORAGE_KEY, JSON.stringify(saved));
+}
+
+async function loadDefaultProjectOverviews() {
+  try {
+    const response = await fetch(`${PROJECT_OVERVIEWS_PATH}?v=overview-admin-20260614-2303`, { cache: "no-store" });
+
+    if (!response.ok) {
+      return;
+    }
+
+    const overviews = await response.json();
+    Object.entries(overviews).forEach(([overviewId, overview]) => {
+      if (!projectOverviewStore.has(overviewId)) {
+        projectOverviewStore.set(overviewId, normalizeOverview(overview));
+      }
+    });
+  } catch {
+    // Static fallback remains available from MODEL_CONFIGS.
+  }
+}
+
+function isFirebaseConfigured() {
+  return Boolean(FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.authDomain && FIREBASE_CONFIG.projectId);
+}
+
+async function initializeOverviewFirebase(modelConfigs, onChange) {
+  if (!isFirebaseConfigured()) {
+    overviewAdminStatus.textContent = "Firebase config가 비어 있어 현재 브라우저에 임시 저장됩니다.";
+    return;
+  }
+
+  try {
+    const [{ initializeApp }, firestoreModule] = await Promise.all([
+      import("https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js"),
+      import("https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js")
+    ]);
+    const app = initializeApp(FIREBASE_CONFIG);
+    const db = firestoreModule.getFirestore(app);
+
+    overviewFirebaseState.db = db;
+    overviewFirebaseState.firestore = firestoreModule;
+    overviewFirebaseState.enabled = true;
+    overviewAdminStatus.textContent = "Firebase Firestore와 연결되었습니다.";
+
+    modelConfigs
+      .filter((config) => getOverviewId(config))
+      .forEach((config) => {
+        const overviewId = getOverviewId(config);
+        const docRef = firestoreModule.doc(db, FIRESTORE_OVERVIEW_COLLECTION, overviewId);
+        const unsubscribe = firestoreModule.onSnapshot(docRef, (snapshot) => {
+          if (snapshot.exists()) {
+            projectOverviewStore.set(overviewId, normalizeOverview(snapshot.data()));
+            onChange?.();
+          }
+        });
+        overviewFirebaseState.unsubscribe.push(unsubscribe);
+      });
+  } catch (error) {
+    overviewFirebaseState.enabled = false;
+    overviewAdminStatus.textContent = `Firebase 연결 실패: ${error.message || error}`;
+  }
+}
+
+async function saveProjectOverview(config, overview) {
+  const overviewId = getOverviewId(config);
+  const normalizedOverview = normalizeOverview(overview);
+
+  setProjectOverview(config, normalizedOverview);
+  saveLocalOverviewOverrides();
+
+  if (!overviewFirebaseState.enabled) {
+    return "Firebase config 전이라 현재 브라우저에 임시 저장했습니다.";
+  }
+
+  const { db, firestore } = overviewFirebaseState;
+  await firestore.setDoc(firestore.doc(db, FIRESTORE_OVERVIEW_COLLECTION, overviewId), normalizedOverview, { merge: true });
+  return "Firebase Firestore에 저장했습니다.";
+}
+
+function renderProjectOverview(overview) {
+  if (!projectOverview) {
+    return;
+  }
+
+  projectOverview.replaceChildren();
+
+  if (!overview) {
+    projectOverview.classList.add("is-hidden");
+    return;
+  }
+
+  projectOverview.classList.remove("is-hidden");
+
+  const title = document.createElement("h2");
+  title.textContent = overview.title;
+  const list = document.createElement("dl");
+
+  overview.rows.forEach(([label, value]) => {
+    const term = document.createElement("dt");
+    const description = document.createElement("dd");
+
+    term.textContent = formatOverviewLabel(label);
+    description.textContent = value;
+    list.append(term, description);
+  });
+
+  projectOverview.append(title, list);
+}
+
+function formatOverviewLabel(label) {
+  const text = String(label || "").replace(/\s+/g, "");
+
+  if (text.length >= 4) {
+    return text;
+  }
+
+  if (text.length <= 1) {
+    return text;
+  }
+
+  return text.split("").join(" ".repeat(5 - text.length));
+}
+
+function renderOverviewAdminEditor(config) {
+  currentOverviewConfig = config || null;
+  overviewAdminRows.replaceChildren();
+
+  if (!currentOverviewConfig) {
+    overviewAdminStatus.textContent = "편집할 프로젝트 개요가 없습니다.";
+    overviewAdminForm.hidden = true;
+    return;
+  }
+
+  const overview = getProjectOverview(currentOverviewConfig) || { title: "■ 설계개요", rows: [] };
+  overview.rows.forEach(([label, value]) => {
+    addOverviewAdminRow(label, value);
+  });
+  overviewAdminForm.hidden = false;
+}
+
+function addOverviewAdminRow(label = "", value = "") {
+  const row = document.createElement("div");
+  const labelInput = document.createElement("input");
+  const valueInput = document.createElement("textarea");
+  const removeButton = document.createElement("button");
+
+  row.className = "overview-admin-row";
+  labelInput.value = label;
+  labelInput.placeholder = "항목명";
+  valueInput.value = value;
+  valueInput.placeholder = "내용";
+  removeButton.type = "button";
+  removeButton.textContent = "삭제";
+  removeButton.addEventListener("click", () => row.remove());
+  row.append(labelInput, valueInput, removeButton);
+  overviewAdminRows.append(row);
+}
+
+function getOverviewFromAdminForm() {
+  const rows = [...overviewAdminRows.querySelectorAll(".overview-admin-row")]
+    .map((row) => {
+      const [labelInput, valueInput] = row.querySelectorAll("input, textarea");
+      return [labelInput.value.trim(), valueInput.value.trim()];
+    })
+    .filter(([label]) => label);
+
+  return {
+    title: "■ 설계개요",
+    rows
+  };
+}
+
+function isTextInputTarget(target) {
+  return Boolean(target?.closest?.("input, textarea, select, [contenteditable='true']"));
+}
+
+function isOverviewAdminEditing(event) {
+  return Boolean(!overviewAdminPanel.hidden && (overviewAdminPanel.contains(event.target) || isTextInputTarget(event.target)));
+}
+
+overviewAdminButton.addEventListener("click", () => {
+  overviewAdminPanel.hidden = !overviewAdminPanel.hidden;
+});
+
+overviewAdminCloseButton.addEventListener("click", () => {
+  overviewAdminPanel.hidden = true;
+});
+
+function unlockOverviewAdminIfReady() {
+  if (overviewAdminPasscode.value !== OVERVIEW_ADMIN_PASSCODE) {
+    return;
+  }
+
+  isOverviewAdminUnlocked = true;
+  overviewAdminStatus.textContent = "관리자모드가 열렸습니다.";
+  renderOverviewAdminEditor(currentOverviewConfig);
+}
+
+overviewAdminPasscode.addEventListener("input", unlockOverviewAdminIfReady);
+overviewAdminPasscode.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    unlockOverviewAdminIfReady();
+  }
+});
+
+overviewAdminAddRowButton.addEventListener("click", () => {
+  addOverviewAdminRow();
+});
+
+overviewAdminForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+
+  if (!isOverviewAdminUnlocked || !currentOverviewConfig) {
+    overviewAdminStatus.textContent = "관리자모드를 먼저 열어주세요.";
+    return;
+  }
+
+  const overview = getOverviewFromAdminForm();
+
+  try {
+    const message = await saveProjectOverview(currentOverviewConfig, overview);
+    renderProjectOverview(getProjectOverview(currentOverviewConfig));
+    overviewAdminStatus.textContent = message;
+  } catch (error) {
+    overviewAdminStatus.textContent = `저장 실패: ${error.message || error}`;
+  }
+});
 
 function vectorToText(vector) {
   return `x ${vector.x.toFixed(2)}, y ${vector.y.toFixed(2)}, z ${vector.z.toFixed(2)}`;
@@ -1602,37 +1931,6 @@ function tryMoveWithCollision(BABYLON, scene, camera, movement, collisionMeshSet
   };
 }
 
-function keepOrbitCameraOutsideWalls(BABYLON, scene, orbitCamera, collisionMeshSet) {
-  const target = orbitCamera.target;
-  const toCamera = orbitCamera.position.subtract(target);
-  const distance = toCamera.length();
-
-  if (distance <= 0) {
-    return null;
-  }
-
-  const direction = toCamera.scale(1 / distance);
-  const rayDistance = Math.max(distance + ORBIT_WALL_PADDING, orbitCamera.upperRadiusLimit || distance);
-  const ray = new BABYLON.Ray(target, direction, rayDistance);
-  const hit = getRayHits(scene, ray, (mesh) => isRayPickableCollisionMesh(mesh, collisionMeshSet))
-    .map(getBlockingBodyHit)
-    .find(Boolean);
-
-  if (!hit?.hit || !hit.pickedPoint) {
-    return null;
-  }
-
-  const minimumDistance = hit.distance + ORBIT_WALL_PADDING;
-
-  if (distance < minimumDistance) {
-    orbitCamera.setPosition(target.add(direction.scale(minimumDistance)));
-    orbitCamera.radius = Math.max(orbitCamera.radius, minimumDistance);
-    return hit;
-  }
-
-  return null;
-}
-
 function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, initialModelState, options = {}) {
   let activeGroundMeshes = initialModelState.walkableGroundMeshes;
   let activeCollisionMeshes = initialModelState.collisionMeshes;
@@ -1790,7 +2088,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     fireballs.push(createFireballProjectile(BABYLON, scene, walkCamera));
     lastFireballAt = now;
     inputDiagnostics.lastFireball = `shot ${fireballs.length}/${FIREBALL_SETTINGS.maxActive}`;
-    setStatus("Fireball fired. E can be used again after 3 seconds.");
+    setStatus("Fireball fired. E can be used again after 0.5 seconds.");
     updateInputDebug();
   }
 
@@ -2181,6 +2479,11 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
   });
 
   window.addEventListener("keydown", (event) => {
+    if (isOverviewAdminEditing(event)) {
+      clearMovementKeys();
+      return;
+    }
+
     const key = getInputKey(event);
     const inputCode = event.code || event.key || "?";
     const movementKeys = ["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright", "shift", " "];
@@ -2213,6 +2516,11 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
   });
 
   window.addEventListener("keyup", (event) => {
+    if (isOverviewAdminEditing(event)) {
+      clearMovementKeys();
+      return;
+    }
+
     const key = getInputKey(event);
     inputDiagnostics.keyUpCount += 1;
     inputDiagnostics.lastKeyUp = `${key || "unknown"} (${event.code || event.key || "?"})`;
@@ -2221,6 +2529,11 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
   });
 
   document.addEventListener("keyup", (event) => {
+    if (isOverviewAdminEditing(event)) {
+      clearMovementKeys();
+      return;
+    }
+
     const key = getInputKey(event);
     keys.delete(key);
     updateInputDebug();
@@ -2241,9 +2554,8 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
 
   scene.onBeforeRenderObservable.add(() => {
     if (!walkMode) {
-      const orbitHit = keepOrbitCameraOutsideWalls(BABYLON, scene, orbitCamera, collisionMeshSet);
-      inputDiagnostics.lastCollision = orbitHit?.pickedMesh ? `orbit:${orbitHit.pickedMesh.name || orbitHit.pickedMesh.id}` : "-";
-      inputDiagnostics.movementBlocked = Boolean(orbitHit);
+      inputDiagnostics.lastCollision = "-";
+      inputDiagnostics.movementBlocked = false;
       updateDebug();
       return;
     }
@@ -2543,6 +2855,8 @@ async function start() {
   sun.diffuse = new BABYLON.Color3(1, 0.94, 0.82);
   sun.specular = new BABYLON.Color3(1, 0.9, 0.75);
   setupSunControls(BABYLON, sun);
+  await loadDefaultProjectOverviews();
+  loadLocalOverviewOverrides();
   const modelStates = await Promise.all(MODEL_CONFIGS.map(async (config) => {
     const orbitModelState = await loadTourModelState(BABYLON, scene, config);
 
@@ -2565,7 +2879,8 @@ async function start() {
     modelState.tourModelState ? [modelState, modelState.tourModelState] : [modelState]
   ));
   const slideDistance = getSlideDistance(modelStates);
-  let activeModelIndex = 0;
+  let activeModelIndex = Math.max(0, MODEL_CONFIGS.findIndex((config) => config.file === DEFAULT_MODEL_FILE));
+  let displayedModelState = modelStates[activeModelIndex];
   let transitionState = null;
   let isTransitioning = false;
 
@@ -2591,6 +2906,22 @@ async function start() {
     nextModelButton.disabled = isTransitioning;
   }
 
+  function updateProjectOverviewVisibility() {
+    const isOrbitMode = !controls || !controls.isWalkMode();
+    const overviewModelState = modelStates[activeModelIndex];
+    const overview = !isTransitioning && isOrbitMode
+      ? getProjectOverview(overviewModelState.config)
+      : null;
+
+    renderProjectOverview(overview);
+
+    if (isOverviewAdminUnlocked) {
+      renderOverviewAdminEditor(overviewModelState.config);
+    } else {
+      currentOverviewConfig = overviewModelState.config;
+    }
+  }
+
   function showActiveModelState(nextModelState, previousModelState) {
     if (previousModelState && previousModelState !== nextModelState) {
       setModelStateEnabled(previousModelState, false);
@@ -2598,9 +2929,11 @@ async function start() {
 
     setModelSlideOffset(BABYLON, nextModelState, 0);
     setModelStateEnabled(nextModelState, true);
+    displayedModelState = nextModelState;
     applyOrbitCameraStart(BABYLON, orbitCamera, nextModelState.orbitModelState || nextModelState);
     applyOrbitCameraConstraints(BABYLON, orbitCamera, nextModelState.orbitModelState || nextModelState);
     renderModelDebug(nextModelState);
+    updateProjectOverviewVisibility();
   }
 
   function easeOutCubic(value) {
@@ -2627,6 +2960,7 @@ async function start() {
     setModelStateEnabled(nextModelState, true);
     setModelSlideOffset(BABYLON, nextModelState, nextStartOffset);
     updateModelSwitcherVisibility();
+    updateProjectOverviewVisibility();
     setStatus(`Switching to ${nextModelState.config.label}...`);
 
     transitionState = {
@@ -2663,6 +2997,7 @@ async function start() {
     setModelStateEnabled(transitionState.currentModelState, false);
 
     activeModelIndex = transitionState.nextModelIndex;
+    displayedModelState = transitionState.nextModelState;
     controls.setModelState(transitionState.nextModelState);
     applyOrbitCameraStart(BABYLON, orbitCamera, transitionState.nextModelState);
     applyOrbitCameraConstraints(BABYLON, orbitCamera, transitionState.nextModelState);
@@ -2672,10 +3007,14 @@ async function start() {
     transitionState = null;
     isTransitioning = false;
     updateModelSwitcherVisibility();
+    updateProjectOverviewVisibility();
   }
 
   controls = createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, modelStates[activeModelIndex], {
-    onModeChange: updateModelSwitcherVisibility,
+    onModeChange: () => {
+      updateModelSwitcherVisibility();
+      updateProjectOverviewVisibility();
+    },
     onActiveModelStateChange: showActiveModelState
   });
   previousModelButton.addEventListener("click", () => startModelTransition(-1));
@@ -2686,6 +3025,8 @@ async function start() {
   applyOrbitCameraStart(BABYLON, orbitCamera, modelStates[activeModelIndex]);
   applyOrbitCameraConstraints(BABYLON, orbitCamera, modelStates[activeModelIndex]);
   updateModelSwitcherVisibility();
+  updateProjectOverviewVisibility();
+  initializeOverviewFirebase(MODEL_CONFIGS, updateProjectOverviewVisibility);
 
   setStatus("Orbit view ready. Middle mouse rotates, Shift+middle pans, wheel zooms to cursor. Click to Play starts walk mode.");
 
