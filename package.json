@@ -8,7 +8,7 @@
     "lint": "eslint *.js",
     "lint:fix": "eslint *.js --fix",
     "start": "npx http-server -p 8080 -o main.html",
-    "start:metaverse": "node metaverse/server.js"
+    "start:metaverse": "npx http-server metaverse -p 8081 -o index.html -c-1"
   },
   "repository": {
     "type": "git",

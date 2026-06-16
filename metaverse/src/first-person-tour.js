@@ -1,11 +1,13 @@
 import { FIREBASE_CONFIG, OVERVIEW_ADMIN_PASSCODE } from "./firebase-config.js";
 
 const MODEL_ROOT = "./assets/models/";
+const ENEMY_ROOT = "./assets/enemies/";
 const DEFAULT_MODEL_FILE = "Angji.glb";
 const MODEL_CONFIGS = [
   {
     file: "Jinju.glb",
-    label: "Glocal Jinju"
+    label: "Glocal Jinju",
+    overviewId: "jinju"
   },
   {
     file: "Angji.glb",
@@ -49,6 +51,7 @@ const MODEL_CONFIGS = [
   {
     file: "Chungju.glb",
     label: "충주",
+    overviewId: "chungju",
     orbitCamera: {
       position: { x: 76.28, y: 45.34, z: 89.47 },
       target: { x: 10.34, y: 12.58, z: 28.13 }
@@ -61,6 +64,7 @@ const MODEL_CONFIGS = [
   {
     file: "Geochang.glb",
     label: "거창",
+    overviewId: "geochang",
     orbitCamera: {
       position: { x: 10.80, y: 58.49, z: 98.94 },
       target: { x: 10.31, y: 12.44, z: 28.26 }
@@ -211,6 +215,33 @@ const FIREBALL_SETTINGS = {
   maxDistance: 80,
   hitFadeMs: 850,
   hitRotationRadians: Math.PI / 2
+};
+const MATERIAL_REFLECTION_SETTINGS = {
+  specularIntensity: 0,
+  specularPower: 8,
+  roughness: 1,
+  metallic: 0
+};
+const ENEMY_SETTINGS = {
+  file: "enemy01.glb",
+  modelFile: "Angji_tour.glb",
+  spawnDelayMs: 5000,
+  fadeInMs: 1000,
+  deathBlinkMs: 2000,
+  deathBlinkCount: 5,
+  fadeOutMs: 2000,
+  maxHp: 10,
+  hitboxPadding: 0,
+  heightOffset: -1.7,
+  hpBarGap: 0,
+  hpBarWidth: 2.2,
+  hpBarHeight: 0.18,
+  scale: 2,
+  patrolSpeedMultiplier: 0.5,
+  patrolPoints: [
+    { x: -9.63, y: 18.72, z: 21.71 },
+    { x: -22.29, y: 18.65, z: -3.84 }
+  ]
 };
 
 const canvas = document.getElementById("gameCanvas");
@@ -1280,6 +1311,158 @@ function disposeFireballProjectile(projectile) {
   projectile.mesh?.dispose();
 }
 
+function createEnemyHpBar(BABYLON, scene) {
+  const root = new BABYLON.TransformNode("tour-enemy-hp-root", scene);
+  const texture = new BABYLON.DynamicTexture("tour-enemy-hp-texture", {
+    width: 512,
+    height: 64
+  }, scene);
+  const material = new BABYLON.StandardMaterial("tour-enemy-hp-material", scene);
+  const plane = BABYLON.MeshBuilder.CreatePlane("tour-enemy-hp-plane", {
+    width: ENEMY_SETTINGS.hpBarWidth,
+    height: ENEMY_SETTINGS.hpBarHeight
+  }, scene);
+
+  texture.hasAlpha = true;
+  material.diffuseTexture = texture;
+  material.emissiveTexture = texture;
+  material.specularColor = BABYLON.Color3.Black();
+  material.disableLighting = true;
+  material.backFaceCulling = false;
+
+  plane.parent = root;
+  plane.material = material;
+  plane.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
+  plane.isPickable = false;
+
+  root.setEnabled(false);
+  return { root, plane, texture };
+}
+
+function updateEnemyHpBar(hpBar, hp) {
+  if (!hpBar) {
+    return;
+  }
+
+  const context = hpBar.texture.getContext();
+  const width = hpBar.texture.getSize().width;
+  const height = hpBar.texture.getSize().height;
+  const padding = 5;
+  const gap = 4;
+  const segmentHeight = height - padding * 2;
+  const segmentWidth = (width - padding * 2 - gap * (ENEMY_SETTINGS.maxHp - 1)) / ENEMY_SETTINGS.maxHp;
+
+  context.clearRect(0, 0, width, height);
+  context.fillStyle = "rgba(0, 0, 0, 0.86)";
+  context.fillRect(0, 0, width, height);
+
+  context.fillStyle = "rgb(20, 230, 60)";
+  for (let index = 0; index < hp; index += 1) {
+    context.fillRect(
+      padding + index * (segmentWidth + gap),
+      padding,
+      segmentWidth,
+      segmentHeight
+    );
+  }
+
+  hpBar.texture.update();
+}
+
+function getRayAabbHitDistance(origin, direction, min, max, maxDistance) {
+  let near = 0;
+  let far = maxDistance;
+  const axes = ["x", "y", "z"];
+
+  for (const axis of axes) {
+    const rayDirection = direction[axis];
+
+    if (Math.abs(rayDirection) < 1e-6) {
+      if (origin[axis] < min[axis] || origin[axis] > max[axis]) {
+        return null;
+      }
+      continue;
+    }
+
+    let t1 = (min[axis] - origin[axis]) / rayDirection;
+    let t2 = (max[axis] - origin[axis]) / rayDirection;
+
+    if (t1 > t2) {
+      const temp = t1;
+      t1 = t2;
+      t2 = temp;
+    }
+
+    near = Math.max(near, t1);
+    far = Math.min(far, t2);
+
+    if (near > far) {
+      return null;
+    }
+  }
+
+  return near >= 0 && near <= maxDistance ? near : null;
+}
+
+function setEnemyMeshVisibility(enemy, visibility) {
+  enemy.meshes.forEach((mesh) => {
+    mesh.visibility = visibility;
+  });
+}
+
+async function loadEnemyModel(BABYLON, scene) {
+  const fileName = `${ENEMY_SETTINGS.file}?v=${Date.now()}`;
+  const result = await BABYLON.SceneLoader.ImportMeshAsync("", ENEMY_ROOT, fileName, scene);
+  const root = new BABYLON.TransformNode("tour-enemy-root", scene);
+  const contentRoot = new BABYLON.TransformNode("tour-enemy-content", scene);
+  const meshes = getGeometryMeshes(result.meshes);
+
+  contentRoot.parent = root;
+
+  getRootNodes(result).forEach((node) => {
+    if (node !== root && node !== contentRoot) {
+      node.setParent(contentRoot);
+    }
+  });
+
+  updateWorldMatrices(root, meshes);
+  const bounds = getFullBounds(BABYLON, meshes);
+  contentRoot.position.addInPlace(new BABYLON.Vector3(
+    -bounds.center.x,
+    -bounds.min.y,
+    -bounds.center.z
+  ));
+  root.scaling.set(ENEMY_SETTINGS.scale, ENEMY_SETTINGS.scale, ENEMY_SETTINGS.scale);
+  updateWorldMatrices(root, meshes);
+  const scaledBounds = getFullBounds(BABYLON, meshes);
+  const hitboxPadding = ENEMY_SETTINGS.hitboxPadding;
+
+  meshes.forEach((mesh) => {
+    mesh.isPickable = false;
+    mesh.checkCollisions = false;
+    mesh.metadata = { ...(mesh.metadata || {}), passThrough: true, enemyVisual: true };
+  });
+  softenModelMaterialReflections(BABYLON, scene.materials);
+
+  const hpBar = createEnemyHpBar(BABYLON, scene);
+  root.setEnabled(false);
+
+  return {
+    root,
+    contentRoot,
+    meshes,
+    hpBar,
+    visualHeight: scaledBounds.size.y,
+    hitboxSize: new BABYLON.Vector3(
+      scaledBounds.size.x + hitboxPadding * 2,
+      scaledBounds.size.y + hitboxPadding * 2,
+      scaledBounds.size.z + hitboxPadding * 2
+    ),
+    hpBarOffsetY: scaledBounds.size.y + ENEMY_SETTINGS.hpBarGap + ENEMY_SETTINGS.hpBarHeight / 2,
+    fadeObserver: null
+  };
+}
+
 function animatePeopleFireballHit(BABYLON, scene, mesh) {
   if (!mesh || mesh.metadata?.fireballDying || mesh.metadata?.fireballDefeated) {
     return false;
@@ -1554,6 +1737,40 @@ function splitPeopleTargetMeshes(BABYLON, scene, meshes) {
   });
 
   return generatedMeshes;
+}
+
+function softenModelMaterialReflections(BABYLON, materials) {
+  materials.forEach((material) => {
+    if (!material || material.name === "tour-fireball-material") {
+      return;
+    }
+
+    material.backFaceCulling = false;
+
+    if ("specularColor" in material) {
+      material.specularColor = BABYLON.Color3.Black();
+    }
+
+    if ("specularPower" in material) {
+      material.specularPower = MATERIAL_REFLECTION_SETTINGS.specularPower;
+    }
+
+    if ("roughness" in material) {
+      material.roughness = MATERIAL_REFLECTION_SETTINGS.roughness;
+    }
+
+    if ("metallic" in material) {
+      material.metallic = MATERIAL_REFLECTION_SETTINGS.metallic;
+    }
+
+    if ("microSurface" in material) {
+      material.microSurface = 0;
+    }
+
+    if ("environmentIntensity" in material) {
+      material.environmentIntensity = MATERIAL_REFLECTION_SETTINGS.specularIntensity;
+    }
+  });
 }
 
 function findGroundHit(BABYLON, scene, position, groundMeshSet) {
@@ -1955,6 +2172,17 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
   let yaw = walkCamera.rotation.y;
   let pitch = walkCamera.rotation.x;
   let currentLabel = "orbit view";
+  const enemyState = {
+    asset: null,
+    loadPromise: null,
+    spawnTimerId: null,
+    spawnToken: 0,
+    active: false,
+    dying: false,
+    defeated: false,
+    hp: ENEMY_SETTINGS.maxHp,
+    patrolTargetIndex: 1
+  };
 
   window.tourControllerSettings = CONTROLLER_SETTINGS;
   window.tourInputDiagnostics = inputDiagnostics;
@@ -1969,8 +2197,232 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     }
   }
 
+  function getEnemyPatrolPoint(index) {
+    const point = ENEMY_SETTINGS.patrolPoints[index];
+    return new BABYLON.Vector3(point.x, point.y + ENEMY_SETTINGS.heightOffset, point.z);
+  }
+
+  function canUseEnemyInCurrentMode() {
+    return walkMode && activeModelState.config?.file === ENEMY_SETTINGS.modelFile;
+  }
+
+  function updateEnemyHp() {
+    updateEnemyHpBar(enemyState.asset?.hpBar, enemyState.hp);
+  }
+
+  function resetEnemy() {
+    enemyState.spawnToken += 1;
+
+    if (enemyState.spawnTimerId) {
+      clearTimeout(enemyState.spawnTimerId);
+      enemyState.spawnTimerId = null;
+    }
+
+    if (enemyState.asset?.fadeObserver) {
+      scene.onBeforeRenderObservable.remove(enemyState.asset.fadeObserver);
+      enemyState.asset.fadeObserver = null;
+    }
+
+    enemyState.active = false;
+    enemyState.dying = false;
+    enemyState.defeated = false;
+    enemyState.hp = ENEMY_SETTINGS.maxHp;
+    enemyState.patrolTargetIndex = 1;
+    updateEnemyHp();
+
+    if (enemyState.asset) {
+      enemyState.asset.root.position.copyFrom(getEnemyPatrolPoint(0));
+      enemyState.asset.root.rotation.set(0, 0, 0);
+      enemyState.asset.root.setEnabled(false);
+      setEnemyMeshVisibility(enemyState.asset, 1);
+      enemyState.asset.hpBar.root.setEnabled(false);
+    }
+  }
+
+  async function ensureEnemyLoaded() {
+    if (enemyState.asset) {
+      return enemyState.asset;
+    }
+
+    if (!enemyState.loadPromise) {
+      enemyState.loadPromise = loadEnemyModel(BABYLON, scene)
+        .then((asset) => {
+          enemyState.asset = asset;
+          updateEnemyHp();
+          return asset;
+        })
+        .catch((error) => {
+          console.error("Enemy load failed", error);
+          enemyState.loadPromise = null;
+          inputDiagnostics.lastFireball = "enemy load failed";
+          setStatus("Enemy model could not be loaded.");
+          updateInputDebug();
+          return null;
+        });
+    }
+
+    return enemyState.loadPromise;
+  }
+
+  function scheduleEnemySpawn() {
+    resetEnemy();
+
+    if (!canUseEnemyInCurrentMode()) {
+      return;
+    }
+
+    const token = enemyState.spawnToken;
+    enemyState.spawnTimerId = setTimeout(async () => {
+      const asset = await ensureEnemyLoaded();
+
+      if (!asset || token !== enemyState.spawnToken || !canUseEnemyInCurrentMode()) {
+        return;
+      }
+
+      spawnEnemy();
+    }, ENEMY_SETTINGS.spawnDelayMs);
+  }
+
+  function spawnEnemy() {
+    const asset = enemyState.asset;
+
+    if (!asset || enemyState.active || enemyState.defeated) {
+      return;
+    }
+
+    enemyState.active = true;
+    enemyState.dying = false;
+    enemyState.hp = ENEMY_SETTINGS.maxHp;
+    enemyState.patrolTargetIndex = 1;
+    asset.root.position.copyFrom(getEnemyPatrolPoint(0));
+    asset.root.setEnabled(true);
+    asset.hpBar.root.setEnabled(true);
+    updateEnemyHp();
+
+    const startedAt = performance.now();
+    let observer = null;
+    setEnemyMeshVisibility(asset, 0);
+
+    observer = scene.onBeforeRenderObservable.add(() => {
+      const progress = Math.min((performance.now() - startedAt) / ENEMY_SETTINGS.fadeInMs, 1);
+      setEnemyMeshVisibility(asset, progress);
+
+      if (progress >= 1) {
+        scene.onBeforeRenderObservable.remove(observer);
+        asset.fadeObserver = null;
+      }
+    });
+    asset.fadeObserver = observer;
+  }
+
+  function getEnemyHitDistance(origin, direction, maxDistance) {
+    if (!enemyState.active || enemyState.dying || enemyState.defeated || !enemyState.asset) {
+      return null;
+    }
+
+    const position = enemyState.asset.root.position;
+    const size = enemyState.asset.hitboxSize;
+    const radius = FIREBALL_SETTINGS.radius;
+    const min = new BABYLON.Vector3(
+      position.x - size.x / 2 - radius,
+      position.y - radius,
+      position.z - size.z / 2 - radius
+    );
+    const max = new BABYLON.Vector3(
+      position.x + size.x / 2 + radius,
+      position.y + size.y + radius,
+      position.z + size.z / 2 + radius
+    );
+
+    return getRayAabbHitDistance(origin, direction, min, max, maxDistance);
+  }
+
+  function damageEnemy() {
+    if (!enemyState.active || enemyState.dying || enemyState.defeated) {
+      return;
+    }
+
+    enemyState.hp = Math.max(0, enemyState.hp - 1);
+    updateEnemyHp();
+
+    if (enemyState.hp <= 0) {
+      fadeOutEnemy();
+    }
+  }
+
+  function fadeOutEnemy() {
+    const asset = enemyState.asset;
+
+    if (!asset || enemyState.dying) {
+      return;
+    }
+
+    enemyState.dying = true;
+    enemyState.active = false;
+    enemyState.defeated = true;
+    asset.hpBar.root.setEnabled(false);
+
+    const startedAt = performance.now();
+    const blinkInterval = ENEMY_SETTINGS.deathBlinkMs / (ENEMY_SETTINGS.deathBlinkCount * 2);
+
+    asset.fadeObserver = scene.onBeforeRenderObservable.add(() => {
+      const elapsed = performance.now() - startedAt;
+
+      if (elapsed < ENEMY_SETTINGS.deathBlinkMs) {
+        const blinkPhase = Math.floor(elapsed / blinkInterval);
+        setEnemyMeshVisibility(asset, blinkPhase % 2 === 0 ? 1 : 0);
+        return;
+      }
+
+      const fadeElapsed = elapsed - ENEMY_SETTINGS.deathBlinkMs;
+      const progress = Math.min(fadeElapsed / ENEMY_SETTINGS.fadeOutMs, 1);
+      const eased = 1 - ((1 - progress) ** 3);
+      setEnemyMeshVisibility(asset, 1 - eased);
+
+      if (progress < 1) {
+        return;
+      }
+
+      setEnemyMeshVisibility(asset, 0);
+      asset.root.setEnabled(false);
+      scene.onBeforeRenderObservable.remove(asset.fadeObserver);
+      asset.fadeObserver = null;
+      enemyState.dying = false;
+    });
+  }
+
+  function updateEnemy(deltaScale) {
+    const asset = enemyState.asset;
+
+    if (!asset || !enemyState.active || enemyState.dying || enemyState.defeated) {
+      return;
+    }
+
+    const playerPosition = walkCamera.position;
+    asset.root.lookAt(new BABYLON.Vector3(playerPosition.x, asset.root.position.y, playerPosition.z));
+
+    const target = getEnemyPatrolPoint(enemyState.patrolTargetIndex);
+    const toTarget = target.subtract(asset.root.position);
+    const distance = toTarget.length();
+    const modelSpeedMultiplier = activeModelState.config?.moveSpeedMultiplier || 1;
+    const patrolSpeed = CONTROLLER_SETTINGS.moveSpeed
+      * modelSpeedMultiplier
+      * ENEMY_SETTINGS.patrolSpeedMultiplier
+      * deltaScale;
+
+    if (distance <= patrolSpeed) {
+      asset.root.position.copyFrom(target);
+      enemyState.patrolTargetIndex = enemyState.patrolTargetIndex === 0 ? 1 : 0;
+    } else if (distance > 0) {
+      asset.root.position.addInPlace(toTarget.normalize().scale(patrolSpeed));
+    }
+
+    asset.hpBar.root.position.copyFrom(asset.root.position.add(new BABYLON.Vector3(0, asset.hpBarOffsetY, 0)));
+  }
+
   function setModelState(nextModelState) {
     clearFireballs();
+    resetEnemy();
     activeGroundMeshes = nextModelState.walkableGroundMeshes;
     activeCollisionMeshes = nextModelState.collisionMeshes;
     groundMeshSet = new Set(activeGroundMeshes);
@@ -2098,6 +2550,17 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
       const stepDistance = FIREBALL_SETTINGS.speed * deltaScale;
       const ray = new BABYLON.Ray(fireball.mesh.position, fireball.direction, stepDistance + FIREBALL_SETTINGS.radius);
       const hit = getRayHits(scene, ray, isFireballHitMesh)[0] || null;
+      const enemyHitDistance = getEnemyHitDistance(fireball.mesh.position, fireball.direction, stepDistance + FIREBALL_SETTINGS.radius);
+      const meshHitDistance = typeof hit?.distance === "number" ? hit.distance : Number.POSITIVE_INFINITY;
+
+      if (enemyHitDistance !== null && enemyHitDistance <= meshHitDistance) {
+        damageEnemy();
+        inputDiagnostics.lastFireball = `enemy hit:${enemyState.hp}/${ENEMY_SETTINGS.maxHp}`;
+        setStatus(enemyState.hp > 0 ? `Enemy hit. HP ${enemyState.hp}/${ENEMY_SETTINGS.maxHp}.` : "Enemy defeated.");
+        disposeFireballProjectile(fireball);
+        fireballs.splice(index, 1);
+        continue;
+      }
 
       if (hit) {
         const targetName = hit.pickedMesh.name || hit.pickedMesh.id || "mesh";
@@ -2423,6 +2886,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     tourResetFade?.classList.remove("is-active");
     resetWalkCameraToTourStart();
     walkMode = true;
+    scheduleEnemySpawn();
     options.onModeChange?.("walk");
     currentLabel = "fixed tour start";
 
@@ -2438,6 +2902,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
   function enterOrbitMode() {
     walkMode = false;
     clearFireballs();
+    resetEnemy();
     clearMovementKeys();
     document.exitPointerLock?.();
     activateModelState(activeModelState.orbitModelState || activeModelState, "orbit");
@@ -2608,6 +3073,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
 
     applyGravity(deltaScale);
     updateFireballs(deltaScale);
+    updateEnemy(deltaScale);
 
     if (isWalkCameraOutsideTourBounds()) {
       resetTourWithFade("out of bounds");
@@ -2779,9 +3245,7 @@ async function loadTourModelState(BABYLON, scene, config) {
     mesh.metadata = { ...(mesh.metadata || {}), passThrough, peopleTarget };
   });
 
-  scene.materials.forEach((material) => {
-    material.backFaceCulling = false;
-  });
+  softenModelMaterialReflections(BABYLON, scene.materials);
   hideTourStartMarker(model.tourStartNode, meshes);
 
   if (booleanParam("clay", CLAY_PREVIEW)) {
@@ -2853,7 +3317,7 @@ async function start() {
   sun.position = new BABYLON.Vector3(80, 120, -60);
   sun.intensity = 2.4;
   sun.diffuse = new BABYLON.Color3(1, 0.94, 0.82);
-  sun.specular = new BABYLON.Color3(1, 0.9, 0.75);
+  sun.specular = BABYLON.Color3.Black();
   setupSunControls(BABYLON, sun);
   await loadDefaultProjectOverviews();
   loadLocalOverviewOverrides();
