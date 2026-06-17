@@ -874,6 +874,143 @@ function hasMaterialKeyword(mesh, keywords) {
   });
 }
 
+function hasExactMaterialName(mesh, names) {
+  const normalizedTargets = new Set(names.map((name) => normalizeName(name)));
+
+  return getMaterialNames(mesh).some((name) => normalizedTargets.has(normalizeName(name)));
+}
+
+function isAngjiProjectConfig(config) {
+  return config?.overviewId === "angji";
+}
+
+function isAngjiTreeMesh(mesh) {
+  return getMaterialNames(mesh).some((name) => normalizeName(name).startsWith("dtv"));
+}
+
+function getLocalVertexBounds(BABYLON, mesh) {
+  const positions = mesh.getVerticesData(BABYLON.VertexBuffer.PositionKind);
+
+  if (!positions || positions.length < 3) {
+    return null;
+  }
+
+  const min = new BABYLON.Vector3(Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY);
+  const max = new BABYLON.Vector3(Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY);
+
+  for (let index = 0; index < positions.length; index += 3) {
+    min.x = Math.min(min.x, positions[index]);
+    min.y = Math.min(min.y, positions[index + 1]);
+    min.z = Math.min(min.z, positions[index + 2]);
+    max.x = Math.max(max.x, positions[index]);
+    max.y = Math.max(max.y, positions[index + 1]);
+    max.z = Math.max(max.z, positions[index + 2]);
+  }
+
+  return { min, max };
+}
+
+function getTreeMeshFaceYawOffset(BABYLON, mesh) {
+  const bounds = getLocalVertexBounds(BABYLON, mesh);
+
+  if (!bounds) {
+    return 0;
+  }
+
+  const axisSizes = [
+    { axis: BABYLON.Axis.X, size: bounds.max.x - bounds.min.x },
+    { axis: BABYLON.Axis.Y, size: bounds.max.y - bounds.min.y },
+    { axis: BABYLON.Axis.Z, size: bounds.max.z - bounds.min.z }
+  ].sort((left, right) => left.size - right.size);
+
+  const thinAxis = axisSizes[0].axis;
+  let bestLength = 0;
+  let bestYaw = 0;
+
+  [1, -1].forEach((sign) => {
+    const direction = mesh.getDirection(thinAxis).clone();
+    direction.scaleInPlace(sign);
+    direction.y = 0;
+    const lengthSquared = direction.lengthSquared();
+
+    if (lengthSquared > bestLength) {
+      bestLength = lengthSquared;
+      direction.normalize();
+      bestYaw = Math.atan2(direction.x, direction.z);
+    }
+  });
+
+  return bestLength > 1e-6 ? bestYaw : 0;
+}
+
+function attachTreeYawPivot(BABYLON, scene, mesh, modelRoot) {
+  mesh.billboardMode = 0;
+  modelRoot.computeWorldMatrix(true);
+  mesh.computeWorldMatrix(true);
+
+  const worldPos = mesh.getAbsolutePosition().clone();
+  const rootWorldInverse = modelRoot.getWorldMatrix().clone();
+  rootWorldInverse.invert();
+  const localPos = BABYLON.Vector3.TransformCoordinates(worldPos, rootWorldInverse);
+
+  const pivot = new BABYLON.TransformNode(`tree-yaw-pivot-${mesh.uniqueId}`, scene);
+  pivot.parent = modelRoot;
+  pivot.position.copyFrom(localPos);
+  pivot.rotation.set(0, 0, 0);
+  pivot.rotationQuaternion = null;
+  mesh.setParent(pivot, true);
+  mesh.computeWorldMatrix(true);
+
+  mesh.metadata = {
+    ...(mesh.metadata || {}),
+    treeYawPivot: pivot,
+    treeFaceYawOffset: getTreeMeshFaceYawOffset(BABYLON, mesh)
+  };
+}
+
+function restoreTreeMeshInitialRotation(mesh) {
+  const pivot = mesh.metadata?.treeYawPivot;
+
+  if (!pivot) {
+    return;
+  }
+
+  mesh.billboardMode = 0;
+  pivot.rotationQuaternion = null;
+  pivot.rotation.set(0, 0, 0);
+}
+
+function restoreTreeMeshesInitialRotation(meshes) {
+  meshes.forEach((mesh) => {
+    restoreTreeMeshInitialRotation(mesh);
+  });
+}
+
+function faceTreeMeshTowardPlayer(BABYLON, mesh, playerPosition) {
+  const pivot = mesh.metadata?.treeYawPivot;
+
+  if (!pivot) {
+    return;
+  }
+
+  pivot.rotationQuaternion = null;
+  const position = pivot.getAbsolutePosition();
+  const dx = playerPosition.x - position.x;
+  const dz = playerPosition.z - position.z;
+
+  if (dx * dx + dz * dz < 1e-6) {
+    pivot.rotation.set(0, 0, 0);
+    return;
+  }
+
+  const faceYawOffset = mesh.metadata?.treeFaceYawOffset || 0;
+
+  // Keep the mesh's original upright pose and spin horizontally to face the player.
+  pivot.rotation.x = 0;
+  pivot.rotation.z = 0;
+  pivot.rotation.y = Math.atan2(dx, dz) - faceYawOffset;
+}
+
 function isStairSurface(mesh) {
   let current = mesh;
 
@@ -2156,6 +2293,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
   let localGroundMeshSet = groundMeshSet;
   let localCollisionMeshSet = collisionMeshSet;
   let projectileHitMeshSet = new Set(initialModelState.projectileHitMeshes);
+  let activeTreeMeshes = initialModelState.treeMeshes || [];
   let lastLocalMeshPosition = null;
   let activeModelState = initialModelState;
   const keys = new Set();
@@ -2420,6 +2558,22 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     asset.hpBar.root.position.copyFrom(asset.root.position.add(new BABYLON.Vector3(0, asset.hpBarOffsetY, 0)));
   }
 
+  function updateTreeMeshesFacingViewer() {
+    if (activeTreeMeshes.length === 0) {
+      return;
+    }
+
+    const viewerPosition = walkMode ? walkCamera.position : orbitCamera.position;
+
+    activeTreeMeshes.forEach((mesh) => {
+      if (!mesh.isEnabled() || (typeof mesh.visibility === "number" && mesh.visibility <= 0.02)) {
+        return;
+      }
+
+      faceTreeMeshTowardPlayer(BABYLON, mesh, viewerPosition);
+    });
+  }
+
   function setModelState(nextModelState) {
     clearFireballs();
     resetEnemy();
@@ -2430,6 +2584,8 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     localGroundMeshSet = groundMeshSet;
     localCollisionMeshSet = collisionMeshSet;
     projectileHitMeshSet = new Set(nextModelState.projectileHitMeshes);
+    restoreTreeMeshesInitialRotation(activeTreeMeshes);
+    activeTreeMeshes = nextModelState.treeMeshes || [];
     lastLocalMeshPosition = null;
     activeModelState = nextModelState;
     clearMovementKeys();
@@ -2881,11 +3037,11 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     clearMovementKeys();
     canvas.focus();
     scene.activeCamera = walkCamera;
+    walkMode = true;
     activateModelState(activeModelState.tourModelState || activeModelState, "walk");
     isResettingTour = false;
     tourResetFade?.classList.remove("is-active");
     resetWalkCameraToTourStart();
-    walkMode = true;
     scheduleEnemySpawn();
     options.onModeChange?.("walk");
     currentLabel = "fixed tour start";
@@ -3018,6 +3174,8 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
   });
 
   scene.onBeforeRenderObservable.add(() => {
+    updateTreeMeshesFacingViewer();
+
     if (!walkMode) {
       inputDiagnostics.lastCollision = "-";
       inputDiagnostics.movementBlocked = false;
@@ -3285,6 +3443,14 @@ async function loadTourModelState(BABYLON, scene, config) {
   stairSurfaceMeshes.forEach((mesh) => groundMeshMap.set(mesh.uniqueId, mesh));
   floorSurfaceMeshes.forEach((mesh) => groundMeshMap.set(mesh.uniqueId, mesh));
 
+  const treeMeshes = isAngjiProjectConfig(config)
+    ? meshes.filter((mesh) => mesh.isEnabled() && isAngjiTreeMesh(mesh))
+    : [];
+
+  treeMeshes.forEach((mesh) => {
+    attachTreeYawPivot(BABYLON, scene, mesh, model.root);
+  });
+
   return {
     config,
     result,
@@ -3298,6 +3464,7 @@ async function loadTourModelState(BABYLON, scene, config) {
     stairSurfaceMeshes,
     floorSurfaceMeshes,
     peopleTargetMeshes,
+    treeMeshes,
     projectileHitMeshes: meshes.filter((mesh) => mesh.isEnabled() && !isDescendantOf(mesh, model.tourStartNode))
   };
 }
