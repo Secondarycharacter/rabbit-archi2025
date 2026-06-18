@@ -2,6 +2,9 @@ import { FIREBASE_CONFIG, OVERVIEW_ADMIN_PASSCODE } from "./firebase-config.js";
 
 const MODEL_ROOT = "./assets/models/";
 const ENEMY_ROOT = "./assets/enemies/";
+const AUDIO_BGM_ROOT = "/assets/audio/bgm/";
+const TOUR_BGM_FADE_MS = 3000;
+const TOUR_BGM_VOLUME = 1;
 const DEFAULT_MODEL_FILE = "Angji.glb";
 const MODEL_CONFIGS = [
   {
@@ -14,13 +17,22 @@ const MODEL_CONFIGS = [
     tourFile: "Angji_tour.glb",
     label: "앵지",
     overviewId: "angji",
+    tourBgm: "angji/angji_tour_bgm.mp3",
     moveSpeedMultiplier: 3,
+    performance: {
+      localCollisionRadius: 18,
+      localGroundRadius: 24,
+      localMeshUpdateDistance: 4,
+      treeFacingMinMoveDistance: 0.35,
+      treeFacingIntervalFrames: 3
+    },
     orbitCamera: {
-      position: { x: -105.81, y: 53.81, z: 49.34 },
-      target: { x: 1.52, y: 7.40, z: 4.64 },
+      position: { x: -143.86, y: 53.30, z: 6.29 },
+      target: { x: 4.27, y: 8.65, z: 5.02 },
       upperBetaDegrees: 82,
       minTargetY: 6.81,
-      zoomOutMultiplier: 3
+      zoomOutMultiplier: 3,
+      time: 7
     },
     tourCamera: {
       position: { x: -46.61, y: 24.44, z: 30.49 },
@@ -50,15 +62,25 @@ const MODEL_CONFIGS = [
   },
   {
     file: "Chungju.glb",
+    tourFile: "Chungju_tour.glb",
     label: "충주",
     overviewId: "chungju",
+    moveSpeedMultiplier: 3,
+    performance: {
+      localCollisionRadius: 18,
+      localGroundRadius: 24,
+      localMeshUpdateDistance: 4,
+      treeFacingMinMoveDistance: 0.35,
+      treeFacingIntervalFrames: 3
+    },
     orbitCamera: {
-      position: { x: 76.28, y: 45.34, z: 89.47 },
-      target: { x: 10.34, y: 12.58, z: 28.13 }
+      position: { x: 50.91, y: 40.94, z: 74.48 },
+      target: { x: 10.67, y: 16.05, z: 24.47 },
+      time: 11
     },
     tourCamera: {
-      position: { x: 44.89, y: 18.09, z: 35.64 },
-      target: { x: 3.82, y: 5.71, z: -3.36 }
+      position: { x: 28.63, y: 6.51, z: 35.81 },
+      target: { x: 21.50, y: 6.80, z: 28.80 }
     }
   },
   {
@@ -91,6 +113,14 @@ const TOUR_LATERAL_COLLISION_OFFSETS = [-PLAYER_RADIUS * 0.75, 0, PLAYER_RADIUS 
 const LOCAL_COLLISION_RADIUS = 26;
 const LOCAL_GROUND_RADIUS = 34;
 const LOCAL_MESH_UPDATE_DISTANCE = 2.5;
+const DEFAULT_PERFORMANCE_SETTINGS = {
+  localCollisionRadius: LOCAL_COLLISION_RADIUS,
+  localGroundRadius: LOCAL_GROUND_RADIUS,
+  localMeshUpdateDistance: LOCAL_MESH_UPDATE_DISTANCE,
+  treeFacingMinMoveDistance: 0.2,
+  treeFacingIntervalFrames: 2
+};
+const FURNITURE_MATERIAL_PREFIXES = ["chair", "sofa", "table"];
 const TOUR_RESET_HORIZONTAL_MARGIN_RATIO = 0.08;
 const TOUR_RESET_MIN_HORIZONTAL_MARGIN = 30;
 const TOUR_RESET_FALL_DISTANCE = 8;
@@ -122,7 +152,8 @@ const FLOOR_MATERIAL_KEYWORDS = [
   "paverswithgrassherringbone",
   "vegetationgrass",
   "polishedconcretenew",
-  "woodfloor"
+  "woodfloor",
+  "ground"
 ];
 const PASS_THROUGH_MATERIAL_KEYWORDS = ["defaultmaterial8", "people"];
 const FLOOR_NODE_KEYWORDS = [
@@ -245,6 +276,9 @@ const ENEMY_SETTINGS = {
 };
 
 const canvas = document.getElementById("gameCanvas");
+const metaverseLoading = document.getElementById("metaverseLoading");
+const loadingProgress = document.getElementById("loadingProgress");
+const loadingProgressBar = document.getElementById("loadingProgressBar");
 const statusMessage = document.getElementById("statusMessage");
 const projectTitle = document.getElementById("projectTitle");
 const floorLabel = document.getElementById("floorLabel");
@@ -291,6 +325,111 @@ const overviewFirebaseState = {
 };
 let isOverviewAdminUnlocked = false;
 let currentOverviewConfig = null;
+let loadingTargetProgress = 0;
+let loadingDisplayedProgress = 0;
+let loadingProgressFrameId = null;
+let loadingRevealPending = false;
+
+const LOADING_PROGRESS = {
+  engineReady: 0.06,
+  dataReady: 0.1,
+  modelsWeight: 0.78,
+  sceneReady: 0.94
+};
+
+function countModelLoadSteps() {
+  return MODEL_CONFIGS.reduce((total, config) => total + (config.tourFile ? 2 : 1), 0);
+}
+
+function updateLoadingProgressBar() {
+  const percent = Math.round(loadingDisplayedProgress * 100);
+
+  if (loadingProgressBar) {
+    loadingProgressBar.style.width = `${percent}%`;
+  }
+
+  if (loadingProgress) {
+    loadingProgress.setAttribute("aria-valuenow", String(percent));
+  }
+}
+
+function startLoadingProgressAnimation() {
+  if (loadingProgressFrameId !== null) {
+    return;
+  }
+
+  const tick = () => {
+    const delta = loadingTargetProgress - loadingDisplayedProgress;
+
+    if (Math.abs(delta) < 0.003) {
+      loadingDisplayedProgress = loadingTargetProgress;
+    } else {
+      loadingDisplayedProgress += delta * 0.14;
+    }
+
+    updateLoadingProgressBar();
+
+    if (loadingRevealPending && loadingDisplayedProgress >= 0.995 && loadingTargetProgress >= 1) {
+      loadingProgressFrameId = null;
+      hideLoadingOverlay();
+      return;
+    }
+
+    if (loadingDisplayedProgress < loadingTargetProgress || loadingRevealPending) {
+      loadingProgressFrameId = window.requestAnimationFrame(tick);
+      return;
+    }
+
+    loadingProgressFrameId = null;
+  };
+
+  loadingProgressFrameId = window.requestAnimationFrame(tick);
+}
+
+function setLoadingTargetProgress(value) {
+  loadingTargetProgress = Math.max(loadingTargetProgress, Math.min(1, value));
+  startLoadingProgressAnimation();
+}
+
+function reportModelLoadProgress(completedSteps, totalSteps) {
+  const modelProgress = LOADING_PROGRESS.dataReady + ((completedSteps / totalSteps) * LOADING_PROGRESS.modelsWeight);
+  setLoadingTargetProgress(modelProgress);
+}
+
+function requestLoadingReveal() {
+  loadingRevealPending = true;
+  setLoadingTargetProgress(1);
+}
+
+function startLoadingOverlay() {
+  if (!metaverseLoading) {
+    return;
+  }
+
+  loadingTargetProgress = 0;
+  loadingDisplayedProgress = 0;
+  loadingRevealPending = false;
+  updateLoadingProgressBar();
+
+  metaverseLoading.classList.remove("is-hidden");
+  metaverseLoading.setAttribute("aria-busy", "true");
+}
+
+function hideLoadingOverlay() {
+  if (loadingProgressFrameId !== null) {
+    window.cancelAnimationFrame(loadingProgressFrameId);
+    loadingProgressFrameId = null;
+  }
+
+  if (!metaverseLoading) {
+    return;
+  }
+
+  metaverseLoading.classList.add("is-hidden");
+  metaverseLoading.setAttribute("aria-busy", "false");
+}
+
+startLoadingOverlay();
 
 canvas.tabIndex = 0;
 
@@ -832,6 +971,9 @@ function isNonWalkableObject(node) {
     "trunk",
     "plant",
     "bush",
+    "chair",
+    "sofa",
+    "table",
     "자동차",
     "차량",
     "나무",
@@ -884,7 +1026,217 @@ function isAngjiProjectConfig(config) {
   return config?.overviewId === "angji";
 }
 
-function isAngjiTreeMesh(mesh) {
+function getTourBgmUrl(config) {
+  const fileName = config?.tourBgm;
+
+  if (!fileName) {
+    return null;
+  }
+
+  return `${AUDIO_BGM_ROOT}${fileName}`;
+}
+
+function createTourBgmController() {
+  let audio = null;
+  let fadeFrameId = null;
+  let loadedUrl = null;
+
+  function clampVolume(value) {
+    return Math.max(0, Math.min(1, value));
+  }
+
+  function cancelFade() {
+    if (fadeFrameId !== null) {
+      cancelAnimationFrame(fadeFrameId);
+      fadeFrameId = null;
+    }
+  }
+
+  function fadeVolumeTo(targetVolume, durationMs, onComplete) {
+    cancelFade();
+
+    if (!audio) {
+      onComplete?.();
+      return;
+    }
+
+    const startVolume = clampVolume(audio.volume);
+    const clampedTarget = clampVolume(targetVolume);
+    const startTime = performance.now();
+
+    const step = (now) => {
+      const progress = Math.min((now - startTime) / durationMs, 1);
+      audio.volume = clampVolume(startVolume + (clampedTarget - startVolume) * progress);
+
+      if (progress < 1) {
+        fadeFrameId = requestAnimationFrame(step);
+        return;
+      }
+
+      audio.volume = clampedTarget;
+      fadeFrameId = null;
+      onComplete?.();
+    };
+
+    fadeFrameId = requestAnimationFrame(step);
+  }
+
+  function getTrack(url) {
+    if (!audio || loadedUrl !== url) {
+      cancelFade();
+      audio?.pause();
+      audio = document.createElement("audio");
+      audio.loop = true;
+      audio.preload = "auto";
+      audio.src = url;
+      loadedUrl = url;
+      audio.load();
+    }
+
+    audio.loop = true;
+    return audio;
+  }
+
+  function beginFadeIn() {
+    fadeVolumeTo(TOUR_BGM_VOLUME, TOUR_BGM_FADE_MS);
+  }
+
+  function playTourBgm(config, { keepBgm = false } = {}) {
+    const url = getTourBgmUrl(config);
+
+    if (!url) {
+      return false;
+    }
+
+    const track = getTrack(url);
+
+    if (keepBgm && !track.paused) {
+      cancelFade();
+
+      if (track.volume < TOUR_BGM_VOLUME - 0.01) {
+        beginFadeIn();
+      }
+
+      return true;
+    }
+
+    cancelFade();
+
+    if (!keepBgm) {
+      track.currentTime = 0;
+    }
+
+    track.volume = 0;
+
+    try {
+      const playAttempt = track.play();
+
+      if (playAttempt && typeof playAttempt.then === "function") {
+        playAttempt
+          .then(() => beginFadeIn())
+          .catch((error) => {
+            console.warn("Tour BGM play failed:", error);
+          });
+      } else {
+        beginFadeIn();
+      }
+
+      return true;
+    } catch (error) {
+      console.warn("Tour BGM play failed:", error);
+      return false;
+    }
+  }
+
+  function preload(config) {
+    const url = getTourBgmUrl(config);
+
+    if (!url) {
+      return Promise.resolve();
+    }
+
+    const track = getTrack(url);
+
+    if (track.readyState >= HTMLMediaElement.HAVE_ENOUGH_DATA) {
+      return Promise.resolve();
+    }
+
+    return new Promise((resolve) => {
+      const finish = () => resolve();
+
+      track.addEventListener("canplaythrough", finish, { once: true });
+      track.addEventListener("error", () => {
+        console.warn(`Tour BGM preload failed: ${url}`);
+        finish();
+      }, { once: true });
+    });
+  }
+
+  function stopTourBgm({ fadeOut = true } = {}) {
+    if (!audio) {
+      return;
+    }
+
+    cancelFade();
+
+    if (!fadeOut) {
+      audio.pause();
+      audio.currentTime = 0;
+      audio.volume = 0;
+      return;
+    }
+
+    fadeVolumeTo(0, TOUR_BGM_FADE_MS, () => {
+      audio.pause();
+      audio.currentTime = 0;
+    });
+  }
+
+  return {
+    preload,
+    onEnterWalkMode(config, walkEntryOptions = {}) {
+      playTourBgm(config, walkEntryOptions);
+    },
+    onEnterOrbitMode(config) {
+      if (!getTourBgmUrl(config)) {
+        return;
+      }
+
+      stopTourBgm({ fadeOut: true });
+    }
+  };
+}
+
+function isChungjuProjectConfig(config) {
+  return config?.overviewId === "chungju";
+}
+
+function isFurnitureMaterialName(name) {
+  const normalizedName = normalizeName(name);
+
+  return FURNITURE_MATERIAL_PREFIXES.some((prefix) => normalizedName.startsWith(prefix));
+}
+
+function isFurnitureMesh(mesh) {
+  return getMaterialNames(mesh).some((name) => isFurnitureMaterialName(name));
+}
+
+function getPerformanceSettings(config) {
+  return {
+    ...DEFAULT_PERFORMANCE_SETTINGS,
+    ...(config?.performance || {})
+  };
+}
+
+function freezeSceneMaterials(materials) {
+  materials.forEach((material) => {
+    if (material && typeof material.freeze === "function") {
+      material.freeze();
+    }
+  });
+}
+
+function isDtvTreeMesh(mesh) {
   return getMaterialNames(mesh).some((name) => normalizeName(name).startsWith("dtv"));
 }
 
@@ -2295,6 +2647,8 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
   let projectileHitMeshSet = new Set(initialModelState.projectileHitMeshes);
   let activeTreeMeshes = initialModelState.treeMeshes || [];
   let lastLocalMeshPosition = null;
+  let lastTreeViewerPosition = null;
+  let treeFacingFrameCounter = 0;
   let activeModelState = initialModelState;
   const keys = new Set();
   const fireballs = [];
@@ -2563,7 +2917,24 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
       return;
     }
 
+    const performanceSettings = getPerformanceSettings(activeModelState.config);
     const viewerPosition = walkMode ? walkCamera.position : orbitCamera.position;
+    treeFacingFrameCounter += 1;
+
+    const movedEnough = !lastTreeViewerPosition
+      || BABYLON.Vector3.DistanceSquared(
+        viewerPosition,
+        lastTreeViewerPosition
+      ) >= performanceSettings.treeFacingMinMoveDistance * performanceSettings.treeFacingMinMoveDistance;
+    const frameReady = treeFacingFrameCounter % performanceSettings.treeFacingIntervalFrames === 0;
+
+    if (!movedEnough && !frameReady) {
+      return;
+    }
+
+    if (movedEnough) {
+      lastTreeViewerPosition = viewerPosition.clone();
+    }
 
     activeTreeMeshes.forEach((mesh) => {
       if (!mesh.isEnabled() || (typeof mesh.visibility === "number" && mesh.visibility <= 0.02)) {
@@ -2587,6 +2958,8 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     restoreTreeMeshesInitialRotation(activeTreeMeshes);
     activeTreeMeshes = nextModelState.treeMeshes || [];
     lastLocalMeshPosition = null;
+    lastTreeViewerPosition = null;
+    treeFacingFrameCounter = 0;
     activeModelState = nextModelState;
     clearMovementKeys();
     verticalVelocity = 0;
@@ -2616,17 +2989,30 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
       return;
     }
 
+    const performanceSettings = getPerformanceSettings(activeModelState.config);
+
     if (
       !force
       && lastLocalMeshPosition
-      && BABYLON.Vector3.DistanceSquared(walkCamera.position, lastLocalMeshPosition) < LOCAL_MESH_UPDATE_DISTANCE * LOCAL_MESH_UPDATE_DISTANCE
+      && BABYLON.Vector3.DistanceSquared(walkCamera.position, lastLocalMeshPosition)
+        < performanceSettings.localMeshUpdateDistance * performanceSettings.localMeshUpdateDistance
     ) {
       return;
     }
 
     lastLocalMeshPosition = walkCamera.position.clone();
-    const nearbyCollisionMeshes = getMeshesNearPosition(BABYLON, activeCollisionMeshes, walkCamera.position, LOCAL_COLLISION_RADIUS);
-    const nearbyGroundMeshes = getMeshesNearPosition(BABYLON, activeGroundMeshes, walkCamera.position, LOCAL_GROUND_RADIUS);
+    const nearbyCollisionMeshes = getMeshesNearPosition(
+      BABYLON,
+      activeCollisionMeshes,
+      walkCamera.position,
+      performanceSettings.localCollisionRadius
+    );
+    const nearbyGroundMeshes = getMeshesNearPosition(
+      BABYLON,
+      activeGroundMeshes,
+      walkCamera.position,
+      performanceSettings.localGroundRadius
+    );
 
     localCollisionMeshSet = nearbyCollisionMeshes.length > 0 ? new Set(nearbyCollisionMeshes) : collisionMeshSet;
     localGroundMeshSet = nearbyGroundMeshes.length > 0 ? new Set(nearbyGroundMeshes) : groundMeshSet;
@@ -3032,7 +3418,13 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     updateInputDebug();
   }
 
-  function enterWalkMode(shouldLockPointer = false) {
+  function enterWalkMode(shouldLockPointer = false, walkEntryOptions = {}) {
+    const walkModelState = activeModelState.tourModelState || activeModelState;
+
+    if (!walkEntryOptions.bgmAlreadyStarted) {
+      options.tourBgm?.onEnterWalkMode(walkModelState.config, walkEntryOptions);
+    }
+
     orbitCamera.detachControl(canvas);
     clearMovementKeys();
     canvas.focus();
@@ -3061,7 +3453,9 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     resetEnemy();
     clearMovementKeys();
     document.exitPointerLock?.();
+    const leavingTourConfig = activeModelState.config;
     activateModelState(activeModelState.orbitModelState || activeModelState, "orbit");
+    options.tourBgm?.onEnterOrbitMode(leavingTourConfig);
     orbitCamera.attachControl(canvas, false);
     scene.activeCamera = orbitCamera;
     floorLabel.textContent = "Orbit View";
@@ -3072,7 +3466,13 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
   }
 
   lockPointerButton.addEventListener("click", () => {
-    enterWalkMode(true);
+    if (walkMode) {
+      return;
+    }
+
+    const walkModelState = activeModelState.tourModelState || activeModelState;
+    options.tourBgm?.onEnterWalkMode(walkModelState.config, { keepBgm: false });
+    enterWalkMode(true, { bgmAlreadyStarted: true });
   });
 
   canvas.addEventListener("click", () => {
@@ -3117,7 +3517,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     }
 
     if (key === "r" && !event.repeat) {
-      enterWalkMode(document.pointerLockElement === canvas);
+      enterWalkMode(document.pointerLockElement === canvas, { keepBgm: true });
     }
 
     if (key === "e" && !event.repeat) {
@@ -3179,7 +3579,9 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     if (!walkMode) {
       inputDiagnostics.lastCollision = "-";
       inputDiagnostics.movementBlocked = false;
-      updateDebug();
+      if (treeFacingFrameCounter % 3 === 0) {
+        updateDebug();
+      }
       return;
     }
 
@@ -3307,22 +3709,80 @@ function setupSunControls(BABYLON, sun) {
   updateSunFromControls(BABYLON, sun);
 }
 
-function applyOrbitCameraStart(BABYLON, orbitCamera, modelState) {
-  const orbitSettings = modelState.config?.orbitCamera;
+function applyOrbitEnvironmentSettings(BABYLON, sun, modelState) {
+  const orbitTime = modelState.config?.orbitCamera?.time;
 
-  if (!orbitSettings?.position || !orbitSettings?.target) {
+  if (typeof orbitTime !== "number") {
     return;
   }
 
-  const position = new BABYLON.Vector3(orbitSettings.position.x, orbitSettings.position.y, orbitSettings.position.z);
-  const target = new BABYLON.Vector3(orbitSettings.target.x, orbitSettings.target.y, orbitSettings.target.z);
-  const distance = BABYLON.Vector3.Distance(position, target);
+  timeSlider.value = String(orbitTime);
+  updateSunFromControls(BABYLON, sun);
+}
 
-  orbitCamera.target.copyFrom(target);
-  orbitCamera.setPosition(position);
+function getOrbitCameraSettings(modelState) {
+  const orbitSettings = modelState?.config?.orbitCamera;
+
+  if (orbitSettings?.position && orbitSettings?.target) {
+    return orbitSettings;
+  }
+
+  return DEFAULT_ORBIT_CAMERA;
+}
+
+function getOrbitEnvironmentTime(modelState, fallbackTime) {
+  const orbitTime = modelState.config?.orbitCamera?.time;
+
+  if (typeof orbitTime === "number") {
+    return orbitTime;
+  }
+
+  return fallbackTime;
+}
+
+function getOrbitCameraView(BABYLON, orbitSettings) {
+  return {
+    target: new BABYLON.Vector3(orbitSettings.target.x, orbitSettings.target.y, orbitSettings.target.z),
+    position: new BABYLON.Vector3(orbitSettings.position.x, orbitSettings.position.y, orbitSettings.position.z)
+  };
+}
+
+function captureOrbitCameraView(orbitCamera) {
+  return {
+    target: orbitCamera.target.clone(),
+    position: orbitCamera.position.clone()
+  };
+}
+
+function interpolateOrbitCameraView(BABYLON, fromView, toView, t) {
+  return {
+    target: BABYLON.Vector3.Lerp(fromView.target, toView.target, t),
+    position: BABYLON.Vector3.Lerp(fromView.position, toView.position, t)
+  };
+}
+
+function applyOrbitCameraView(BABYLON, orbitCamera, view) {
+  const distance = BABYLON.Vector3.Distance(view.position, view.target);
+
+  orbitCamera.target.copyFrom(view.target);
+  orbitCamera.setPosition(view.position);
   orbitCamera.radius = distance;
+}
+
+function applyOrbitEnvironmentBlend(BABYLON, sun, fromTime, toTime, t) {
+  timeSlider.value = String(fromTime + (toTime - fromTime) * t);
+  updateSunFromControls(BABYLON, sun);
+}
+
+function applyOrbitCameraStart(BABYLON, orbitCamera, modelState) {
+  const orbitSettings = getOrbitCameraSettings(modelState);
+  const view = getOrbitCameraView(BABYLON, orbitSettings);
+  const zoomOutMultiplier = modelState.config?.orbitCamera?.zoomOutMultiplier || 1;
+  const distance = BABYLON.Vector3.Distance(view.position, view.target);
+
+  applyOrbitCameraView(BABYLON, orbitCamera, view);
   orbitCamera.maxZ = Math.max(10000, distance * 8);
-  orbitCamera.upperRadiusLimit = distance * (orbitSettings.zoomOutMultiplier || 1);
+  orbitCamera.upperRadiusLimit = distance * zoomOutMultiplier;
   orbitCamera.metadata = {
     ...(orbitCamera.metadata || {}),
     baseUpperRadiusLimit: distance
@@ -3362,7 +3822,7 @@ function renderModelDebug(modelState) {
 
   modelStatus.textContent = `Loaded ${config.label}`;
   modelSource.textContent = `${MODEL_ROOT}${config.file}`;
-  modelStats.textContent = `${meshes.length} meshes / collision ${collisionMeshes.length} / walkable ${walkableGroundMeshes.length} / stairSurfaces ${stairSurfaceMeshes.length} / floorSurfaces ${floorSurfaceMeshes.length} / peopleTargets ${peopleTargetMeshes.length} / humanPassThrough ${modelState.humanPassThroughCount} / collisionFallback ${modelState.usedCollisionFallback ? "yes" : "no"} / scale ${model.scale.toExponential(3)} / full ${boundsToText(model.bounds)} / focus ${boundsToText(model.focusBounds)} / ${model.tourStartNode ? "Tour_Start found" : "Tour_Start not found"}`;
+  modelStats.textContent = `${meshes.length} meshes / collision ${collisionMeshes.length} / walkable ${walkableGroundMeshes.length} / stairSurfaces ${stairSurfaceMeshes.length} / floorSurfaces ${floorSurfaceMeshes.length} / peopleTargets ${peopleTargetMeshes.length} / humanPassThrough ${modelState.humanPassThroughCount} / furniturePassThrough ${modelState.furniturePassThroughCount || 0} / collisionFallback ${modelState.usedCollisionFallback ? "yes" : "no"} / scale ${model.scale.toExponential(3)} / full ${boundsToText(model.bounds)} / focus ${boundsToText(model.focusBounds)} / ${model.tourStartNode ? "Tour_Start found" : "Tour_Start not found"}`;
   meshList.replaceChildren(
     ...meshes.slice(0, 50).map((mesh) => {
       const item = document.createElement("li");
@@ -3382,16 +3842,23 @@ async function loadTourModelState(BABYLON, scene, config) {
   meshes = [...meshes, ...splitPeopleTargetMeshes(BABYLON, scene, meshes)];
 
   let humanPassThroughCount = 0;
+  let furniturePassThroughCount = 0;
   const peopleTargetMeshes = [];
 
   meshes.forEach((mesh) => {
     getCachedMeshBounds(BABYLON, mesh);
 
-    const passThrough = isNonCollisionProp(mesh);
+    const furniture = isChungjuProjectConfig(config) && isFurnitureMesh(mesh);
+    const humanPassThrough = isNonCollisionProp(mesh);
+    const passThrough = humanPassThrough || furniture;
     const peopleTarget = isPeopleFireballTarget(mesh);
 
-    if (passThrough) {
+    if (humanPassThrough) {
       humanPassThroughCount += 1;
+    }
+
+    if (furniture) {
+      furniturePassThroughCount += 1;
     }
 
     if (peopleTarget && mesh.isEnabled()) {
@@ -3400,7 +3867,12 @@ async function loadTourModelState(BABYLON, scene, config) {
 
     mesh.isPickable = mesh.isEnabled() && (passThrough ? peopleTarget : true);
     mesh.checkCollisions = passThrough ? false : ENABLE_MODEL_COLLISIONS;
-    mesh.metadata = { ...(mesh.metadata || {}), passThrough, peopleTarget };
+    mesh.metadata = {
+      ...(mesh.metadata || {}),
+      passThrough,
+      peopleTarget,
+      furniture
+    };
   });
 
   softenModelMaterialReflections(BABYLON, scene.materials);
@@ -3410,12 +3882,24 @@ async function loadTourModelState(BABYLON, scene, config) {
     applyClayPreviewMaterial(BABYLON, scene, meshes);
   }
 
+  const treeMeshes = meshes.filter((mesh) => mesh.isEnabled() && isDtvTreeMesh(mesh));
+  const treeMeshIds = new Set(treeMeshes.map((mesh) => mesh.uniqueId));
+
   let usedCollisionFallback = false;
-  let collisionMeshes = meshes.filter((mesh) => mesh.isEnabled() && !isDescendantOf(mesh, model.tourStartNode) && !mesh.metadata?.passThrough);
+  let collisionMeshes = meshes.filter((mesh) => (
+    mesh.isEnabled()
+    && !isDescendantOf(mesh, model.tourStartNode)
+    && !mesh.metadata?.passThrough
+    && !treeMeshIds.has(mesh.uniqueId)
+  ));
 
   if (collisionMeshes.length === 0) {
     usedCollisionFallback = true;
-    collisionMeshes = meshes.filter((mesh) => mesh.isEnabled() && !isDescendantOf(mesh, model.tourStartNode));
+    collisionMeshes = meshes.filter((mesh) => (
+      mesh.isEnabled()
+      && !isDescendantOf(mesh, model.tourStartNode)
+      && !treeMeshIds.has(mesh.uniqueId)
+    ));
     collisionMeshes.forEach((mesh) => {
       mesh.metadata = { ...(mesh.metadata || {}), passThrough: false, collisionFallback: true };
       mesh.isPickable = true;
@@ -3438,18 +3922,23 @@ async function loadTourModelState(BABYLON, scene, config) {
   const groundMeshMap = new Map();
 
   collisionMeshes
-    .filter((mesh) => !isNonWalkableObject(mesh))
+    .filter((mesh) => !isNonWalkableObject(mesh) && !mesh.metadata?.furniture && !treeMeshIds.has(mesh.uniqueId))
     .forEach((mesh) => groundMeshMap.set(mesh.uniqueId, mesh));
   stairSurfaceMeshes.forEach((mesh) => groundMeshMap.set(mesh.uniqueId, mesh));
   floorSurfaceMeshes.forEach((mesh) => groundMeshMap.set(mesh.uniqueId, mesh));
 
-  const treeMeshes = isAngjiProjectConfig(config)
-    ? meshes.filter((mesh) => mesh.isEnabled() && isAngjiTreeMesh(mesh))
-    : [];
-
   treeMeshes.forEach((mesh) => {
     attachTreeYawPivot(BABYLON, scene, mesh, model.root);
+    mesh.isPickable = false;
+    mesh.checkCollisions = false;
+    mesh.metadata = {
+      ...(mesh.metadata || {}),
+      treeMesh: true,
+      passThrough: true
+    };
   });
+
+  freezeSceneMaterials(scene.materials);
 
   return {
     config,
@@ -3458,6 +3947,7 @@ async function loadTourModelState(BABYLON, scene, config) {
     model,
     baseRootPosition: model.root.position.clone(),
     humanPassThroughCount,
+    furniturePassThroughCount,
     usedCollisionFallback,
     collisionMeshes,
     walkableGroundMeshes: Array.from(groundMeshMap.values()),
@@ -3486,10 +3976,21 @@ async function start() {
   sun.diffuse = new BABYLON.Color3(1, 0.94, 0.82);
   sun.specular = BABYLON.Color3.Black();
   setupSunControls(BABYLON, sun);
+  setLoadingTargetProgress(LOADING_PROGRESS.engineReady);
   await loadDefaultProjectOverviews();
   loadLocalOverviewOverrides();
+  setLoadingTargetProgress(LOADING_PROGRESS.dataReady);
+
+  const tourBgm = createTourBgmController();
+  const bgmReady = Promise.all(MODEL_CONFIGS.map((config) => tourBgm.preload(config)));
+
+  const modelLoadSteps = countModelLoadSteps();
+  let completedModelLoadSteps = 0;
+
   const modelStates = await Promise.all(MODEL_CONFIGS.map(async (config) => {
     const orbitModelState = await loadTourModelState(BABYLON, scene, config);
+    completedModelLoadSteps += 1;
+    reportModelLoadProgress(completedModelLoadSteps, modelLoadSteps);
 
     if (!config.tourFile) {
       return orbitModelState;
@@ -3501,11 +4002,15 @@ async function start() {
       label: `${config.label} 투어`,
       isTourVariant: true
     });
+    completedModelLoadSteps += 1;
+    reportModelLoadProgress(completedModelLoadSteps, modelLoadSteps);
     orbitModelState.tourModelState = tourModelState;
     tourModelState.orbitModelState = orbitModelState;
 
     return orbitModelState;
   }));
+  await bgmReady;
+
   const allModelStates = modelStates.flatMap((modelState) => (
     modelState.tourModelState ? [modelState, modelState.tourModelState] : [modelState]
   ));
@@ -3561,8 +4066,10 @@ async function start() {
     setModelSlideOffset(BABYLON, nextModelState, 0);
     setModelStateEnabled(nextModelState, true);
     displayedModelState = nextModelState;
-    applyOrbitCameraStart(BABYLON, orbitCamera, nextModelState.orbitModelState || nextModelState);
-    applyOrbitCameraConstraints(BABYLON, orbitCamera, nextModelState.orbitModelState || nextModelState);
+    const orbitModelState = nextModelState.orbitModelState || nextModelState;
+    applyOrbitCameraStart(BABYLON, orbitCamera, orbitModelState);
+    applyOrbitCameraConstraints(BABYLON, orbitCamera, orbitModelState);
+    applyOrbitEnvironmentSettings(BABYLON, sun, orbitModelState);
     renderModelDebug(nextModelState);
     updateProjectOverviewVisibility();
   }
@@ -3586,6 +4093,7 @@ async function start() {
     const nextModelState = modelStates[nextModelIndex];
     const nextStartOffset = direction > 0 ? slideDistance : -slideDistance;
     const currentEndOffset = direction > 0 ? -slideDistance : slideDistance;
+    const fromEnvironmentTime = Number(timeSlider.value);
 
     isTransitioning = true;
     setModelStateEnabled(nextModelState, true);
@@ -3601,7 +4109,11 @@ async function start() {
       nextModelState,
       nextModelIndex,
       nextStartOffset,
-      currentEndOffset
+      currentEndOffset,
+      fromCameraView: captureOrbitCameraView(orbitCamera),
+      toCameraView: getOrbitCameraView(BABYLON, getOrbitCameraSettings(nextModelState)),
+      fromEnvironmentTime,
+      toEnvironmentTime: getOrbitEnvironmentTime(nextModelState, fromEnvironmentTime)
     };
   }
 
@@ -3618,6 +4130,18 @@ async function start() {
 
     setModelSlideOffset(BABYLON, transitionState.currentModelState, currentOffset);
     setModelSlideOffset(BABYLON, transitionState.nextModelState, nextOffset);
+    applyOrbitCameraView(
+      BABYLON,
+      orbitCamera,
+      interpolateOrbitCameraView(BABYLON, transitionState.fromCameraView, transitionState.toCameraView, eased)
+    );
+    applyOrbitEnvironmentBlend(
+      BABYLON,
+      sun,
+      transitionState.fromEnvironmentTime,
+      transitionState.toEnvironmentTime,
+      eased
+    );
 
     if (progress < 1) {
       return;
@@ -3632,6 +4156,7 @@ async function start() {
     controls.setModelState(transitionState.nextModelState);
     applyOrbitCameraStart(BABYLON, orbitCamera, transitionState.nextModelState);
     applyOrbitCameraConstraints(BABYLON, orbitCamera, transitionState.nextModelState);
+    applyOrbitEnvironmentSettings(BABYLON, sun, transitionState.nextModelState);
     renderModelDebug(transitionState.nextModelState);
     setStatus(`${transitionState.nextModelState.config.label} orbit view ready. Middle mouse rotates, Shift+middle pans, wheel zooms to cursor. Click to Play starts walk mode.`);
 
@@ -3642,6 +4167,7 @@ async function start() {
   }
 
   controls = createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, modelStates[activeModelIndex], {
+    tourBgm,
     onModeChange: () => {
       updateModelSwitcherVisibility();
       updateProjectOverviewVisibility();
@@ -3655,18 +4181,27 @@ async function start() {
   renderModelDebug(modelStates[activeModelIndex]);
   applyOrbitCameraStart(BABYLON, orbitCamera, modelStates[activeModelIndex]);
   applyOrbitCameraConstraints(BABYLON, orbitCamera, modelStates[activeModelIndex]);
+  applyOrbitEnvironmentSettings(BABYLON, sun, modelStates[activeModelIndex]);
   updateModelSwitcherVisibility();
   updateProjectOverviewVisibility();
   initializeOverviewFirebase(MODEL_CONFIGS, updateProjectOverviewVisibility);
 
   setStatus("Orbit view ready. Middle mouse rotates, Shift+middle pans, wheel zooms to cursor. Click to Play starts walk mode.");
+  setLoadingTargetProgress(LOADING_PROGRESS.sceneReady);
+
+  let hasRenderedFirstFrame = false;
 
   engine.runRenderLoop(() => {
     updateModelTransition();
-    if (!controls.isWalkMode()) {
+    if (!controls.isWalkMode() && !isTransitioning) {
       applyOrbitCameraConstraints(BABYLON, orbitCamera, modelStates[activeModelIndex]);
     }
     scene.render();
+
+    if (!hasRenderedFirstFrame) {
+      hasRenderedFirstFrame = true;
+      requestLoadingReveal();
+    }
   });
 
   window.addEventListener("resize", () => {
@@ -3676,6 +4211,7 @@ async function start() {
 
 start().catch((error) => {
   console.error(error);
+  hideLoadingOverlay();
   modelStatus.textContent = "Error";
   modelStats.textContent = error.message || String(error);
   setStatus("Failed to start first-person tour.");

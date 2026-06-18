@@ -4,10 +4,27 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Metaverse Architecture Tour</title>
-  <link rel="stylesheet" href="./styles/main.css?v=no-reflection-20260615-2007">
+  <link rel="stylesheet" href="./styles/main.css?v=metaverse-loading-compact-20260618">
 </head>
 <body>
   <main class="game-shell">
+    <div class="metaverse-loading" id="metaverseLoading" aria-live="polite" aria-busy="true">
+      <div class="metaverse-loading__content">
+        <p class="metaverse-loading__text">LOADING</p>
+        <div
+          class="metaverse-loading__progress"
+          id="loadingProgress"
+          role="progressbar"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          aria-valuenow="0"
+          aria-label="Loading progress"
+        >
+          <div class="metaverse-loading__progress-bar" id="loadingProgressBar"></div>
+        </div>
+      </div>
+    </div>
+
     <canvas id="gameCanvas" tabindex="0" aria-label="3D architecture tour canvas"></canvas>
 
     <nav class="model-switcher is-hidden" id="modelSwitcher" aria-label="Building model navigation">
@@ -115,6 +132,6 @@
 
   <script src="https://cdn.babylonjs.com/babylon.js"></script>
   <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
-  <script type="module" src="./src/first-person-tour.js?v=angji-tree-dtv-all-modes-20260618"></script>
+  <script type="module" src="./src/first-person-tour.js?v=angji-tour-bgm-volume-clamp-20260619"></script>
 </body>
 </html>
