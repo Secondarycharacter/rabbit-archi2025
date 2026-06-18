@@ -2,7 +2,7 @@ import { FIREBASE_CONFIG, OVERVIEW_ADMIN_PASSCODE } from "./firebase-config.js";
 
 const MODEL_ROOT = "./assets/models/";
 const ENEMY_ROOT = "./assets/enemies/";
-const AUDIO_BGM_ROOT = "/assets/audio/bgm/";
+const AUDIO_BGM_ROOT = "./assets/audio/bgm/";
 const TOUR_BGM_FADE_MS = 3000;
 const TOUR_BGM_VOLUME = 1;
 const DEFAULT_MODEL_FILE = "Angji.glb";

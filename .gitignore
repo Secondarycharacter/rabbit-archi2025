@@ -9,3 +9,7 @@ package-lock.json
 # OS
 .DS_Store
 Thumbs.db
+
+# GLB backups: keep only the previous version locally (see metaverse/scripts/backup-models-before-commit.ps1)
+metaverse/assets/models/backup/*
+!metaverse/assets/models/backup/.gitkeep

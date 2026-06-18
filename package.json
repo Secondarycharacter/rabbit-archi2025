@@ -8,7 +8,8 @@
     "lint": "eslint *.js",
     "lint:fix": "eslint *.js --fix",
     "start": "npx http-server -p 8080 -o main.html",
-    "start:metaverse": "npx http-server metaverse -p 8081 -o index.html -c-1"
+    "start:metaverse": "npx http-server metaverse -p 8081 -o index.html -c-1",
+    "models:backup": "powershell -NoProfile -ExecutionPolicy Bypass -File metaverse/scripts/backup-models-before-commit.ps1"
   },
   "repository": {
     "type": "git",
