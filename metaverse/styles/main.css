@@ -29,6 +29,22 @@ body {
   touch-action: none;
 }
 
+body.walk-mode-active #gameCanvas {
+  cursor: crosshair;
+}
+
+body.walk-mode-active.is-pointer-locked #gameCanvas {
+  cursor: none;
+}
+
+body.walk-mode-active .hud__center {
+  display: none;
+}
+
+body.walk-mode-active .project-overview {
+  display: none;
+}
+
 .model-switcher {
   position: fixed;
   inset: 0;

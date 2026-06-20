@@ -1,4 +1,12 @@
-import { FIREBASE_CONFIG, OVERVIEW_ADMIN_PASSCODE } from "./firebase-config.js";
+import { FIREBASE_CONFIG, OVERVIEW_ADMIN_PASSCODE } from "./firebase-config.js?v=jump-over-fix22-tour-20260620";
+import { createTpsSystem } from "./controllers/createTpsSystem.js?v=jump-over-fix22-tour-20260620";
+import {
+  CONTROLLER_SETTINGS,
+  EYE_HEIGHT,
+  MAX_FALL_SPEED,
+  GROUND_SNAP_TOLERANCE,
+  createAngjiTpsOptions
+} from "./angji-character-config.js?v=jump-over-fix22-tour-20260620";
 
 const MODEL_ROOT = "./assets/models/";
 const ENEMY_ROOT = "./assets/enemies/";
@@ -102,7 +110,6 @@ const MODEL_ROTATION_X = 0;
 const CLAY_PREVIEW = false;
 const ENABLE_MODEL_COLLISIONS = false;
 const TOUR_START_NAME = "Tour_Start";
-const EYE_HEIGHT = 1.7;
 const PLAYER_RADIUS = 0.35;
 const PLAYER_HEIGHT = 1.7;
 const GROUND_RAY_UP = 40;
@@ -181,8 +188,6 @@ const GROUND_NORMAL_MIN_Y = 0.55;
 const CLASSIFIED_GROUND_NORMAL_MIN_Y = 0.18;
 const WALL_NORMAL_MAX_Y = 0.9;
 const MIN_COLLISION_DISTANCE = 0.04;
-const GROUND_SNAP_TOLERANCE = 0.08;
-const MAX_FALL_SPEED = 0.85;
 const STEP_SMOOTHING = 0.35;
 const STEP_SETTLE_EPSILON = 0.015;
 const GROUND_GRACE_MS = 180;
@@ -229,14 +234,6 @@ const DEFAULT_TOUR_CAMERA = {
   target: { x: 26.94, y: 4.55, z: 8.86 }
 };
 
-const CONTROLLER_SETTINGS = {
-  mouseSensitivity: 0.0022,
-  moveSpeed: 0.09,
-  runMultiplier: 2.3,
-  jumpForce: 0,
-  gravity: 0.018,
-  maxLookDegrees: 70
-};
 const FIREBALL_SETTINGS = {
   cooldownMs: 500,
   maxActive: 3,
@@ -1646,6 +1643,8 @@ function getInputKey(event) {
     KeyS: "s",
     KeyD: "d",
     KeyE: "e",
+    KeyJ: "j",
+    KeyP: "p",
     KeyG: "g",
     KeyR: "r",
     KeyF: "f",
@@ -2637,6 +2636,15 @@ function tryMoveWithCollision(BABYLON, scene, camera, movement, collisionMeshSet
   };
 }
 
+function createTpsCamera(BABYLON, scene, sourceCamera) {
+  const camera = new BABYLON.UniversalCamera("tpsCamera", sourceCamera.position.clone(), scene);
+  camera.minZ = 0.03;
+  camera.maxZ = 10000;
+  camera.fov = BABYLON.Tools.ToRadians(72);
+  camera.inputs.clear();
+  return camera;
+}
+
 function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, initialModelState, options = {}) {
   let activeGroundMeshes = initialModelState.walkableGroundMeshes;
   let activeCollisionMeshes = initialModelState.collisionMeshes;
@@ -2653,6 +2661,8 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
   const keys = new Set();
   const fireballs = [];
   const inputDiagnostics = createInputDiagnostics();
+  const tpsCamera = createTpsCamera(BABYLON, scene, walkCamera);
+  let tpsSystem = null;
   let walkMode = false;
   let isGrounded = false;
   let verticalVelocity = 0;
@@ -2664,6 +2674,11 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
   let yaw = walkCamera.rotation.y;
   let pitch = walkCamera.rotation.x;
   let currentLabel = "orbit view";
+  let lastTpsMoveBlocked = false;
+  let pendingMouseDeltaX = 0;
+  let pendingMouseDeltaY = 0;
+  let pendingWheelDelta = 0;
+  let lastTpsRuntimeState = null;
   const enemyState = {
     asset: null,
     loadPromise: null,
@@ -2679,8 +2694,21 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
   window.tourControllerSettings = CONTROLLER_SETTINGS;
   window.tourInputDiagnostics = inputDiagnostics;
 
+  tpsSystem = createTpsSystem(
+    BABYLON,
+    scene,
+    tpsCamera,
+    createAngjiTpsOptions(walkCamera, {
+      getCollisionMask: () => (mesh) => localCollisionMeshSet.has(mesh),
+      onLoadError: () => {
+        setStatus("Character model could not be loaded. Walk mode will continue without avatar.");
+      }
+    })
+  );
+
   function clearMovementKeys() {
     keys.clear();
+    tpsSystem?.getInputController?.()?.clear();
   }
 
   function clearFireballs() {
@@ -3079,7 +3107,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
       return;
     }
 
-    fireballs.push(createFireballProjectile(BABYLON, scene, walkCamera));
+    fireballs.push(createFireballProjectile(BABYLON, scene, tpsCamera));
     lastFireballAt = now;
     inputDiagnostics.lastFireball = `shot ${fireballs.length}/${FIREBALL_SETTINGS.maxActive}`;
     setStatus("Fireball fired. E can be used again after 0.5 seconds.");
@@ -3172,8 +3200,11 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     const tourCamera = getActiveTourCameraConfig();
     walkCamera.position.set(tourCamera.position.x, tourCamera.position.y, tourCamera.position.z);
     walkCamera.setTarget(new BABYLON.Vector3(tourCamera.target.x, tourCamera.target.y, tourCamera.target.z));
-    yaw = walkCamera.rotation.y;
-    pitch = walkCamera.rotation.x;
+    yaw = Math.atan2(
+      tourCamera.target.x - tourCamera.position.x,
+      tourCamera.target.z - tourCamera.position.z
+    );
+    pitch = 0;
     verticalVelocity = 0;
     stepTargetY = null;
     stepTargetHit = null;
@@ -3181,6 +3212,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     lastLocalMeshPosition = null;
     refreshLocalMeshSets(true);
     snapToGround();
+    tpsSystem?.reset?.(tourCamera);
   }
 
   function isWalkCameraOutsideTourBounds() {
@@ -3315,7 +3347,20 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     return true;
   }
 
-  function applyGravity(deltaScale) {
+  function integrateVerticalPhysics(deltaScale, state) {
+    let { verticalVelocity: vy, isGrounded: grounded, verticalImpulse = 0 } = state;
+
+    if (verticalImpulse > 0 && grounded) {
+      vy = verticalImpulse;
+      grounded = false;
+      stepTargetY = null;
+      stepTargetHit = null;
+      verticalVelocity = vy;
+      isGrounded = false;
+      walkCamera.position.y += vy * deltaScale;
+      return { verticalVelocity: vy, isGrounded: false };
+    }
+
     if (typeof stepTargetY === "number") {
       const nextY = walkCamera.position.y + (stepTargetY - walkCamera.position.y) * Math.min(STEP_SMOOTHING * deltaScale, 1);
       const targetHit = stepTargetHit;
@@ -3331,7 +3376,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
       verticalVelocity = 0;
       isGrounded = true;
       rememberStableGround(targetHit, walkCamera.position.y);
-      return;
+      return { verticalVelocity, isGrounded };
     }
 
     const groundPose = getLandingGroundPoseAtPosition(BABYLON, scene, walkCamera.position, localGroundMeshSet, walkCamera.position.y);
@@ -3339,13 +3384,13 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     if (groundPose) {
       const distanceToGround = walkCamera.position.y - groundPose.eyeY;
 
-      if (distanceToGround <= GROUND_SNAP_TOLERANCE && distanceToGround >= -MAX_STEP_UP) {
+      if (distanceToGround <= GROUND_SNAP_TOLERANCE && distanceToGround >= -MAX_STEP_UP && vy <= 0) {
         walkCamera.position.y = groundPose.eyeY;
         verticalVelocity = 0;
         isGrounded = true;
         rememberStableGround(groundPose.hit, groundPose.eyeY);
         inputDiagnostics.lastGround = getSurfaceDebugName(groundPose.hit);
-        return;
+        return { verticalVelocity, isGrounded };
       }
 
       if (distanceToGround < -GROUND_SNAP_TOLERANCE && Math.abs(distanceToGround) <= MAX_STEP_UP) {
@@ -3354,20 +3399,20 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
         isGrounded = true;
         rememberStableGround(groundPose.hit, groundPose.eyeY);
         inputDiagnostics.lastGround = getSurfaceDebugName(groundPose.hit);
-        return;
+        return { verticalVelocity, isGrounded };
       }
     }
 
     if (trySnapToStairWhileStanding()) {
-      return;
+      return { verticalVelocity, isGrounded };
     }
 
     if (tryUseGroundGrace()) {
-      return;
+      return { verticalVelocity, isGrounded };
     }
 
     const previousY = walkCamera.position.y;
-    verticalVelocity = Math.max(verticalVelocity - CONTROLLER_SETTINGS.gravity * deltaScale, -MAX_FALL_SPEED);
+    verticalVelocity = Math.max(vy - CONTROLLER_SETTINGS.gravity * deltaScale, -MAX_FALL_SPEED);
     walkCamera.position.y += verticalVelocity * deltaScale;
     isGrounded = false;
 
@@ -3391,13 +3436,28 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     } else {
       inputDiagnostics.lastGround = "-";
     }
+
+    return { verticalVelocity, isGrounded };
+  }
+
+  function applyGravity(deltaScale) {
+    const result = integrateVerticalPhysics(deltaScale, {
+      verticalVelocity,
+      isGrounded,
+      verticalImpulse: 0
+    });
+    verticalVelocity = result.verticalVelocity;
+    isGrounded = result.isGrounded;
   }
 
   function updateDebug() {
     const activeCamera = scene.activeCamera || orbitCamera;
-    const activeTarget = activeCamera === walkCamera
-      ? walkCamera.position.add(getForward().scale(10))
-      : (orbitCamera.target || BABYLON.Vector3.Zero());
+    const activeTarget = activeCamera === tpsCamera
+      ? tpsCamera.target?.clone?.() || BABYLON.Vector3.Zero()
+      : activeCamera === walkCamera
+        ? walkCamera.position.add(getForward().scale(10))
+        : (orbitCamera.target || BABYLON.Vector3.Zero());
+    const activeKeys = Array.from(keys);
 
     playerDebug.textContent = [
       `active ${activeCamera.name}`,
@@ -3405,20 +3465,23 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
       `activeTarget ${vectorToText(activeTarget)}`,
       `orbitPos ${vectorToText(orbitCamera.position)}`,
       `orbitTarget ${vectorToText(orbitCamera.target)}`,
-      `walkPos ${vectorToText(walkCamera.position)}`,
-      `walkTarget ${vectorToText(walkCamera.position.add(getForward().scale(10)))}`,
+      `playerEye ${vectorToText(walkCamera.position)}`,
+      `tpsCam ${vectorToText(tpsCamera.position)}`,
       `yaw ${yaw.toFixed(2)}`,
       `pitch ${pitch.toFixed(2)}`,
       `vy ${verticalVelocity.toFixed(3)}`,
       `stepTarget ${typeof stepTargetY === "number" ? stepTargetY.toFixed(2) : "-"}`,
-      `keys ${Array.from(keys).join(",") || "-"}`,
+      `keys ${activeKeys.join(",") || "-"}`,
       isGrounded ? "grounded" : "air",
+      tpsSystem?.isCharacterReady?.() ? "character ready" : "character loading",
+      lastTpsRuntimeState?.locomotionState ? `loco ${lastTpsRuntimeState.locomotionState}` : "loco -",
+      lastTpsRuntimeState?.activeAction ? `action ${lastTpsRuntimeState.activeAction}` : "action -",
       currentLabel
     ].join(" / ");
     updateInputDebug();
   }
 
-  function enterWalkMode(shouldLockPointer = false, walkEntryOptions = {}) {
+  async function enterWalkMode(shouldLockPointer = false, walkEntryOptions = {}) {
     const walkModelState = activeModelState.tourModelState || activeModelState;
 
     if (!walkEntryOptions.bgmAlreadyStarted) {
@@ -3427,31 +3490,37 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
 
     orbitCamera.detachControl(canvas);
     clearMovementKeys();
-    canvas.focus();
-    scene.activeCamera = walkCamera;
+    document.body.classList.add("walk-mode-active");
+    canvas.setAttribute("tabindex", "0");
+    canvas.focus({ preventScroll: true });
+    await tpsSystem?.ensureLoaded?.();
+    scene.activeCamera = tpsCamera;
     walkMode = true;
     activateModelState(activeModelState.tourModelState || activeModelState, "walk");
     isResettingTour = false;
     tourResetFade?.classList.remove("is-active");
     resetWalkCameraToTourStart();
+    tpsSystem?.show?.();
     scheduleEnemySpawn();
     options.onModeChange?.("walk");
-    currentLabel = "fixed tour start";
+    currentLabel = "third-person tour";
 
     if (shouldLockPointer) {
       requestPointerLockSafe();
     }
 
-    floorLabel.textContent = "Walk Mode";
-    setStatus("Walk mode active. WASD moves, Shift runs, gravity is enabled, stairs can be climbed.");
+    floorLabel.textContent = "Walk Mode (TPS)";
+    setStatus("Third-person walk mode active. WASD moves, Shift runs, Space jumps, J jump-over test, E throws, P dances, mouse looks, wheel zooms.");
     updateDebug();
   }
 
   function enterOrbitMode() {
     walkMode = false;
+    document.body.classList.remove("walk-mode-active");
     clearFireballs();
     resetEnemy();
     clearMovementKeys();
+    tpsSystem?.hide?.();
     document.exitPointerLock?.();
     const leavingTourConfig = activeModelState.config;
     activateModelState(activeModelState.orbitModelState || activeModelState, "orbit");
@@ -3472,7 +3541,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
 
     const walkModelState = activeModelState.tourModelState || activeModelState;
     options.tourBgm?.onEnterWalkMode(walkModelState.config, { keepBgm: false });
-    enterWalkMode(true, { bgmAlreadyStarted: true });
+    void enterWalkMode(true, { bgmAlreadyStarted: true });
   });
 
   canvas.addEventListener("click", () => {
@@ -3481,21 +3550,25 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     }
   });
 
+  canvas.addEventListener("wheel", (event) => {
+    if (!walkMode) {
+      return;
+    }
+
+    event.preventDefault();
+    pendingWheelDelta += event.deltaY;
+  }, { passive: false });
+
   window.addEventListener("mousemove", (event) => {
     inputDiagnostics.mouseMoveCount += 1;
     inputDiagnostics.lastMouseMove = walkMode ? "walk" : "orbit";
     inputDiagnostics.lastMouseDelta = `x ${event.movementX || 0}, y ${event.movementY || 0}`;
 
-    if (!walkMode || document.pointerLockElement !== canvas) {
-      updateInputDebug();
-      return;
+    if (walkMode && document.pointerLockElement === canvas) {
+      pendingMouseDeltaX += event.movementX || 0;
+      pendingMouseDeltaY += event.movementY || 0;
     }
 
-    const maxPitch = BABYLON.Tools.ToRadians(CONTROLLER_SETTINGS.maxLookDegrees);
-    yaw += event.movementX * CONTROLLER_SETTINGS.mouseSensitivity;
-    pitch += event.movementY * CONTROLLER_SETTINGS.mouseSensitivity;
-    pitch = Math.max(-maxPitch, Math.min(maxPitch, pitch));
-    walkCamera.rotation.set(pitch, yaw, 0);
     updateInputDebug();
   });
 
@@ -3508,21 +3581,39 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     const key = getInputKey(event);
     const inputCode = event.code || event.key || "?";
     const movementKeys = ["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright", "shift", " "];
+    const inputBlocked = walkMode && tpsSystem?.isPlayerInputBlocked?.();
 
-    inputDiagnostics.keyDownCount += 1;
-    inputDiagnostics.lastKeyDown = `${key || "unknown"} (${inputCode})`;
+    if (!event.repeat) {
+      inputDiagnostics.keyDownCount += 1;
+      inputDiagnostics.lastKeyDown = `${key || "unknown"} (${inputCode})`;
+    }
 
     if (key === "f" && !event.repeat) {
       enterOrbitMode();
     }
 
     if (key === "r" && !event.repeat) {
-      enterWalkMode(document.pointerLockElement === canvas, { keepBgm: true });
+      void enterWalkMode(document.pointerLockElement === canvas, { keepBgm: true });
     }
 
-    if (key === "e" && !event.repeat) {
+    if (key === "e" && !event.repeat && !inputBlocked) {
       event.preventDefault();
+      tpsSystem?.getInputController?.()?.queueThrow();
       tryShootFireball();
+    }
+
+    if (key === "p" && !event.repeat && walkMode && !inputBlocked) {
+      event.preventDefault();
+      tpsSystem?.getInputController?.()?.queueDance();
+    }
+
+    if (key === " " && !event.repeat && walkMode && !inputBlocked) {
+      tpsSystem?.getInputController?.()?.queueJump();
+    }
+
+    if (key === "j" && !event.repeat && walkMode) {
+      event.preventDefault();
+      tpsSystem?.getInputController?.()?.queueJumpOver();
     }
 
     if (movementKeys.includes(key)) {
@@ -3533,7 +3624,9 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
       }
     }
 
-    updateInputDebug();
+    if (!event.repeat) {
+      updateInputDebug();
+    }
   });
 
   window.addEventListener("keyup", (event) => {
@@ -3549,17 +3642,6 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     updateInputDebug();
   });
 
-  document.addEventListener("keyup", (event) => {
-    if (isOverviewAdminEditing(event)) {
-      clearMovementKeys();
-      return;
-    }
-
-    const key = getInputKey(event);
-    keys.delete(key);
-    updateInputDebug();
-  });
-
   window.addEventListener("blur", clearMovementKeys);
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) clearMovementKeys();
@@ -3567,9 +3649,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
   document.addEventListener("pointerlockchange", () => {
     inputDiagnostics.pointerLocked = document.pointerLockElement === canvas;
     inputDiagnostics.pointerLockError = "-";
-
-    if (document.pointerLockElement !== canvas) clearMovementKeys();
-
+    document.body.classList.toggle("is-pointer-locked", document.pointerLockElement === canvas);
     updateInputDebug();
   });
 
@@ -3591,21 +3671,13 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     }
 
     const deltaScale = Math.min(engine.getDeltaTime() / 16.6667, 2);
+    const deltaSeconds = engine.getDeltaTime() / 1000;
     refreshLocalMeshSets();
     const modelSpeedMultiplier = activeModelState.config?.moveSpeedMultiplier || 1;
-    const speed = CONTROLLER_SETTINGS.moveSpeed * modelSpeedMultiplier * (keys.has("shift") ? CONTROLLER_SETTINGS.runMultiplier : 1) * deltaScale;
-    const axes = getFlatAxes();
-    const movement = BABYLON.Vector3.Zero();
 
-    if (keys.has("w") || keys.has("arrowup")) movement.addInPlace(axes.forward);
-    if (keys.has("s") || keys.has("arrowdown")) movement.subtractInPlace(axes.forward);
-    if (keys.has("d") || keys.has("arrowright")) movement.addInPlace(axes.right);
-    if (keys.has("a") || keys.has("arrowleft")) movement.subtractInPlace(axes.right);
-
-    if (movement.lengthSquared() > 0) {
-      movement.normalize().scaleInPlace(speed);
-      inputDiagnostics.lastMoveCommand = Array.from(keys).join(",") || "-";
-      const moveResult = tryMoveWithCollision(BABYLON, scene, walkCamera, movement, localCollisionMeshSet, activeModelState.model.bounds, localGroundMeshSet, {
+    const applyHorizontalMove = (direction, moveSpeed) => {
+      const appliedMovement = direction.clone().scale(moveSpeed);
+      const moveResult = tryMoveWithCollision(BABYLON, scene, walkCamera, appliedMovement, localCollisionMeshSet, activeModelState.model.bounds, localGroundMeshSet, {
         allowStepUp: typeof stepTargetY !== "number"
       });
 
@@ -3625,13 +3697,69 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
       inputDiagnostics.lastCollision = moveResult.reason;
       inputDiagnostics.lastMoveDistance = moveResult.distance.toFixed(3);
       inputDiagnostics.movementBlocked = !moveResult.moved;
+      lastTpsMoveBlocked = !moveResult.moved;
+    };
+
+    const tpsState = tpsSystem?.updateFrame?.({
+      deltaSeconds,
+      deltaScale,
+      keys,
+      isGrounded,
+      verticalVelocity,
+      modelSpeedMultiplier,
+      clearPlayerKeys: () => tpsSystem?.getInputController?.()?.clear(),
+      resolveGroundEyeY: (position) => {
+        const groundPose = getLandingGroundPoseAtPosition(
+          BABYLON,
+          scene,
+          position,
+          localGroundMeshSet,
+          position.y
+        );
+
+        return groundPose?.eyeY ?? position.y;
+      },
+      integrateVertical: (verticalState) => integrateVerticalPhysics(deltaScale, verticalState),
+      applyHorizontalMove,
+      mouseDelta: {
+        x: pendingMouseDeltaX,
+        y: pendingMouseDeltaY
+      },
+      wheelDelta: pendingWheelDelta,
+      onDiagnostics: ({ lastMoveCommand, moved, reason }) => {
+        inputDiagnostics.lastMoveCommand = lastMoveCommand;
+
+        if (!moved && reason) {
+          inputDiagnostics.lastCollision = reason;
+          inputDiagnostics.movementBlocked = false;
+          lastTpsMoveBlocked = false;
+        }
+      }
+    });
+
+    pendingMouseDeltaX = 0;
+    pendingMouseDeltaY = 0;
+    pendingWheelDelta = 0;
+
+    if (typeof tpsState?.verticalVelocity === "number") {
+      verticalVelocity = tpsState.verticalVelocity;
+    }
+
+    if (typeof tpsState?.isGrounded === "boolean") {
+      isGrounded = tpsState.isGrounded;
+    }
+
+    if (tpsState) {
+      lastTpsRuntimeState = tpsState;
+      yaw = tpsState.cameraYaw;
+      pitch = tpsState.cameraPitch;
     } else {
       inputDiagnostics.lastMoveCommand = "-";
       inputDiagnostics.lastCollision = "-";
       inputDiagnostics.movementBlocked = false;
+      lastTpsMoveBlocked = false;
     }
 
-    applyGravity(deltaScale);
     updateFireballs(deltaScale);
     updateEnemy(deltaScale);
 
@@ -3639,12 +3767,20 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
       resetTourWithFade("out of bounds");
     }
 
-    updateDebug();
+    if (treeFacingFrameCounter % 3 === 0) {
+      updateDebug();
+    }
   });
 
   updateDebug();
 
-  return { enterWalkMode, enterOrbitMode, setModelState, isWalkMode: () => walkMode };
+  return {
+    enterWalkMode,
+    enterOrbitMode,
+    setModelState,
+    isWalkMode: () => walkMode,
+    preloadCharacter: () => tpsSystem?.ensureLoaded?.()
+  };
 }
 
 function setModelSlideOffset(BABYLON, modelState, offsetX) {
@@ -4173,6 +4309,9 @@ async function start() {
       updateProjectOverviewVisibility();
     },
     onActiveModelStateChange: showActiveModelState
+  });
+  void controls.preloadCharacter?.().catch((error) => {
+    console.warn("Character preload failed", error);
   });
   previousModelButton.addEventListener("click", () => startModelTransition(-1));
   nextModelButton.addEventListener("click", () => startModelTransition(1));
