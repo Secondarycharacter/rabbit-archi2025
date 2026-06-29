@@ -1,4 +1,4 @@
-import { ACTION } from "./CharacterStateMachine.js?v=jump-over-fix22-tour-20260620";
+import { ACTION } from "./CharacterStateMachine.js?v=tps-tour-test-sync-20260629";
 
 const EMPTY_INPUT = {
   movement: null,

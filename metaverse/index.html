@@ -44,9 +44,11 @@
           <aside class="project-overview is-hidden" id="projectOverview" aria-label="건축개요"></aside>
         </div>
         <div class="hud__actions">
+          <a class="hud__link-button local-dev-only" id="characterTestButton" href="./character-test.html">Character Test</a>
           <button id="sunToggleButton" type="button">Sun</button>
-          <button id="debugToggleButton" type="button">Debug</button>
-          <button id="lockPointerButton" type="button">Click to Play</button>
+          <button class="local-dev-only" id="debugToggleButton" type="button">Debug</button>
+          <button id="orbitViewButton" type="button">Orbit View</button>
+          <button id="tourModeButton" type="button">Tour Mode</button>
         </div>
       </div>
 
@@ -96,7 +98,7 @@
 
     <div class="tour-reset-fade" id="tourResetFade" aria-hidden="true"></div>
 
-    <aside class="debug-panel" id="debugPanel" hidden>
+    <aside class="debug-panel local-dev-only" id="debugPanel" hidden>
       <h2>Model Test</h2>
       <dl>
         <div>
@@ -121,6 +123,26 @@
         </div>
       </dl>
       <button id="copyDebugButton" type="button">Copy Debug</button>
+      <h3>Guest Placement</h3>
+      <p class="guest-placement-hint">
+        원하는 위치로 이동한 뒤 바라볼 방향을 맞추고 <kbd>B</kbd>를 누르세요.
+        오빗 모드에서는 조준점(타깃) 위치를 저장합니다. URL에 <code>?placement=1</code>을 붙이면 자동으로 켜집니다.
+      </p>
+      <label class="guest-placement-label-field" for="guestPlacementLabel">
+        다음 마커 이름 (선택)
+        <input id="guestPlacementLabel" type="text" placeholder="예: happycats-skeleton" />
+      </label>
+      <label class="guest-placement-label-field" for="guestPlacementFile">
+        GLB 경로 (선택)
+        <input id="guestPlacementFile" type="text" placeholder="guest/01 Happycats/..." />
+      </label>
+      <div class="guest-placement-actions">
+        <button id="captureGuestPlacementButton" type="button">Capture (B)</button>
+        <button id="copyGuestPlacementsButton" type="button">Copy JSON</button>
+        <button id="undoGuestPlacementButton" type="button">Undo</button>
+        <button id="clearGuestPlacementsButton" type="button">Clear</button>
+      </div>
+      <ol id="guestPlacementList"></ol>
       <h3>Meshes</h3>
       <ol id="meshList"></ol>
     </aside>
@@ -132,6 +154,6 @@
 
   <script src="https://cdn.babylonjs.com/babylon.js"></script>
   <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
-  <script type="module" src="./src/first-person-tour.js?v=jump-over-fix22-tour-20260620"></script>
+  <script type="module" src="./src/first-person-tour.js?v=local-dev-20260629"></script>
 </body>
 </html>

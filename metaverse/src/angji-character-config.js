@@ -197,7 +197,9 @@ const BASE_CONTROLLER_SETTINGS = {
   blendRunIdle: 0.28,
   blendStopIdle: 0.1,
   blendJump: 0.05,
-  blendAction: 0.2
+  blendJumpRelease: 0.2,
+  blendAction: 0.2,
+  ignoreCollisionDuringJump: true
 };
 
 export const CONTROLLER_SETTINGS = resolveJumpControllerSettings(BASE_CONTROLLER_SETTINGS);

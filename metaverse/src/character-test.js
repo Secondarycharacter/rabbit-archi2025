@@ -1,4 +1,4 @@
-import { createTpsSystem } from "./controllers/createTpsSystem.js?v=jump-over-fix22-tour-20260620";
+import { createTpsSystem } from "./controllers/createTpsSystem.js?v=tps-tour-test-sync-20260629";
 import {
   ANGJI_GROUND_Y,
   ANGJI_MOVE_SPEED_MULTIPLIER,
@@ -8,7 +8,13 @@ import {
   GROUND_SNAP_TOLERANCE,
   MAX_FALL_SPEED,
   createAngjiTpsOptions
-} from "./angji-character-config.js?v=jump-over-fix22-tour-20260620";
+} from "./angji-character-config.js?v=tps-tour-test-sync-20260629";
+import { bindCharacterTpsKeyboard } from "./character-tps-bindings.js?v=tps-tour-test-sync-20260629";
+import { isLocalDevEnvironment } from "./local-dev.js?v=local-dev-20260629";
+
+if (!isLocalDevEnvironment()) {
+  window.location.replace("./index.html");
+}
 
 const BABYLON = window.BABYLON;
 
@@ -31,27 +37,6 @@ let verticalVelocity = 0;
 let pendingMouseDeltaX = 0;
 let pendingMouseDeltaY = 0;
 let pendingWheelDelta = 0;
-
-function getInputKey(event) {
-  const codeMap = {
-    KeyW: "w",
-    KeyA: "a",
-    KeyS: "s",
-    KeyD: "d",
-    KeyE: "e",
-    KeyJ: "j",
-    KeyP: "p",
-    ArrowUp: "arrowup",
-    ArrowDown: "arrowdown",
-    ArrowLeft: "arrowleft",
-    ArrowRight: "arrowright",
-    ShiftLeft: "shift",
-    ShiftRight: "shift",
-    Space: " "
-  };
-
-  return codeMap[event.code] || String(event.key || "").toLowerCase();
-}
 
 function createWalkCamera(scene) {
   const camera = new BABYLON.UniversalCamera(
@@ -326,7 +311,7 @@ async function main() {
     createAngjiTpsOptions(walkCamera, {
       onLoadError: (error) => {
         console.error(error);
-        statusLine.textContent = "Character load failed. Check rabbit01.glb path.";
+        statusLine.textContent = "Character load failed. Check rabbit_Explorer_Ver2.glb path.";
       }
     })
   );
@@ -360,48 +345,12 @@ async function main() {
     pendingMouseDeltaY += event.movementY || 0;
   });
 
-  window.addEventListener("keydown", (event) => {
-    const key = getInputKey(event);
-    const movementKeys = ["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright", "shift", " "];
-    const inputBlocked = walkMode && tpsSystem.isPlayerInputBlocked?.();
-
-    if (key === "e" && !event.repeat && walkMode && !inputBlocked) {
-      event.preventDefault();
-      tpsSystem.getInputController()?.queueThrow();
-    }
-
-    if (key === "p" && !event.repeat && walkMode && !inputBlocked) {
-      event.preventDefault();
-      tpsSystem.getInputController()?.queueDance();
-    }
-
-    if (key === " " && !event.repeat && walkMode && !inputBlocked) {
-      tpsSystem.getInputController()?.queueJump();
-    }
-
-    if (key === "j" && !event.repeat && walkMode) {
-      event.preventDefault();
-      tpsSystem.getInputController()?.queueJumpOver();
-    }
-
-    if (movementKeys.includes(key)) {
-      event.preventDefault();
-
-      if (walkMode) {
-        keys.add(key);
-      }
-    }
-  });
-
-  window.addEventListener("keyup", (event) => {
-    keys.delete(getInputKey(event));
-  });
-
-  window.addEventListener("blur", () => clearMovementKeys(tpsSystem));
-  document.addEventListener("visibilitychange", () => {
-    if (document.hidden) {
-      clearMovementKeys(tpsSystem);
-    }
+  bindCharacterTpsKeyboard(window, {
+    canvas,
+    keys,
+    getWalkMode: () => walkMode,
+    getTpsSystem: () => tpsSystem,
+    onClearKeys: () => clearMovementKeys(tpsSystem)
   });
 
   scene.onBeforeRenderObservable.add(() => {

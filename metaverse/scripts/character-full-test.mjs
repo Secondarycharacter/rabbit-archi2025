@@ -11,7 +11,7 @@ import { ACTION, LOCOMOTION, WALK_JUMP_PHASE, createCharacterStateMachine } from
 import { CONTROLLER_SETTINGS } from "../src/angji-character-config.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const GLB_PATH = path.join(__dirname, "../assets/character/rabbit01.glb");
+const GLB_PATH = path.join(__dirname, "../assets/character/rabbit_Explorer_Ver2.glb");
 
 let passed = 0;
 let failed = 0;

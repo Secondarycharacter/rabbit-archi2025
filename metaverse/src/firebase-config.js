@@ -8,4 +8,4 @@ export const FIREBASE_CONFIG = {
 };
 
 // Prototype-only passcode. For production, replace this with Firebase Authentication.
-export const OVERVIEW_ADMIN_PASSCODE = "d5f4667cf6475357097dacbc04f2aa0372df86183fb922b6c77babcae9f50cc4";
+export const OVERVIEW_ADMIN_PASSCODE = "0000";

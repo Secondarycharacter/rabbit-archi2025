@@ -1,16 +1,24 @@
-import { createAnimationController } from "./AnimationController.js?v=jump-over-fix22-tour-20260620";
-import { createCameraController } from "./CameraController.js?v=jump-over-fix22-tour-20260620";
-import { createCharacterStateMachine, ACTION } from "./CharacterStateMachine.js?v=jump-over-fix22-tour-20260620";
-import { createInputController } from "./InputController.js?v=jump-over-fix22-tour-20260620";
-import { createMovementController } from "./MovementController.js?v=jump-over-fix22-tour-20260620";
+import { createAnimationController } from "./AnimationController.js?v=tps-jump-nocol-20260629";
+import { createCameraController } from "./CameraController.js?v=tps-jump-nocol-20260629";
+import { createCharacterStateMachine, ACTION } from "./CharacterStateMachine.js?v=tps-jump-nocol-20260629";
+import { createInputController } from "./InputController.js?v=tps-jump-nocol-20260629";
+import { createMovementController } from "./MovementController.js?v=tps-jump-nocol-20260629";
 import {
   createCharacterController,
   loadCharacterModel,
   CHARACTER_FILE,
   CHARACTER_ROOT
-} from "./CharacterController.js?v=jump-over-fix22-tour-20260620";
-import { CLIP_NAMES } from "./AnimationController.js?v=jump-over-fix22-tour-20260620";
-import { createRootMotionNeutralizer, stripLocomotionRootMotion } from "./RootMotionNeutralizer.js?v=jump-over-fix22-tour-20260620";
+} from "./CharacterController.js?v=tps-jump-nocol-20260629";
+import { CLIP_NAMES } from "./AnimationController.js?v=tps-jump-nocol-20260629";
+import { createRootMotionNeutralizer, stripLocomotionRootMotion } from "./RootMotionNeutralizer.js?v=tps-jump-nocol-20260629";
+
+function shouldIgnoreCollisionDuringJump(stateOutput, isGrounded) {
+  return Boolean(
+    stateOutput.walkJumpHorizontalMoveActive
+    || stateOutput.walkJumpAnimInAirborne
+    || (!isGrounded && stateOutput.isJumpAction)
+  );
+}
 
 export function createTpsSystem(BABYLON, scene, camera, options = {}) {
   const {
@@ -54,6 +62,7 @@ export function createTpsSystem(BABYLON, scene, camera, options = {}) {
     doubleTapMs: controllerSettings.jumpDoubleTapMs ?? 320
   });
   const movementController = createMovementController(controllerSettings);
+  const ignoreCollisionDuringJump = controllerSettings.ignoreCollisionDuringJump !== false;
 
   const cameraController = createCameraController(BABYLON, scene, camera, {
     mouseSensitivity: controllerSettings.mouseSensitivity ?? 0.0022,
@@ -257,7 +266,10 @@ export function createTpsSystem(BABYLON, scene, camera, options = {}) {
     });
 
     if (movementResult.moveDirection && movementResult.moveSpeed > 0.000001 && applyHorizontalMove) {
-      applyHorizontalMove(movementResult.moveDirection, movementResult.moveSpeed);
+      applyHorizontalMove(movementResult.moveDirection, movementResult.moveSpeed, {
+        ignoreCollision: ignoreCollisionDuringJump
+          && shouldIgnoreCollisionDuringJump(stateOutput, isGrounded)
+      });
       onDiagnostics?.({
         lastMoveCommand: Array.from(keys).join(",") || "-",
         moved: true
@@ -303,7 +315,11 @@ export function createTpsSystem(BABYLON, scene, camera, options = {}) {
         if (rootDistance > 0.000001) {
           applyHorizontalMove(
             new BABYLON.Vector3(rootDelta.x / rootDistance, 0, rootDelta.z / rootDistance),
-            rootDistance
+            rootDistance,
+            {
+              ignoreCollision: ignoreCollisionDuringJump
+                && shouldIgnoreCollisionDuringJump(stateOutput, isGrounded)
+            }
           );
         }
       }

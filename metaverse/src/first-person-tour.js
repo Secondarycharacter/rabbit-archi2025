@@ -1,18 +1,31 @@
-import { FIREBASE_CONFIG, OVERVIEW_ADMIN_PASSCODE } from "./firebase-config.js?v=jump-over-fix22-tour-20260620";
-import { createTpsSystem } from "./controllers/createTpsSystem.js?v=jump-over-fix22-tour-20260620";
+import { FIREBASE_CONFIG, OVERVIEW_ADMIN_PASSCODE } from "./firebase-config.js?v=tps-jump-nocol-20260629";
+import { createTpsSystem } from "./controllers/createTpsSystem.js?v=tps-jump-nocol-20260629";
 import {
   CONTROLLER_SETTINGS,
   EYE_HEIGHT,
   MAX_FALL_SPEED,
   GROUND_SNAP_TOLERANCE,
+  ANGJI_MOVE_SPEED_MULTIPLIER,
   createAngjiTpsOptions
-} from "./angji-character-config.js?v=jump-over-fix22-tour-20260620";
+} from "./angji-character-config.js?v=tps-jump-nocol-20260629";
+import {
+  applyCharacterTpsKeyDown
+} from "./character-tps-bindings.js?v=tps-jump-nocol-20260629";
+import { createGuestPlacementTool } from "./guest-placement-tool.js?v=tps-jump-nocol-20260629";
+import {
+  ANGJI_GUEST_MARKS,
+  ANGJI_PRIORITY_GUEST_IDS,
+  ANGJI_SIMULTANEOUS_GUEST_IDS
+} from "./angji-guest-config.js?v=mark-456-y-down-20260629";
+import { createGuestCharacterSystem } from "./guest-character-system.js?v=guest-root-motion-20260629";
+import { applyLocalDevToolsVisibility, isLocalDevEnvironment } from "./local-dev.js?v=local-dev-20260629";
 
 const MODEL_ROOT = "./assets/models/";
-const ENEMY_ROOT = "./assets/enemies/";
+const ENEMY_ROOT = "./assets/guest/";
 const AUDIO_BGM_ROOT = "./assets/audio/bgm/";
 const TOUR_BGM_FADE_MS = 3000;
 const TOUR_BGM_VOLUME = 1;
+const TOUR_BGM_ENABLED = false;
 const DEFAULT_MODEL_FILE = "Angji.glb";
 const MODEL_CONFIGS = [
   {
@@ -163,6 +176,9 @@ const FLOOR_MATERIAL_KEYWORDS = [
   "ground"
 ];
 const PASS_THROUGH_MATERIAL_KEYWORDS = ["defaultmaterial8", "people"];
+const TOUR_PROP_MATERIAL_EXACT_NAMES = ["people01"];
+const TOUR_PROP_MATERIAL_KEYWORDS = ["<lc>", ...PASS_THROUGH_MATERIAL_KEYWORDS];
+const TOUR_PROP_NODE_KEYWORDS = ["prop", "소품", "decor", "decoration", "accessory", "ornament"];
 const FLOOR_NODE_KEYWORDS = [
   "3dgeom247",
   "3dgeom1133",
@@ -281,7 +297,8 @@ const projectTitle = document.getElementById("projectTitle");
 const floorLabel = document.getElementById("floorLabel");
 const healthLabel = document.getElementById("healthLabel");
 const monsterLabel = document.getElementById("monsterLabel");
-const lockPointerButton = document.getElementById("lockPointerButton");
+const tourModeButton = document.getElementById("tourModeButton");
+const orbitViewButton = document.getElementById("orbitViewButton");
 const sunToggleButton = document.getElementById("sunToggleButton");
 const sunPanel = document.getElementById("sunPanel");
 const seasonSlider = document.getElementById("seasonSlider");
@@ -297,6 +314,13 @@ const playerDebug = document.getElementById("playerDebug");
 const inputDebug = document.getElementById("inputDebug");
 const meshList = document.getElementById("meshList");
 const copyDebugButton = document.getElementById("copyDebugButton");
+const guestPlacementLabel = document.getElementById("guestPlacementLabel");
+const guestPlacementFile = document.getElementById("guestPlacementFile");
+const guestPlacementList = document.getElementById("guestPlacementList");
+const captureGuestPlacementButton = document.getElementById("captureGuestPlacementButton");
+const copyGuestPlacementsButton = document.getElementById("copyGuestPlacementsButton");
+const undoGuestPlacementButton = document.getElementById("undoGuestPlacementButton");
+const clearGuestPlacementsButton = document.getElementById("clearGuestPlacementsButton");
 const modelSwitcher = document.getElementById("modelSwitcher");
 const previousModelButton = document.getElementById("previousModelButton");
 const nextModelButton = document.getElementById("nextModelButton");
@@ -310,6 +334,7 @@ const overviewAdminForm = document.getElementById("overviewAdminForm");
 const overviewAdminRows = document.getElementById("overviewAdminRows");
 const overviewAdminAddRowButton = document.getElementById("overviewAdminAddRowButton");
 const overviewAdminStatus = document.getElementById("overviewAdminStatus");
+const localDevToolsEnabled = applyLocalDevToolsVisibility();
 const PROJECT_OVERVIEWS_PATH = "./data/project-overviews.json";
 const OVERVIEW_LOCAL_STORAGE_KEY = "metaverseProjectOverviews";
 const FIRESTORE_OVERVIEW_COLLECTION = "metaverseProjectOverviews";
@@ -436,26 +461,69 @@ healthLabel.textContent = "Human scale";
 monsterLabel.textContent = "Object collision";
 statusMessage.textContent = `Loading ${MODEL_CONFIGS.map((model) => model.file).join(", ")}...`;
 
-debugToggleButton.addEventListener("click", () => {
-  debugPanel.hidden = !debugPanel.hidden;
-});
+function isPlacementToolEnabled() {
+  return localDevToolsEnabled && (!debugPanel.hidden || booleanParam("placement", false));
+}
 
-copyDebugButton.addEventListener("click", async () => {
-  const debugText = [
-    `Status: ${modelStatus.textContent}`,
-    `Source: ${modelSource.textContent}`,
-    `Stats: ${modelStats.textContent}`,
-    `Player: ${playerDebug.textContent}`,
-    `Input: ${inputDebug.textContent}`
-  ].join("\n");
-
-  try {
-    await navigator.clipboard.writeText(debugText);
-    setStatus("Debug copied. Paste it in chat so I can inspect the current position.");
-  } catch {
-    setStatus(debugText);
+function renderGuestPlacementList(markers) {
+  if (!guestPlacementList) {
+    return;
   }
-});
+
+  guestPlacementList.innerHTML = markers.length === 0
+    ? "<li>아직 마커가 없습니다.</li>"
+    : markers.map((marker) => (
+      `<li><strong>${marker.label}</strong>`
+      + `${marker.file ? ` / ${marker.file}` : ""}`
+      + `<br>pos x ${marker.position.x}, y ${marker.position.y}, z ${marker.position.z}`
+      + `<br>rotY ${marker.rotationY} (${marker.rotationYDeg}°)`
+      + `</li>`
+    )).join("");
+}
+
+function getGuestPlacementInputs() {
+  return {
+    label: guestPlacementLabel?.value?.trim() || "",
+    file: guestPlacementFile?.value?.trim() || ""
+  };
+}
+
+function clearGuestPlacementInputs() {
+  if (guestPlacementLabel) {
+    guestPlacementLabel.value = "";
+  }
+
+  if (guestPlacementFile) {
+    guestPlacementFile.value = "";
+  }
+}
+
+if (localDevToolsEnabled) {
+  debugToggleButton?.addEventListener("click", () => {
+    debugPanel.hidden = !debugPanel.hidden;
+  });
+
+  if (booleanParam("placement", false)) {
+    debugPanel.hidden = false;
+  }
+
+  copyDebugButton?.addEventListener("click", async () => {
+    const debugText = [
+      `Status: ${modelStatus.textContent}`,
+      `Source: ${modelSource.textContent}`,
+      `Stats: ${modelStats.textContent}`,
+      `Player: ${playerDebug.textContent}`,
+      `Input: ${inputDebug.textContent}`
+    ].join("\n");
+
+    try {
+      await navigator.clipboard.writeText(debugText);
+      setStatus("Debug copied. Paste it in chat so I can inspect the current position.");
+    } catch {
+      setStatus(debugText);
+    }
+  });
+}
 
 function setStatus(message) {
   statusMessage.textContent = message;
@@ -959,6 +1027,39 @@ function isNonCollisionProp(node) {
   return false;
 }
 
+function isTourPropMesh(mesh) {
+  if (isNonCollisionProp(mesh)) {
+    return true;
+  }
+
+  if (hasExactMaterialName(mesh, TOUR_PROP_MATERIAL_EXACT_NAMES)) {
+    return true;
+  }
+
+  if (hasMaterialKeyword(mesh, TOUR_PROP_MATERIAL_KEYWORDS)) {
+    return true;
+  }
+
+  let current = mesh;
+
+  while (current) {
+    if (current.metadata?.isGeneratedTourRoot) {
+      current = current.parent;
+      continue;
+    }
+
+    const name = normalizeName(current.name || current.id);
+
+    if (TOUR_PROP_NODE_KEYWORDS.some((keyword) => name.includes(normalizeName(keyword)))) {
+      return true;
+    }
+
+    current = current.parent;
+  }
+
+  return false;
+}
+
 function isNonWalkableObject(node) {
   const nonWalkableNames = [
     "car",
@@ -1019,11 +1120,82 @@ function hasExactMaterialName(mesh, names) {
   return getMaterialNames(mesh).some((name) => normalizedTargets.has(normalizeName(name)));
 }
 
+function auditAngjiTourElements(modelState) {
+  if (!modelState) {
+    return null;
+  }
+
+  const categories = {
+    disabled: [],
+    invisible: [],
+    peopleProps: [],
+    propMeshes: [],
+    glass: [],
+    trees: [],
+    metal: [],
+    splitPeopleComponents: []
+  };
+
+  modelState.meshes.forEach((mesh) => {
+    const label = mesh.name || mesh.id || "(unnamed)";
+    const materialNames = getMaterialNames(mesh).join(",") || "no-material";
+    const entry = `${label} [${materialNames}]`;
+
+    if (!mesh.isEnabled()) {
+      categories.disabled.push(entry);
+    }
+
+    if (typeof mesh.visibility === "number" && mesh.visibility <= 0.02) {
+      categories.invisible.push(entry);
+    }
+
+    if (mesh.metadata?.fireballSplitComponent) {
+      categories.splitPeopleComponents.push(entry);
+    } else if (hasExactMaterialName(mesh, ["people01"])) {
+      categories.peopleProps.push(entry);
+    }
+
+    if (isTourPropMesh(mesh)) {
+      categories.propMeshes.push(entry);
+    }
+
+    if (hasMaterialKeyword(mesh, ["glass", "translucent"])) {
+      categories.glass.push(entry);
+    }
+
+    if (isDtvTreeMesh(mesh)) {
+      categories.trees.push(entry);
+    }
+
+    if (hasMaterialKeyword(mesh, ["metal", "aluminum", "silver"])) {
+      categories.metal.push(entry);
+    }
+  });
+
+  const summary = {
+    totalMeshes: modelState.meshes.length,
+    disabled: categories.disabled.length,
+    invisible: categories.invisible.length,
+    peopleProps: categories.peopleProps.length,
+    propMeshes: categories.propMeshes.length,
+    splitPeopleComponents: categories.splitPeopleComponents.length,
+    glass: categories.glass.length,
+    trees: categories.trees.length,
+    metal: categories.metal.length
+  };
+
+  return { summary, categories };
+}
+
 function isAngjiProjectConfig(config) {
   return config?.overviewId === "angji";
 }
 
 function getTourBgmUrl(config) {
+  if (!TOUR_BGM_ENABLED) {
+    return null;
+  }
+
   const fileName = config?.tourBgm;
 
   if (!fileName) {
@@ -1646,8 +1818,7 @@ function getInputKey(event) {
     KeyJ: "j",
     KeyP: "p",
     KeyG: "g",
-    KeyR: "r",
-    KeyF: "f",
+    KeyB: "b",
     ArrowUp: "arrowup",
     ArrowDown: "arrowdown",
     ArrowLeft: "arrowleft",
@@ -2679,6 +2850,8 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
   let pendingMouseDeltaY = 0;
   let pendingWheelDelta = 0;
   let lastTpsRuntimeState = null;
+  let guestPlacementTool = null;
+  let guestCharacterSystem = null;
   const enemyState = {
     asset: null,
     loadPromise: null,
@@ -2705,6 +2878,165 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
       }
     })
   );
+
+  guestPlacementTool = createGuestPlacementTool(BABYLON, scene, {
+    eyeHeight: EYE_HEIGHT,
+    resolveGroundPoint: (x, z, referenceEyeY) => {
+      const pose = getLandingGroundPoseAtPosition(
+        BABYLON,
+        scene,
+        new BABYLON.Vector3(x, referenceEyeY, z),
+        localGroundMeshSet,
+        referenceEyeY
+      );
+
+      if (!pose) {
+        return null;
+      }
+
+      return new BABYLON.Vector3(x, pose.groundY, z);
+    },
+    onChange: (markers) => {
+      renderGuestPlacementList(markers);
+    }
+  });
+  renderGuestPlacementList([]);
+
+  guestCharacterSystem = createGuestCharacterSystem(BABYLON, scene, {
+    getGeometryMeshes,
+    getRootNodes,
+    updateWorldMatrices,
+    getFullBounds,
+    softenModelMaterialReflections,
+    targetHeight: 1.75
+  });
+  preloadAngjiPriorityGuests();
+
+  function getAngjiPriorityGuestSpawns() {
+    return ANGJI_GUEST_MARKS.filter((spawn) => ANGJI_PRIORITY_GUEST_IDS.includes(spawn.id));
+  }
+
+  function getAngjiSimultaneousGuestSpawns() {
+    return ANGJI_GUEST_MARKS.filter((spawn) => ANGJI_SIMULTANEOUS_GUEST_IDS.includes(spawn.id));
+  }
+
+  function getAngjiBackgroundGuestSpawns() {
+    const reservedIds = new Set([...ANGJI_PRIORITY_GUEST_IDS, ...ANGJI_SIMULTANEOUS_GUEST_IDS]);
+    return ANGJI_GUEST_MARKS.filter((spawn) => !reservedIds.has(spawn.id));
+  }
+
+  function preloadAngjiPriorityGuests() {
+    if (!isAngjiProjectConfig(activeModelState.config)) {
+      return;
+    }
+
+    void guestCharacterSystem?.preload(getAngjiPriorityGuestSpawns());
+    void guestCharacterSystem?.preload(getAngjiSimultaneousGuestSpawns(), { parallel: true });
+  }
+
+  function canUseAngjiGuests() {
+    return walkMode && isAngjiProjectConfig(activeModelState.config);
+  }
+
+  async function scheduleGuestSpawn() {
+    if (!canUseAngjiGuests()) {
+      guestCharacterSystem?.hide();
+      return;
+    }
+
+    guestCharacterSystem.show({ excludeIds: ANGJI_SIMULTANEOUS_GUEST_IDS });
+
+    try {
+      await guestCharacterSystem.ensureSpawned(getAngjiPriorityGuestSpawns());
+      await guestCharacterSystem.ensureSpawned(getAngjiSimultaneousGuestSpawns(), { parallel: true });
+      void guestCharacterSystem.ensureSpawned(getAngjiBackgroundGuestSpawns()).then(() => {
+        window.auditAngjiTourElements?.();
+      });
+    } catch (error) {
+      console.error("Guest spawn failed", error);
+    }
+  }
+
+  function getPlacementFacingYaw() {
+    const characterYaw = tpsSystem?.getCharacter?.()?.getFacingYaw?.();
+
+    if (walkMode && typeof characterYaw === "number") {
+      return characterYaw;
+    }
+
+    return yaw;
+  }
+
+  function captureGuestPlacement() {
+    if (!guestPlacementTool || !isPlacementToolEnabled()) {
+      return null;
+    }
+
+    const { label, file } = getGuestPlacementInputs();
+    const marker = walkMode
+      ? guestPlacementTool.captureFromWalk({
+        eyePosition: walkCamera.position.clone(),
+        rotationY: getPlacementFacingYaw(),
+        label,
+        file
+      })
+      : guestPlacementTool.captureFromOrbit({
+        cameraPosition: orbitCamera.position.clone(),
+        target: (orbitCamera.target || BABYLON.Vector3.Zero()).clone(),
+        label,
+        file
+      });
+
+    clearGuestPlacementInputs();
+    setStatus(`Guest placement saved: ${marker.label}`);
+    return marker;
+  }
+
+  captureGuestPlacementButton?.addEventListener("click", () => {
+    captureGuestPlacement();
+  });
+
+  copyGuestPlacementsButton?.addEventListener("click", async () => {
+    if (!guestPlacementTool) {
+      return;
+    }
+
+    try {
+      const text = await guestPlacementTool.copyToClipboard();
+      setStatus(`Copied ${guestPlacementTool.getMarkers().length} guest placement(s).`);
+      console.info(text);
+    } catch (error) {
+      setStatus(`Copy failed: ${error.message || error}`);
+    }
+  });
+
+  undoGuestPlacementButton?.addEventListener("click", () => {
+    const removed = guestPlacementTool?.undoLast();
+
+    if (removed) {
+      setStatus(`Removed placement: ${removed.label}`);
+    }
+  });
+
+  clearGuestPlacementsButton?.addEventListener("click", () => {
+    guestPlacementTool?.clear();
+    setStatus("Guest placements cleared.");
+  });
+
+  window.guestPlacement = {
+    capture: () => captureGuestPlacement(),
+    copy: () => guestPlacementTool?.copyToClipboard(),
+    markers: () => guestPlacementTool?.getMarkers() || [],
+    json: () => guestPlacementTool?.formatJson() || "[]"
+  };
+
+  window.auditAngjiTourElements = () => {
+    const walkModelState = activeModelState.tourModelState || activeModelState;
+    const report = auditAngjiTourElements(walkModelState);
+    console.info("[angji-tour-audit]", report?.summary || "no model");
+    console.table(report?.summary || {});
+    return report;
+  };
 
   function clearMovementKeys() {
     keys.clear();
@@ -2924,7 +3256,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     const target = getEnemyPatrolPoint(enemyState.patrolTargetIndex);
     const toTarget = target.subtract(asset.root.position);
     const distance = toTarget.length();
-    const modelSpeedMultiplier = activeModelState.config?.moveSpeedMultiplier || 1;
+    const modelSpeedMultiplier = ANGJI_MOVE_SPEED_MULTIPLIER;
     const patrolSpeed = CONTROLLER_SETTINGS.moveSpeed
       * modelSpeedMultiplier
       * ENEMY_SETTINGS.patrolSpeedMultiplier
@@ -2989,6 +3321,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     lastTreeViewerPosition = null;
     treeFacingFrameCounter = 0;
     activeModelState = nextModelState;
+    preloadAngjiPriorityGuests();
     clearMovementKeys();
     verticalVelocity = 0;
     stepTargetY = null;
@@ -3481,6 +3814,20 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     updateInputDebug();
   }
 
+  function updateModeSwitchButtons() {
+    if (tourModeButton) {
+      tourModeButton.disabled = walkMode;
+      tourModeButton.classList.toggle("is-active", walkMode);
+      tourModeButton.setAttribute("aria-pressed", walkMode ? "true" : "false");
+    }
+
+    if (orbitViewButton) {
+      orbitViewButton.disabled = !walkMode;
+      orbitViewButton.classList.toggle("is-active", !walkMode);
+      orbitViewButton.setAttribute("aria-pressed", walkMode ? "false" : "true");
+    }
+  }
+
   async function enterWalkMode(shouldLockPointer = false, walkEntryOptions = {}) {
     const walkModelState = activeModelState.tourModelState || activeModelState;
 
@@ -3502,6 +3849,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     resetWalkCameraToTourStart();
     tpsSystem?.show?.();
     scheduleEnemySpawn();
+    void scheduleGuestSpawn();
     options.onModeChange?.("walk");
     currentLabel = "third-person tour";
 
@@ -3510,7 +3858,8 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     }
 
     floorLabel.textContent = "Walk Mode (TPS)";
-    setStatus("Third-person walk mode active. WASD moves, Shift runs, Space jumps, J jump-over test, E throws, P dances, mouse looks, wheel zooms.");
+    setStatus("Third-person walk mode active. WASD moves, Shift runs, Space jumps, J jump-over test, E throws, P dances, mouse looks, wheel zooms. Use Orbit View to return.");
+    updateModeSwitchButtons();
     updateDebug();
   }
 
@@ -3519,6 +3868,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     document.body.classList.remove("walk-mode-active");
     clearFireballs();
     resetEnemy();
+    guestCharacterSystem?.hide();
     clearMovementKeys();
     tpsSystem?.hide?.();
     document.exitPointerLock?.();
@@ -3529,12 +3879,13 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     scene.activeCamera = orbitCamera;
     floorLabel.textContent = "Orbit View";
     currentLabel = "orbit view";
-    setStatus("Orbit view ready. Middle mouse rotates, Shift+middle pans, wheel zooms to cursor. Click to Play starts walk mode.");
+    setStatus("Orbit view ready. Middle mouse rotates, Shift+middle pans, wheel zooms to cursor. Use Tour Mode to enter walk mode.");
     options.onModeChange?.("orbit");
+    updateModeSwitchButtons();
     updateDebug();
   }
 
-  lockPointerButton.addEventListener("click", () => {
+  tourModeButton?.addEventListener("click", () => {
     if (walkMode) {
       return;
     }
@@ -3543,6 +3894,16 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     options.tourBgm?.onEnterWalkMode(walkModelState.config, { keepBgm: false });
     void enterWalkMode(true, { bgmAlreadyStarted: true });
   });
+
+  orbitViewButton?.addEventListener("click", () => {
+    if (!walkMode) {
+      return;
+    }
+
+    enterOrbitMode();
+  });
+
+  updateModeSwitchButtons();
 
   canvas.addEventListener("click", () => {
     if (walkMode) {
@@ -3580,49 +3941,33 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
 
     const key = getInputKey(event);
     const inputCode = event.code || event.key || "?";
-    const movementKeys = ["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright", "shift", " "];
-    const inputBlocked = walkMode && tpsSystem?.isPlayerInputBlocked?.();
 
     if (!event.repeat) {
       inputDiagnostics.keyDownCount += 1;
       inputDiagnostics.lastKeyDown = `${key || "unknown"} (${inputCode})`;
     }
 
-    if (key === "f" && !event.repeat) {
-      enterOrbitMode();
-    }
-
-    if (key === "r" && !event.repeat) {
-      void enterWalkMode(document.pointerLockElement === canvas, { keepBgm: true });
-    }
-
-    if (key === "e" && !event.repeat && !inputBlocked) {
+    if (
+      event.code === "KeyB"
+      && !event.repeat
+      && isPlacementToolEnabled()
+      && !isOverviewAdminEditing(event)
+      && !(event.target instanceof HTMLInputElement)
+      && !(event.target instanceof HTMLTextAreaElement)
+    ) {
       event.preventDefault();
-      tpsSystem?.getInputController?.()?.queueThrow();
-      tryShootFireball();
+      captureGuestPlacement();
+      return;
     }
 
-    if (key === "p" && !event.repeat && walkMode && !inputBlocked) {
-      event.preventDefault();
-      tpsSystem?.getInputController?.()?.queueDance();
-    }
-
-    if (key === " " && !event.repeat && walkMode && !inputBlocked) {
-      tpsSystem?.getInputController?.()?.queueJump();
-    }
-
-    if (key === "j" && !event.repeat && walkMode) {
-      event.preventDefault();
-      tpsSystem?.getInputController?.()?.queueJumpOver();
-    }
-
-    if (movementKeys.includes(key)) {
-      event.preventDefault();
-
-      if (walkMode) {
-        keys.add(key);
-      }
-    }
+    const inputBlocked = walkMode && tpsSystem?.isPlayerInputBlocked?.();
+    applyCharacterTpsKeyDown(event, {
+      walkMode,
+      keys,
+      tpsSystem,
+      inputBlocked,
+      onThrowExtra: tryShootFireball
+    });
 
     if (!event.repeat) {
       updateInputDebug();
@@ -3673,9 +4018,20 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     const deltaScale = Math.min(engine.getDeltaTime() / 16.6667, 2);
     const deltaSeconds = engine.getDeltaTime() / 1000;
     refreshLocalMeshSets();
-    const modelSpeedMultiplier = activeModelState.config?.moveSpeedMultiplier || 1;
+    const modelSpeedMultiplier = ANGJI_MOVE_SPEED_MULTIPLIER;
 
-    const applyHorizontalMove = (direction, moveSpeed) => {
+    const applyHorizontalMove = (direction, moveSpeed, options = {}) => {
+      if (options.ignoreCollision) {
+        const next = walkCamera.position.add(direction.scale(moveSpeed));
+        walkCamera.position.x = next.x;
+        walkCamera.position.z = next.z;
+        inputDiagnostics.lastCollision = "jump";
+        inputDiagnostics.lastMoveDistance = moveSpeed.toFixed(3);
+        inputDiagnostics.movementBlocked = false;
+        lastTpsMoveBlocked = false;
+        return;
+      }
+
       const appliedMovement = direction.clone().scale(moveSpeed);
       const moveResult = tryMoveWithCollision(BABYLON, scene, walkCamera, appliedMovement, localCollisionMeshSet, activeModelState.model.bounds, localGroundMeshSet, {
         allowStepUp: typeof stepTargetY !== "number"
@@ -3762,6 +4118,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
 
     updateFireballs(deltaScale);
     updateEnemy(deltaScale);
+    guestCharacterSystem?.update(deltaScale);
 
     if (isWalkCameraOutsideTourBounds()) {
       resetTourWithFade("out of bounds");
@@ -3958,7 +4315,7 @@ function renderModelDebug(modelState) {
 
   modelStatus.textContent = `Loaded ${config.label}`;
   modelSource.textContent = `${MODEL_ROOT}${config.file}`;
-  modelStats.textContent = `${meshes.length} meshes / collision ${collisionMeshes.length} / walkable ${walkableGroundMeshes.length} / stairSurfaces ${stairSurfaceMeshes.length} / floorSurfaces ${floorSurfaceMeshes.length} / peopleTargets ${peopleTargetMeshes.length} / humanPassThrough ${modelState.humanPassThroughCount} / furniturePassThrough ${modelState.furniturePassThroughCount || 0} / collisionFallback ${modelState.usedCollisionFallback ? "yes" : "no"} / scale ${model.scale.toExponential(3)} / full ${boundsToText(model.bounds)} / focus ${boundsToText(model.focusBounds)} / ${model.tourStartNode ? "Tour_Start found" : "Tour_Start not found"}`;
+  modelStats.textContent = `${meshes.length} meshes / collision ${collisionMeshes.length} / walkable ${walkableGroundMeshes.length} / stairSurfaces ${stairSurfaceMeshes.length} / floorSurfaces ${floorSurfaceMeshes.length} / peopleTargets ${peopleTargetMeshes.length} / propPassThrough ${modelState.propPassThroughCount} / furniturePassThrough ${modelState.furniturePassThroughCount || 0} / collisionFallback ${modelState.usedCollisionFallback ? "yes" : "no"} / scale ${model.scale.toExponential(3)} / full ${boundsToText(model.bounds)} / focus ${boundsToText(model.focusBounds)} / ${model.tourStartNode ? "Tour_Start found" : "Tour_Start not found"}`;
   meshList.replaceChildren(
     ...meshes.slice(0, 50).map((mesh) => {
       const item = document.createElement("li");
@@ -3977,7 +4334,7 @@ async function loadTourModelState(BABYLON, scene, config) {
   model.root.name = `tour-building-root-${normalizeName(config.label)}`;
   meshes = [...meshes, ...splitPeopleTargetMeshes(BABYLON, scene, meshes)];
 
-  let humanPassThroughCount = 0;
+  let propPassThroughCount = 0;
   let furniturePassThroughCount = 0;
   const peopleTargetMeshes = [];
 
@@ -3985,12 +4342,12 @@ async function loadTourModelState(BABYLON, scene, config) {
     getCachedMeshBounds(BABYLON, mesh);
 
     const furniture = isChungjuProjectConfig(config) && isFurnitureMesh(mesh);
-    const humanPassThrough = isNonCollisionProp(mesh);
-    const passThrough = humanPassThrough || furniture;
+    const propPassThrough = isTourPropMesh(mesh);
+    const passThrough = propPassThrough || furniture;
     const peopleTarget = isPeopleFireballTarget(mesh);
 
-    if (humanPassThrough) {
-      humanPassThroughCount += 1;
+    if (propPassThrough) {
+      propPassThroughCount += 1;
     }
 
     if (furniture) {
@@ -4007,7 +4364,8 @@ async function loadTourModelState(BABYLON, scene, config) {
       ...(mesh.metadata || {}),
       passThrough,
       peopleTarget,
-      furniture
+      furniture,
+      tourProp: propPassThrough
     };
   });
 
@@ -4082,7 +4440,7 @@ async function loadTourModelState(BABYLON, scene, config) {
     meshes,
     model,
     baseRootPosition: model.root.position.clone(),
-    humanPassThroughCount,
+    propPassThroughCount,
     furniturePassThroughCount,
     usedCollisionFallback,
     collisionMeshes,
@@ -4294,7 +4652,7 @@ async function start() {
     applyOrbitCameraConstraints(BABYLON, orbitCamera, transitionState.nextModelState);
     applyOrbitEnvironmentSettings(BABYLON, sun, transitionState.nextModelState);
     renderModelDebug(transitionState.nextModelState);
-    setStatus(`${transitionState.nextModelState.config.label} orbit view ready. Middle mouse rotates, Shift+middle pans, wheel zooms to cursor. Click to Play starts walk mode.`);
+    setStatus(`${transitionState.nextModelState.config.label} orbit view ready. Middle mouse rotates, Shift+middle pans, wheel zooms to cursor. Use Tour Mode to enter walk mode.`);
 
     transitionState = null;
     isTransitioning = false;
@@ -4325,7 +4683,7 @@ async function start() {
   updateProjectOverviewVisibility();
   initializeOverviewFirebase(MODEL_CONFIGS, updateProjectOverviewVisibility);
 
-  setStatus("Orbit view ready. Middle mouse rotates, Shift+middle pans, wheel zooms to cursor. Click to Play starts walk mode.");
+  setStatus("Orbit view ready. Middle mouse rotates, Shift+middle pans, wheel zooms to cursor. Use Tour Mode to enter walk mode.");
   setLoadingTargetProgress(LOADING_PROGRESS.sceneReady);
 
   let hasRenderedFirstFrame = false;
@@ -4354,5 +4712,8 @@ start().catch((error) => {
   modelStatus.textContent = "Error";
   modelStats.textContent = error.message || String(error);
   setStatus("Failed to start first-person tour.");
-  debugPanel.hidden = false;
+
+  if (localDevToolsEnabled) {
+    debugPanel.hidden = false;
+  }
 });

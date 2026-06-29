@@ -138,10 +138,28 @@ body.walk-mode-active .project-overview {
   font-size: 13px;
 }
 
-#lockPointerButton,
+.hud__actions .local-dev-only {
+  display: none !important;
+}
+
+body.local-dev .hud__actions .local-dev-only {
+  display: inline-block !important;
+}
+
+body.local-dev aside.debug-panel.local-dev-only {
+  display: block;
+}
+
+aside.debug-panel.local-dev-only[hidden] {
+  display: none !important;
+}
+
+#tourModeButton,
+#orbitViewButton,
 #debugToggleButton,
 #sunToggleButton,
-#copyDebugButton {
+#copyDebugButton,
+.hud__link-button {
   pointer-events: auto;
   border: 1px solid rgba(255, 255, 255, 0.35);
   border-radius: 999px;
@@ -149,13 +167,28 @@ body.walk-mode-active .project-overview {
   background: rgba(20, 32, 56, 0.85);
   color: #fff;
   cursor: pointer;
+  text-decoration: none;
+  font: inherit;
+  line-height: inherit;
 }
 
-#lockPointerButton:hover,
+#tourModeButton:hover,
+#orbitViewButton:hover,
 #debugToggleButton:hover,
 #sunToggleButton:hover,
-#copyDebugButton:hover {
+#copyDebugButton:hover,
+.hud__link-button:hover {
   background: rgba(54, 87, 150, 0.9);
+}
+
+.hud__actions button.is-active {
+  background: rgba(88, 132, 214, 0.95);
+  border-color: rgba(255, 255, 255, 0.55);
+}
+
+.hud__actions button:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 
 .hud__actions {
@@ -477,6 +510,60 @@ body.walk-mode-active .project-overview {
 .debug-panel li {
   margin-bottom: 4px;
   word-break: break-word;
+}
+
+.guest-placement-hint {
+  margin: 0 0 12px;
+  color: #c8d8f5;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.guest-placement-hint kbd,
+.guest-placement-hint code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 11px;
+}
+
+.guest-placement-label-field {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 10px;
+  font-size: 12px;
+  color: #d8e6ff;
+}
+
+.guest-placement-label-field input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+}
+
+.guest-placement-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.guest-placement-actions button {
+  flex: 1 1 calc(50% - 4px);
+}
+
+#guestPlacementList {
+  margin: 0 0 8px;
+  padding-left: 18px;
+}
+
+#guestPlacementList li {
+  margin-bottom: 8px;
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .metaverse-loading {

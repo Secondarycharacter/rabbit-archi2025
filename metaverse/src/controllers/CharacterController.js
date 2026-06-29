@@ -1,5 +1,5 @@
 export const CHARACTER_ROOT = "./assets/character/";
-export const CHARACTER_FILE = "rabbit01.glb";
+export const CHARACTER_FILE = "rabbit_Explorer_Ver2.glb";
 
 function dampAngle(current, target, lambda, deltaSeconds) {
   let delta = target - current;

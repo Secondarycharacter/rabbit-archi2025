@@ -1,4 +1,4 @@
-import { ACTION, LOCOMOTION, WALK_JUMP_PHASE } from "./CharacterStateMachine.js?v=jump-over-fix22-tour-20260620";
+import { ACTION, LOCOMOTION, WALK_JUMP_PHASE } from "./CharacterStateMachine.js?v=tps-tour-test-sync-20260629";
 
 export const CLIP_NAMES = {
   idleStandard: "Idle_Standard",
