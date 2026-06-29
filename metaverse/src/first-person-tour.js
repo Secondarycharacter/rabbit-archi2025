@@ -26,7 +26,11 @@ const ENEMY_ROOT = "./assets/guest/";
 const AUDIO_BGM_ROOT = "./assets/audio/bgm/";
 const TOUR_BGM_FADE_MS = 3000;
 const TOUR_BGM_VOLUME = 1;
-const TOUR_BGM_ENABLED = false;
+const TOUR_BGM_ENABLED = true;
+
+function canUseTourBgm() {
+  return TOUR_BGM_ENABLED && isLocalDevEnvironment();
+}
 const DEFAULT_MODEL_FILE = "Angji.glb";
 const MODEL_CONFIGS = [
   {
@@ -1193,7 +1197,7 @@ function isAngjiProjectConfig(config) {
 }
 
 function getTourBgmUrl(config) {
-  if (!TOUR_BGM_ENABLED) {
+  if (!canUseTourBgm()) {
     return null;
   }
 
