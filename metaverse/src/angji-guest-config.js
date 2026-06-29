@@ -3,6 +3,23 @@
 export const ANGJI_PRIORITY_GUEST_IDS = ["Mark-1", "Mark-2"];
 export const ANGJI_SIMULTANEOUS_GUEST_IDS = ["Mark-4", "Mark-5", "Mark-6"];
 
+const ANGJI_RESERVED_GUEST_IDS = new Set([
+  ...ANGJI_PRIORITY_GUEST_IDS,
+  ...ANGJI_SIMULTANEOUS_GUEST_IDS
+]);
+
+export function getAngjiPriorityGuestSpawns() {
+  return ANGJI_GUEST_MARKS.filter((spawn) => ANGJI_PRIORITY_GUEST_IDS.includes(spawn.id));
+}
+
+export function getAngjiSimultaneousGuestSpawns() {
+  return ANGJI_GUEST_MARKS.filter((spawn) => ANGJI_SIMULTANEOUS_GUEST_IDS.includes(spawn.id));
+}
+
+export function getAngjiBackgroundGuestSpawns() {
+  return ANGJI_GUEST_MARKS.filter((spawn) => !ANGJI_RESERVED_GUEST_IDS.has(spawn.id));
+}
+
 export const ANGJI_GUEST_MARKS = [
   {
     id: "Mark-1",

@@ -13,10 +13,11 @@ import {
 } from "./character-tps-bindings.js?v=tps-jump-nocol-20260629";
 import { createGuestPlacementTool } from "./guest-placement-tool.js?v=tps-jump-nocol-20260629";
 import {
-  ANGJI_GUEST_MARKS,
-  ANGJI_PRIORITY_GUEST_IDS,
+  getAngjiBackgroundGuestSpawns,
+  getAngjiPriorityGuestSpawns,
+  getAngjiSimultaneousGuestSpawns,
   ANGJI_SIMULTANEOUS_GUEST_IDS
-} from "./angji-guest-config.js?v=mark-456-y-down-20260629";
+} from "./angji-guest-config.js?v=angji-guest-order-20260629";
 import { createGuestCharacterSystem } from "./guest-character-system.js?v=guest-root-motion-20260629";
 import { applyLocalDevToolsVisibility, isLocalDevEnvironment } from "./local-dev.js?v=local-dev-20260629";
 
@@ -2912,19 +2913,6 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
   });
   preloadAngjiPriorityGuests();
 
-  function getAngjiPriorityGuestSpawns() {
-    return ANGJI_GUEST_MARKS.filter((spawn) => ANGJI_PRIORITY_GUEST_IDS.includes(spawn.id));
-  }
-
-  function getAngjiSimultaneousGuestSpawns() {
-    return ANGJI_GUEST_MARKS.filter((spawn) => ANGJI_SIMULTANEOUS_GUEST_IDS.includes(spawn.id));
-  }
-
-  function getAngjiBackgroundGuestSpawns() {
-    const reservedIds = new Set([...ANGJI_PRIORITY_GUEST_IDS, ...ANGJI_SIMULTANEOUS_GUEST_IDS]);
-    return ANGJI_GUEST_MARKS.filter((spawn) => !reservedIds.has(spawn.id));
-  }
-
   function preloadAngjiPriorityGuests() {
     if (!isAngjiProjectConfig(activeModelState.config)) {
       return;
@@ -2949,9 +2937,12 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     try {
       await guestCharacterSystem.ensureSpawned(getAngjiPriorityGuestSpawns());
       await guestCharacterSystem.ensureSpawned(getAngjiSimultaneousGuestSpawns(), { parallel: true });
-      void guestCharacterSystem.ensureSpawned(getAngjiBackgroundGuestSpawns()).then(() => {
-        window.auditAngjiTourElements?.();
-      });
+
+      for (const spawn of getAngjiBackgroundGuestSpawns()) {
+        await guestCharacterSystem.ensureSpawned([spawn]);
+      }
+
+      window.auditAngjiTourElements?.();
     } catch (error) {
       console.error("Guest spawn failed", error);
     }
@@ -3055,7 +3046,9 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
   }
 
   function canUseEnemyInCurrentMode() {
-    return walkMode && activeModelState.config?.file === ENEMY_SETTINGS.modelFile;
+    return isLocalDevEnvironment()
+      && walkMode
+      && activeModelState.config?.file === ENEMY_SETTINGS.modelFile;
   }
 
   function updateEnemyHp() {
