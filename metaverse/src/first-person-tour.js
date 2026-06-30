@@ -158,6 +158,11 @@ const MIN_STEP_UP = 0.035;
 const STEP_PROBE_DISTANCES = [0.12, 0.2, 0.32, 0.45, 0.62];
 const STAIR_MATERIAL_KEYWORDS = ["polishedconcreteold", "stone01", "stair01", "stair02"];
 const STAIR_NODE_KEYWORDS = ["3dgeom126", "3dgeom292", "3dgeom599", "3dgeom600", "stair01", "stair02"];
+const ANGJI_COLLISION_MATERIAL_PREFIX = "col_";
+const ANGJI_STAIR_MATERIAL_PREFIX = "col_g_stair";
+const ANGJI_GROUND_MATERIAL_PREFIX = "col_g_";
+const ANGJI_FURNITURE_MATERIAL_PREFIX = "col_f_";
+const ANGJI_INVISIBLE_WALL_ALPHA_MAX = 0.02;
 const FLOOR_MATERIAL_KEYWORDS = [
   "colorm00",
   "m00",
@@ -1112,6 +1117,91 @@ function getMaterialNames(mesh) {
   return [mesh.material.name, mesh.material.id];
 }
 
+function normalizeMaterialName(name) {
+  return String(name || "").trim().toLowerCase();
+}
+
+function getNormalizedMaterialNames(mesh) {
+  return getMaterialNames(mesh).map(normalizeMaterialName).filter(Boolean);
+}
+
+function collectMeshMaterials(mesh) {
+  if (!mesh?.material) {
+    return [];
+  }
+
+  if (Array.isArray(mesh.material.subMaterials)) {
+    return mesh.material.subMaterials.filter(Boolean);
+  }
+
+  return [mesh.material];
+}
+
+function getMaterialAlpha(material) {
+  if (!material || typeof material.alpha !== "number") {
+    return 1;
+  }
+
+  return material.alpha;
+}
+
+function hasAngjiInvisibleOpacity(mesh) {
+  if (collectMeshMaterials(mesh).some((material) => getMaterialAlpha(material) <= ANGJI_INVISIBLE_WALL_ALPHA_MAX)) {
+    return true;
+  }
+
+  return typeof mesh.visibility === "number" && mesh.visibility <= ANGJI_INVISIBLE_WALL_ALPHA_MAX;
+}
+
+function hasAngjiCollisionMaterial(mesh) {
+  return getNormalizedMaterialNames(mesh).some((name) => name.startsWith(ANGJI_COLLISION_MATERIAL_PREFIX));
+}
+
+function hasAngjiStairMaterial(mesh) {
+  return getNormalizedMaterialNames(mesh).some((name) => name.startsWith(ANGJI_STAIR_MATERIAL_PREFIX));
+}
+
+function hasAngjiFurnitureMaterial(mesh) {
+  return getNormalizedMaterialNames(mesh).some((name) => name.startsWith(ANGJI_FURNITURE_MATERIAL_PREFIX));
+}
+
+function hasAngjiGroundMaterial(mesh) {
+  if (hasAngjiFurnitureMaterial(mesh) || hasAngjiStairMaterial(mesh)) {
+    return false;
+  }
+
+  return getNormalizedMaterialNames(mesh).some((name) => (
+    name.startsWith(ANGJI_GROUND_MATERIAL_PREFIX)
+    && !name.includes("_wall")
+  ));
+}
+
+function hasAngjiInvisibleWallProxy(mesh) {
+  if (!hasAngjiInvisibleOpacity(mesh) || !hasAngjiCollisionMaterial(mesh)) {
+    return false;
+  }
+
+  // 1% proxy volumes are shared by wall/obstacle COL layers only — not furniture or ground.
+  return !hasAngjiFurnitureMaterial(mesh) && !hasAngjiGroundMaterial(mesh) && !hasAngjiStairMaterial(mesh);
+}
+
+function hasAngjiWallMaterial(mesh) {
+  if (hasAngjiFurnitureMaterial(mesh) || hasAngjiStairMaterial(mesh) || hasAngjiGroundMaterial(mesh)) {
+    return false;
+  }
+
+  const materialNames = getNormalizedMaterialNames(mesh);
+
+  if (materialNames.some((name) => (
+    name.startsWith(ANGJI_COLLISION_MATERIAL_PREFIX)
+    && name.includes("_wall")
+  ))) {
+    return true;
+  }
+
+  return hasAngjiInvisibleWallProxy(mesh);
+}
+
 function hasMaterialKeyword(mesh, keywords) {
   return getMaterialNames(mesh).some((name) => {
     const normalizedName = normalizeName(name);
@@ -1138,13 +1228,38 @@ function auditAngjiTourElements(modelState) {
     glass: [],
     trees: [],
     metal: [],
-    splitPeopleComponents: []
+    splitPeopleComponents: [],
+    angjiWalls: [],
+    angjiFurniture: [],
+    angjiFloors: [],
+    angjiStairs: [],
+    angjiColOther: [],
+    angjiLayerConflicts: []
   };
 
   modelState.meshes.forEach((mesh) => {
     const label = mesh.name || mesh.id || "(unnamed)";
     const materialNames = getMaterialNames(mesh).join(",") || "no-material";
     const entry = `${label} [${materialNames}]`;
+    const angjiLayers = [];
+
+    if (mesh.metadata?.angjiWallSurface) angjiLayers.push("wall");
+    if (mesh.metadata?.angjiFurnitureSurface) angjiLayers.push("furniture");
+    if (mesh.metadata?.angjiFloorSurface) angjiLayers.push("floor");
+    if (mesh.metadata?.angjiStairSurface) angjiLayers.push("stair");
+
+    if (angjiLayers.length > 1) {
+      categories.angjiLayerConflicts.push(`${entry} -> ${angjiLayers.join("+")}`);
+    } else if (angjiLayers.length === 1) {
+      const layer = angjiLayers[0];
+
+      if (layer === "wall") categories.angjiWalls.push(entry);
+      else if (layer === "furniture") categories.angjiFurniture.push(entry);
+      else if (layer === "floor") categories.angjiFloors.push(entry);
+      else if (layer === "stair") categories.angjiStairs.push(entry);
+    } else if (mesh.metadata?.angjiCollisionLayer) {
+      categories.angjiColOther.push(entry);
+    }
 
     if (!mesh.isEnabled()) {
       categories.disabled.push(entry);
@@ -1184,6 +1299,12 @@ function auditAngjiTourElements(modelState) {
     peopleProps: categories.peopleProps.length,
     propMeshes: categories.propMeshes.length,
     splitPeopleComponents: categories.splitPeopleComponents.length,
+    angjiWalls: categories.angjiWalls.length,
+    angjiFurniture: categories.angjiFurniture.length,
+    angjiFloors: categories.angjiFloors.length,
+    angjiStairs: categories.angjiStairs.length,
+    angjiColOther: categories.angjiColOther.length,
+    angjiLayerConflicts: categories.angjiLayerConflicts.length,
     glass: categories.glass.length,
     trees: categories.trees.length,
     metal: categories.metal.length
@@ -1538,6 +1659,10 @@ function faceTreeMeshTowardPlayer(BABYLON, mesh, playerPosition) {
 }
 
 function isStairSurface(mesh) {
+  if (mesh.metadata?.angjiStairSurface) {
+    return true;
+  }
+
   let current = mesh;
 
   while (current) {
@@ -1554,6 +1679,10 @@ function isStairSurface(mesh) {
 }
 
 function isFloorSurface(mesh) {
+  if (mesh.metadata?.angjiFloorSurface) {
+    return true;
+  }
+
   if (hasMaterialKeyword(mesh, PASS_THROUGH_MATERIAL_KEYWORDS)) {
     return false;
   }
@@ -1578,6 +1707,10 @@ function isPeopleFireballTarget(mesh) {
 }
 
 function isLikelyWalkableSurface(mesh) {
+  if (mesh.metadata?.angjiWallSurface || mesh.metadata?.angjiFurnitureSurface) {
+    return false;
+  }
+
   return isStairSurface(mesh) || isFloorSurface(mesh);
 }
 
@@ -1914,6 +2047,10 @@ function getRayHits(scene, ray, predicate) {
 function getBlockingBodyHit(hit) {
   if (!hit?.hit || !hit.pickedMesh || hit.distance < MIN_COLLISION_DISTANCE) {
     return null;
+  }
+
+  if (hit.pickedMesh.metadata?.angjiWallSurface || hit.pickedMesh.metadata?.angjiFurnitureSurface) {
+    return hit;
   }
 
   const normal = hit.getNormal?.(true);
@@ -4312,7 +4449,7 @@ function renderModelDebug(modelState) {
 
   modelStatus.textContent = `Loaded ${config.label}`;
   modelSource.textContent = `${MODEL_ROOT}${config.file}`;
-  modelStats.textContent = `${meshes.length} meshes / collision ${collisionMeshes.length} / walkable ${walkableGroundMeshes.length} / stairSurfaces ${stairSurfaceMeshes.length} / floorSurfaces ${floorSurfaceMeshes.length} / peopleTargets ${peopleTargetMeshes.length} / propPassThrough ${modelState.propPassThroughCount} / furniturePassThrough ${modelState.furniturePassThroughCount || 0} / collisionFallback ${modelState.usedCollisionFallback ? "yes" : "no"} / scale ${model.scale.toExponential(3)} / full ${boundsToText(model.bounds)} / focus ${boundsToText(model.focusBounds)} / ${model.tourStartNode ? "Tour_Start found" : "Tour_Start not found"}`;
+  modelStats.textContent = `${meshes.length} meshes / collision ${collisionMeshes.length} / walkable ${walkableGroundMeshes.length} / stairSurfaces ${stairSurfaceMeshes.length} / floorSurfaces ${floorSurfaceMeshes.length} / peopleTargets ${peopleTargetMeshes.length} / propPassThrough ${modelState.propPassThroughCount} / furniturePassThrough ${modelState.furniturePassThroughCount || 0} / angjiColLayer ${modelState.angjiCollisionLayerCount ?? "-"} / collisionFallback ${modelState.usedCollisionFallback ? "yes" : "no"} / scale ${model.scale.toExponential(3)} / full ${boundsToText(model.bounds)} / focus ${boundsToText(model.focusBounds)} / ${model.tourStartNode ? "Tour_Start found" : "Tour_Start not found"}`;
   meshList.replaceChildren(
     ...meshes.slice(0, 50).map((mesh) => {
       const item = document.createElement("li");
@@ -4334,16 +4471,22 @@ async function loadTourModelState(BABYLON, scene, config) {
   let propPassThroughCount = 0;
   let furniturePassThroughCount = 0;
   const peopleTargetMeshes = [];
+  const isAngjiProject = isAngjiProjectConfig(config);
 
   meshes.forEach((mesh) => {
     getCachedMeshBounds(BABYLON, mesh);
 
     const furniture = isChungjuProjectConfig(config) && isFurnitureMesh(mesh);
     const propPassThrough = isTourPropMesh(mesh);
-    const passThrough = propPassThrough || furniture;
+    const angjiCollisionLayer = isAngjiProject && hasAngjiCollisionMaterial(mesh);
+    const angjiFurnitureSurface = isAngjiProject && hasAngjiFurnitureMaterial(mesh);
+    const angjiStairSurface = isAngjiProject && hasAngjiStairMaterial(mesh);
+    const angjiFloorSurface = isAngjiProject && hasAngjiGroundMaterial(mesh);
+    const angjiWallSurface = isAngjiProject && hasAngjiWallMaterial(mesh);
+    const passThrough = isAngjiProject ? !angjiCollisionLayer : (propPassThrough || furniture);
     const peopleTarget = isPeopleFireballTarget(mesh);
 
-    if (propPassThrough) {
+    if (propPassThrough || (isAngjiProject && passThrough)) {
       propPassThroughCount += 1;
     }
 
@@ -4361,8 +4504,13 @@ async function loadTourModelState(BABYLON, scene, config) {
       ...(mesh.metadata || {}),
       passThrough,
       peopleTarget,
-      furniture,
-      tourProp: propPassThrough
+      furniture: furniture || angjiFurnitureSurface,
+      tourProp: propPassThrough,
+      angjiCollisionLayer,
+      angjiStairSurface,
+      angjiWallSurface,
+      angjiFurnitureSurface,
+      angjiFloorSurface
     };
   });
 
@@ -4377,28 +4525,47 @@ async function loadTourModelState(BABYLON, scene, config) {
   const treeMeshIds = new Set(treeMeshes.map((mesh) => mesh.uniqueId));
 
   let usedCollisionFallback = false;
-  let collisionMeshes = meshes.filter((mesh) => (
-    mesh.isEnabled()
-    && !isDescendantOf(mesh, model.tourStartNode)
-    && !mesh.metadata?.passThrough
-    && !treeMeshIds.has(mesh.uniqueId)
-  ));
+  let collisionMeshes;
 
-  if (collisionMeshes.length === 0) {
-    usedCollisionFallback = true;
+  if (isAngjiProject) {
     collisionMeshes = meshes.filter((mesh) => (
       mesh.isEnabled()
       && !isDescendantOf(mesh, model.tourStartNode)
+      && mesh.metadata?.angjiCollisionLayer
       && !treeMeshIds.has(mesh.uniqueId)
     ));
-    collisionMeshes.forEach((mesh) => {
-      mesh.metadata = { ...(mesh.metadata || {}), passThrough: false, collisionFallback: true };
-      mesh.isPickable = true;
-    });
+
+    if (collisionMeshes.length === 0) {
+      console.warn("Angji tour model has no COL_ collision meshes.");
+    }
+  } else {
+    collisionMeshes = meshes.filter((mesh) => (
+      mesh.isEnabled()
+      && !isDescendantOf(mesh, model.tourStartNode)
+      && !mesh.metadata?.passThrough
+      && !treeMeshIds.has(mesh.uniqueId)
+    ));
+
+    if (collisionMeshes.length === 0) {
+      usedCollisionFallback = true;
+      collisionMeshes = meshes.filter((mesh) => (
+        mesh.isEnabled()
+        && !isDescendantOf(mesh, model.tourStartNode)
+        && !treeMeshIds.has(mesh.uniqueId)
+      ));
+      collisionMeshes.forEach((mesh) => {
+        mesh.metadata = { ...(mesh.metadata || {}), passThrough: false, collisionFallback: true };
+        mesh.isPickable = true;
+      });
+    }
   }
 
-  const stairSurfaceMeshes = meshes.filter((mesh) => mesh.isEnabled() && !isDescendantOf(mesh, model.tourStartNode) && isStairSurface(mesh));
-  const floorSurfaceMeshes = meshes.filter((mesh) => mesh.isEnabled() && !isDescendantOf(mesh, model.tourStartNode) && isFloorSurface(mesh));
+  const stairSurfaceMeshes = isAngjiProject
+    ? meshes.filter((mesh) => mesh.isEnabled() && !isDescendantOf(mesh, model.tourStartNode) && mesh.metadata?.angjiStairSurface)
+    : meshes.filter((mesh) => mesh.isEnabled() && !isDescendantOf(mesh, model.tourStartNode) && isStairSurface(mesh));
+  const floorSurfaceMeshes = isAngjiProject
+    ? meshes.filter((mesh) => mesh.isEnabled() && !isDescendantOf(mesh, model.tourStartNode) && mesh.metadata?.angjiFloorSurface)
+    : meshes.filter((mesh) => mesh.isEnabled() && !isDescendantOf(mesh, model.tourStartNode) && isFloorSurface(mesh));
 
   [...stairSurfaceMeshes, ...floorSurfaceMeshes].forEach((mesh) => {
     mesh.metadata = { ...(mesh.metadata || {}), passThrough: false, groundSurface: true };
@@ -4412,11 +4579,16 @@ async function loadTourModelState(BABYLON, scene, config) {
 
   const groundMeshMap = new Map();
 
-  collisionMeshes
-    .filter((mesh) => !isNonWalkableObject(mesh) && !mesh.metadata?.furniture && !treeMeshIds.has(mesh.uniqueId))
-    .forEach((mesh) => groundMeshMap.set(mesh.uniqueId, mesh));
-  stairSurfaceMeshes.forEach((mesh) => groundMeshMap.set(mesh.uniqueId, mesh));
-  floorSurfaceMeshes.forEach((mesh) => groundMeshMap.set(mesh.uniqueId, mesh));
+  if (isAngjiProject) {
+    stairSurfaceMeshes.forEach((mesh) => groundMeshMap.set(mesh.uniqueId, mesh));
+    floorSurfaceMeshes.forEach((mesh) => groundMeshMap.set(mesh.uniqueId, mesh));
+  } else {
+    collisionMeshes
+      .filter((mesh) => !isNonWalkableObject(mesh) && !mesh.metadata?.furniture && !treeMeshIds.has(mesh.uniqueId))
+      .forEach((mesh) => groundMeshMap.set(mesh.uniqueId, mesh));
+    stairSurfaceMeshes.forEach((mesh) => groundMeshMap.set(mesh.uniqueId, mesh));
+    floorSurfaceMeshes.forEach((mesh) => groundMeshMap.set(mesh.uniqueId, mesh));
+  }
 
   treeMeshes.forEach((mesh) => {
     attachTreeYawPivot(BABYLON, scene, mesh, model.root);
@@ -4439,6 +4611,7 @@ async function loadTourModelState(BABYLON, scene, config) {
     baseRootPosition: model.root.position.clone(),
     propPassThroughCount,
     furniturePassThroughCount,
+    angjiCollisionLayerCount: isAngjiProject ? collisionMeshes.length : undefined,
     usedCollisionFallback,
     collisionMeshes,
     walkableGroundMeshes: Array.from(groundMeshMap.values()),
