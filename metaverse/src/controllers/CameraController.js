@@ -31,7 +31,9 @@ export function createCameraController(BABYLON, scene, camera, options = {}) {
     positionDamping = 8,
     stopPositionDamping = 18,
     collisionPadding = 0.25,
-    collisionMask = null
+    collisionMask = null,
+    cameraFloor2WallNormalMaxY = 0.35,
+    cameraFloor2CeilingMargin = 0.12
   } = options;
 
   let yaw = 0;
@@ -72,6 +74,29 @@ export function createCameraController(BABYLON, scene, camera, options = {}) {
     );
   }
 
+  function isCameraBlockingHit(hit, rayOriginPoint) {
+    if (!hit?.pickedMesh) {
+      return false;
+    }
+
+    if (!hit.pickedMesh.metadata?.angjiCameraBlockingRequiresWallNormal) {
+      return true;
+    }
+
+    const normal = hit.getNormal?.(true);
+
+    if (!normal) {
+      return true;
+    }
+
+    if (Math.abs(normal.y) <= cameraFloor2WallNormalMaxY) {
+      return true;
+    }
+
+    // Flat horizontal Floor2: block ceilings above the aim point, not walkable floors below.
+    return hit.pickedPoint.y > rayOriginPoint.y + cameraFloor2CeilingMargin;
+  }
+
   function resolveCollision(anchorPosition, desiredCameraPosition) {
     if (!collisionMask) {
       return desiredCameraPosition;
@@ -87,11 +112,26 @@ export function createCameraController(BABYLON, scene, camera, options = {}) {
 
     rayDirection.scaleInPlace(1 / rayLength);
     const ray = new BABYLON.Ray(rayOrigin, rayDirection, rayLength);
-    const hit = scene.pickWithRay(ray, (mesh) => (
+    const predicate = (mesh) => (
       mesh.isEnabled()
       && mesh.isPickable !== false
-      && collisionMask(mesh)
-    ));
+      && (
+        Boolean(mesh.metadata?.angjiCameraBlockingSurface)
+        || collisionMask(mesh)
+      )
+    );
+
+    let hit = null;
+
+    if (typeof scene.multiPickWithRay === "function") {
+      hit = (scene.multiPickWithRay(ray, predicate) || [])
+        .filter((candidate) => candidate?.hit && candidate.pickedPoint && candidate.pickedMesh)
+        .filter((candidate) => isCameraBlockingHit(candidate, rayOrigin))
+        .sort((a, b) => a.distance - b.distance)[0] || null;
+    } else {
+      hit = scene.pickWithRay(ray, predicate);
+      hit = isCameraBlockingHit(hit, rayOrigin) ? hit : null;
+    }
 
     if (!hit?.hit || hit.distance >= rayLength) {
       return desiredCameraPosition;

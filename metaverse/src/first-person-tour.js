@@ -1,5 +1,5 @@
 import { FIREBASE_CONFIG, OVERVIEW_ADMIN_PASSCODE } from "./firebase-config.js?v=tps-jump-nocol-20260629";
-import { createTpsSystem } from "./controllers/createTpsSystem.js?v=tps-jump-nocol-20260629";
+import { createTpsSystem } from "./controllers/createTpsSystem.js?v=floor2-ceiling-camera-20260629";
 import {
   CONTROLLER_SETTINGS,
   EYE_HEIGHT,
@@ -7,7 +7,7 @@ import {
   GROUND_SNAP_TOLERANCE,
   ANGJI_MOVE_SPEED_MULTIPLIER,
   createAngjiTpsOptions
-} from "./angji-character-config.js?v=tps-jump-nocol-20260629";
+} from "./angji-character-config.js?v=floor2-ceiling-camera-20260629";
 import {
   applyCharacterTpsKeyDown
 } from "./character-tps-bindings.js?v=tps-jump-nocol-20260629";
@@ -16,9 +16,11 @@ import {
   getAngjiBackgroundGuestSpawns,
   getAngjiPriorityGuestSpawns,
   getAngjiSimultaneousGuestSpawns,
-  ANGJI_SIMULTANEOUS_GUEST_IDS
-} from "./angji-guest-config.js?v=angji-guest-order-20260629";
-import { createGuestCharacterSystem } from "./guest-character-system.js?v=guest-root-motion-20260629";
+  ANGJI_SIMULTANEOUS_GUEST_IDS,
+  ANGJI_PRIORITY_GUEST_IDS,
+  getAngjiGuestPositionYOffset
+} from "./angji-guest-config.js?v=angji-mark3-height-20260629";
+import { createGuestCharacterSystem } from "./guest-character-system.js?v=angji-guest-priority-20260629";
 import { applyLocalDevToolsVisibility, isLocalDevEnvironment } from "./local-dev.js?v=local-dev-20260629";
 
 const MODEL_ROOT = "./assets/models/";
@@ -40,7 +42,6 @@ const MODEL_CONFIGS = [
   },
   {
     file: "Angji.glb",
-    tourFile: "Angji_tour.glb",
     label: "앵지",
     overviewId: "angji",
     tourBgm: "angji/angji_tour_bgm.mp3",
@@ -152,17 +153,24 @@ const TOUR_RESET_FALL_DISTANCE = 8;
 const TOUR_RESET_FADE_MS = 450;
 const MAX_STEP_UP = 0.32;
 const MAX_STAIR_STEP_UP = 0.48;
+const ANGJI_MAX_STAIR_STEP_UP = 1.05;
 const MAX_STEP_DOWN = 0.85;
 const MIN_STEP_DOWN = 0.025;
 const MIN_STEP_UP = 0.035;
 const STEP_PROBE_DISTANCES = [0.12, 0.2, 0.32, 0.45, 0.62];
+const ANGJI_STAIR_PROBE_DISTANCES = [...STEP_PROBE_DISTANCES, 0.85, 1.1, 1.4];
 const STAIR_MATERIAL_KEYWORDS = ["polishedconcreteold", "stone01", "stair01", "stair02"];
 const STAIR_NODE_KEYWORDS = ["3dgeom126", "3dgeom292", "3dgeom599", "3dgeom600", "stair01", "stair02"];
-const ANGJI_COLLISION_MATERIAL_PREFIX = "col_";
-const ANGJI_STAIR_MATERIAL_PREFIX = "col_g_stair";
-const ANGJI_GROUND_MATERIAL_PREFIX = "col_g_";
-const ANGJI_FURNITURE_MATERIAL_PREFIX = "col_f_";
-const ANGJI_INVISIBLE_WALL_ALPHA_MAX = 0.02;
+const ANGJI_BUILDING_WALL_PREFIXES = ["0_col_b_wall"];
+const ANGJI_BUILDING_FLOOR1_PREFIXES = ["0_col_b_floor1"];
+const ANGJI_BUILDING_FLOOR2_PREFIXES = ["0_col_b_floor2"];
+const ANGJI_BUILDING_FLOOR_PREFIXES = [...ANGJI_BUILDING_FLOOR1_PREFIXES, ...ANGJI_BUILDING_FLOOR2_PREFIXES];
+const ANGJI_BUILDING_STAIR_PREFIXES = ["0_col_b_stair"];
+const ANGJI_BUILDING_FURNITURE_PREFIXES = ["0_col_b_fur"];
+const ANGJI_EXTERNAL_FLOOR_PREFIXES = ["0_col_c_floor", "00_col_c_floor"];
+const ANGJI_EXTERNAL_WALL_PREFIXES = ["0_col_c_wall"];
+const ANGJI_EXTERNAL_STAIR_PREFIXES = ["0_col_c_stair"];
+const ANGJI_EXTERNAL_BUILDING_PREFIXES = ["0_col_c_bldg1"];
 const FLOOR_MATERIAL_KEYWORDS = [
   "colorm00",
   "m00",
@@ -278,7 +286,7 @@ const MATERIAL_REFLECTION_SETTINGS = {
 };
 const ENEMY_SETTINGS = {
   file: "enemy01.glb",
-  modelFile: "Angji_tour.glb",
+  modelFile: "Angji.glb",
   spawnDelayMs: 5000,
   fadeInMs: 1000,
   deathBlinkMs: 2000,
@@ -641,12 +649,23 @@ async function initializeOverviewFirebase(modelConfigs, onChange) {
       .forEach((config) => {
         const overviewId = getOverviewId(config);
         const docRef = firestoreModule.doc(db, FIRESTORE_OVERVIEW_COLLECTION, overviewId);
-        const unsubscribe = firestoreModule.onSnapshot(docRef, (snapshot) => {
-          if (snapshot.exists()) {
-            projectOverviewStore.set(overviewId, normalizeOverview(snapshot.data()));
-            onChange?.();
+        const unsubscribe = firestoreModule.onSnapshot(
+          docRef,
+          (snapshot) => {
+            if (snapshot.exists()) {
+              projectOverviewStore.set(overviewId, normalizeOverview(snapshot.data()));
+              onChange?.();
+            }
+          },
+          (error) => {
+            if (error.code === "permission-denied") {
+              console.warn(`Firestore overview (${overviewId}) unavailable in this session.`);
+              return;
+            }
+
+            console.error(`Firestore overview (${overviewId}) listener failed:`, error);
           }
-        });
+        );
         overviewFirebaseState.unsubscribe.push(unsubscribe);
       });
   } catch (error) {
@@ -1137,69 +1156,96 @@ function collectMeshMaterials(mesh) {
   return [mesh.material];
 }
 
-function getMaterialAlpha(material) {
-  if (!material || typeof material.alpha !== "number") {
-    return 1;
-  }
+function angjiMaterialNameMatchesPrefix(name, prefixes) {
+  const normalizedName = normalizeMaterialName(name);
 
-  return material.alpha;
-}
-
-function hasAngjiInvisibleOpacity(mesh) {
-  if (collectMeshMaterials(mesh).some((material) => getMaterialAlpha(material) <= ANGJI_INVISIBLE_WALL_ALPHA_MAX)) {
-    return true;
-  }
-
-  return typeof mesh.visibility === "number" && mesh.visibility <= ANGJI_INVISIBLE_WALL_ALPHA_MAX;
-}
-
-function hasAngjiCollisionMaterial(mesh) {
-  return getNormalizedMaterialNames(mesh).some((name) => name.startsWith(ANGJI_COLLISION_MATERIAL_PREFIX));
-}
-
-function hasAngjiStairMaterial(mesh) {
-  return getNormalizedMaterialNames(mesh).some((name) => name.startsWith(ANGJI_STAIR_MATERIAL_PREFIX));
-}
-
-function hasAngjiFurnitureMaterial(mesh) {
-  return getNormalizedMaterialNames(mesh).some((name) => name.startsWith(ANGJI_FURNITURE_MATERIAL_PREFIX));
-}
-
-function hasAngjiGroundMaterial(mesh) {
-  if (hasAngjiFurnitureMaterial(mesh) || hasAngjiStairMaterial(mesh)) {
-    return false;
-  }
-
-  return getNormalizedMaterialNames(mesh).some((name) => (
-    name.startsWith(ANGJI_GROUND_MATERIAL_PREFIX)
-    && !name.includes("_wall")
+  return prefixes.some((prefix) => (
+    normalizedName === prefix
+    || normalizedName.startsWith(`${prefix}`)
   ));
 }
 
-function hasAngjiInvisibleWallProxy(mesh) {
-  if (!hasAngjiInvisibleOpacity(mesh) || !hasAngjiCollisionMaterial(mesh)) {
-    return false;
+function getAngjiCollisionMaterialRole(mesh) {
+  const materialNames = getNormalizedMaterialNames(mesh);
+
+  for (const name of materialNames) {
+    if (
+      angjiMaterialNameMatchesPrefix(name, ANGJI_BUILDING_STAIR_PREFIXES)
+      || angjiMaterialNameMatchesPrefix(name, ANGJI_EXTERNAL_STAIR_PREFIXES)
+    ) {
+      return "stair";
+    }
+
+    if (angjiMaterialNameMatchesPrefix(name, ANGJI_BUILDING_FURNITURE_PREFIXES)) {
+      return "furniture";
+    }
+
+    if (
+      angjiMaterialNameMatchesPrefix(name, ANGJI_BUILDING_FLOOR_PREFIXES)
+      || angjiMaterialNameMatchesPrefix(name, ANGJI_EXTERNAL_FLOOR_PREFIXES)
+    ) {
+      return "floor";
+    }
+
+    if (
+      angjiMaterialNameMatchesPrefix(name, ANGJI_BUILDING_WALL_PREFIXES)
+      || angjiMaterialNameMatchesPrefix(name, ANGJI_EXTERNAL_WALL_PREFIXES)
+      || angjiMaterialNameMatchesPrefix(name, ANGJI_EXTERNAL_BUILDING_PREFIXES)
+    ) {
+      return "wall";
+    }
   }
 
-  // 1% proxy volumes are shared by wall/obstacle COL layers only — not furniture or ground.
-  return !hasAngjiFurnitureMaterial(mesh) && !hasAngjiGroundMaterial(mesh) && !hasAngjiStairMaterial(mesh);
+  return null;
+}
+
+function hasAngjiCollisionMaterial(mesh) {
+  return getAngjiCollisionMaterialRole(mesh) !== null;
+}
+
+function hasAngjiStairMaterial(mesh) {
+  return getAngjiCollisionMaterialRole(mesh) === "stair";
+}
+
+function hasAngjiFurnitureMaterial(mesh) {
+  return getAngjiCollisionMaterialRole(mesh) === "furniture";
+}
+
+function hasAngjiBuildingFloor1Material(mesh) {
+  return getNormalizedMaterialNames(mesh).some((name) => (
+    angjiMaterialNameMatchesPrefix(name, ANGJI_BUILDING_FLOOR1_PREFIXES)
+  ));
+}
+
+function hasAngjiBuildingFloor2Material(mesh) {
+  return getNormalizedMaterialNames(mesh).some((name) => (
+    angjiMaterialNameMatchesPrefix(name, ANGJI_BUILDING_FLOOR2_PREFIXES)
+  ));
+}
+
+function hasAngjiExternalFloorMaterial(mesh) {
+  return getNormalizedMaterialNames(mesh).some((name) => (
+    angjiMaterialNameMatchesPrefix(name, ANGJI_EXTERNAL_FLOOR_PREFIXES)
+  ));
+}
+
+function hasAngjiGroundMaterial(mesh) {
+  return getAngjiCollisionMaterialRole(mesh) === "floor";
 }
 
 function hasAngjiWallMaterial(mesh) {
-  if (hasAngjiFurnitureMaterial(mesh) || hasAngjiStairMaterial(mesh) || hasAngjiGroundMaterial(mesh)) {
-    return false;
-  }
+  return getAngjiCollisionMaterialRole(mesh) === "wall";
+}
 
-  const materialNames = getNormalizedMaterialNames(mesh);
+function applyAngjiCollisionInvisibility(mesh, BABYLON) {
+  mesh.visibility = 1;
 
-  if (materialNames.some((name) => (
-    name.startsWith(ANGJI_COLLISION_MATERIAL_PREFIX)
-    && name.includes("_wall")
-  ))) {
-    return true;
-  }
-
-  return hasAngjiInvisibleWallProxy(mesh);
+  collectMeshMaterials(mesh).forEach((material) => {
+    material.alpha = 0;
+    material.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+    material.disableDepthWrite = true;
+    material.backFaceCulling = false;
+  });
 }
 
 function hasMaterialKeyword(mesh, keywords) {
@@ -1457,13 +1503,24 @@ function createTourBgmController() {
     }
 
     return new Promise((resolve) => {
-      const finish = () => resolve();
+      let settled = false;
+
+      const finish = () => {
+        if (settled) {
+          return;
+        }
+
+        settled = true;
+        resolve();
+      };
 
       track.addEventListener("canplaythrough", finish, { once: true });
+      track.addEventListener("loadeddata", finish, { once: true });
       track.addEventListener("error", () => {
         console.warn(`Tour BGM preload failed: ${url}`);
         finish();
       }, { once: true });
+      window.setTimeout(finish, 4000);
     });
   }
 
@@ -1712,6 +1769,75 @@ function isLikelyWalkableSurface(mesh) {
   }
 
   return isStairSurface(mesh) || isFloorSurface(mesh);
+}
+
+function pickAngjiGuestFloorY(BABYLON, scene, x, z, floor1Meshes, externalFloorMeshes) {
+  const floor1Set = new Set(floor1Meshes || []);
+  const externalSet = new Set(externalFloorMeshes || []);
+  const rayOrigin = new BABYLON.Vector3(x, GROUND_RAY_UP + 120, z);
+  const ray = new BABYLON.Ray(rayOrigin, new BABYLON.Vector3(0, -1, 0), GROUND_RAY_UP + GROUND_RAY_DOWN + 120);
+
+  const pickTopFloorY = (meshSet) => {
+    if (!meshSet.size) {
+      return null;
+    }
+
+    const hits = getRayHits(scene, ray, (mesh) => (
+      meshSet.has(mesh)
+      && mesh.isEnabled()
+      && mesh.isPickable !== false
+    ));
+
+    const topHit = hits
+      .filter((hit) => {
+        const normal = hit.getNormal?.(true);
+        return !normal || normal.y >= CLASSIFIED_GROUND_NORMAL_MIN_Y;
+      })
+      .sort((a, b) => b.pickedPoint.y - a.pickedPoint.y)[0];
+
+    return topHit?.pickedPoint?.y ?? null;
+  };
+
+  const floor1Y = pickTopFloorY(floor1Set);
+
+  if (floor1Y !== null) {
+    return floor1Y;
+  }
+
+  return pickTopFloorY(externalSet);
+}
+
+function resolveAngjiGuestSpawn(BABYLON, scene, spawn, floor1Meshes, externalFloorMeshes) {
+  const snapFloorY = (x, z, fallbackY) => {
+    const groundY = pickAngjiGuestFloorY(BABYLON, scene, x, z, floor1Meshes, externalFloorMeshes);
+    return groundY ?? fallbackY;
+  };
+  const sitYOffset = getAngjiGuestPositionYOffset(spawn);
+  const snappedY = snapFloorY(spawn.position.x, spawn.position.z, spawn.position.y);
+  const position = {
+    x: spawn.position.x,
+    y: typeof spawn.positionYOverride === "number" ? spawn.positionYOverride : snappedY + sitYOffset,
+    z: spawn.position.z
+  };
+
+  if (!spawn.movement?.patrolTargets?.length) {
+    return {
+      ...spawn,
+      position
+    };
+  }
+
+  return {
+    ...spawn,
+    position,
+    movement: {
+      ...spawn.movement,
+      patrolTargets: spawn.movement.patrolTargets.map((target) => ({
+        ...target,
+        y: snapFloorY(target.x, target.z, target.y)
+      }))
+    }
+  };
 }
 
 function getSurfaceDebugName(hit) {
@@ -2054,6 +2180,14 @@ function getBlockingBodyHit(hit) {
   }
 
   const normal = hit.getNormal?.(true);
+
+  if (hit.pickedMesh.metadata?.angjiStairSurface) {
+    if (normal && normal.y >= WALL_NORMAL_MAX_Y) {
+      return null;
+    }
+
+    return hit;
+  }
 
   if (normal && normal.y > WALL_NORMAL_MAX_Y) {
     return null;
@@ -2747,7 +2881,7 @@ function isStairCollisionHit(hit) {
   return Boolean(hit?.pickedMesh && isStairSurface(hit.pickedMesh));
 }
 
-function findStepUpPose(BABYLON, scene, previousPosition, movement, groundMeshSet) {
+function findStepUpPose(BABYLON, scene, previousPosition, movement, groundMeshSet, options = {}) {
   const moveDistance = movement.length();
 
   if (moveDistance <= 0) {
@@ -2755,11 +2889,12 @@ function findStepUpPose(BABYLON, scene, previousPosition, movement, groundMeshSe
   }
 
   const direction = movement.normalizeToNew();
+  const probeDistances = options.probeDistances ?? STEP_PROBE_DISTANCES;
 
-  for (const distance of STEP_PROBE_DISTANCES) {
+  for (const distance of probeDistances) {
     const probeDistance = Math.max(distance, moveDistance);
     const probePosition = previousPosition.add(direction.scale(probeDistance));
-    const stepPose = getStepPoseAtPosition(BABYLON, scene, probePosition, groundMeshSet, previousPosition.y);
+    const stepPose = getStepPoseAtPosition(BABYLON, scene, probePosition, groundMeshSet, previousPosition.y, options);
 
     if (!stepPose) {
       continue;
@@ -2796,8 +2931,15 @@ function tryMoveWithCollision(BABYLON, scene, camera, movement, collisionMeshSet
   const previousPosition = camera.position.clone();
   const desiredPosition = previousPosition.add(movement);
   const canStepUp = options.allowStepUp !== false;
+  const maxStairStepUp = options.maxStairStepUp ?? MAX_STAIR_STEP_UP;
+  const stairStepOptions = {
+    maxVerticalDelta: maxStairStepUp,
+    probeDistances: options.stairProbeDistances ?? STEP_PROBE_DISTANCES
+  };
   const initialCollisionHit = findBodyCollision(BABYLON, scene, previousPosition, movement, collisionMeshSet, modelBounds);
-  const leadingStepPose = canStepUp ? findStepUpPose(BABYLON, scene, previousPosition, movement, groundMeshSet) : null;
+  const leadingStepPose = canStepUp
+    ? findStepUpPose(BABYLON, scene, previousPosition, movement, groundMeshSet, stairStepOptions)
+    : null;
 
   if (leadingStepPose) {
     if (!initialCollisionHit || isLowStepCollision(initialCollisionHit) || isStairCollisionHit(initialCollisionHit)) {
@@ -2880,10 +3022,20 @@ function tryMoveWithCollision(BABYLON, scene, camera, movement, collisionMeshSet
   }
 
   if (verticalDelta > MAX_STEP_UP) {
-    if (initialCollisionHit) {
+    if (canStepUp && verticalDelta <= maxStairStepUp) {
+      const stepPose = findStepUpPose(BABYLON, scene, previousPosition, movement, groundMeshSet, stairStepOptions);
+
+      if (stepPose) {
+        return applyStepUp(BABYLON, camera, movement, stepPose);
+      }
+    }
+
+    const aheadIsStair = Boolean(groundPose?.hit?.pickedMesh && isStairSurface(groundPose.hit.pickedMesh));
+
+    if (initialCollisionHit || aheadIsStair) {
       return {
         moved: false,
-        reason: `wall:${initialCollisionHit.pickedMesh?.name || initialCollisionHit.pickedMesh?.id || "too high"}`,
+        reason: `wall:${aheadIsStair ? "stair" : initialCollisionHit.pickedMesh?.name || initialCollisionHit.pickedMesh?.id || "too high"}`,
         distance: 0,
         previousPosition
       };
@@ -2924,7 +3076,9 @@ function tryMoveWithCollision(BABYLON, scene, camera, movement, collisionMeshSet
   });
 
   if (collisionHit) {
-    const stepPose = canStepUp ? findStepUpPose(BABYLON, scene, previousPosition, movement, groundMeshSet) : null;
+    const stepPose = canStepUp
+      ? findStepUpPose(BABYLON, scene, previousPosition, movement, groundMeshSet, stairStepOptions)
+      : null;
 
     if (stepPose && (isLowStepCollision(collisionHit) || isStairCollisionHit(collisionHit))) {
       return applyStepUp(BABYLON, camera, movement, stepPose);
@@ -3014,7 +3168,11 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     scene,
     tpsCamera,
     createAngjiTpsOptions(walkCamera, {
-      getCollisionMask: () => (mesh) => localCollisionMeshSet.has(mesh),
+      getCollisionMask: () => (mesh) => (
+        localCollisionMeshSet.has(mesh)
+        || Boolean(mesh.metadata?.angjiCameraBlockingSurface)
+        || Boolean(mesh.metadata?.angjiCollisionLayer)
+      ),
       onLoadError: () => {
         setStatus("Character model could not be loaded. Walk mode will continue without avatar.");
       }
@@ -3050,7 +3208,38 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     updateWorldMatrices,
     getFullBounds,
     softenModelMaterialReflections,
-    targetHeight: 1.75
+    targetHeight: 1.75,
+    resolveSpawnPosition: (spawn) => {
+      const walkModelState = activeModelState.tourModelState || activeModelState;
+
+      if (!isAngjiProjectConfig(walkModelState.config)) {
+        return null;
+      }
+
+      return resolveAngjiGuestSpawn(
+        BABYLON,
+        scene,
+        spawn,
+        walkModelState.angjiBuildingFloor1Meshes,
+        walkModelState.angjiExternalFloorMeshes
+      );
+    },
+    resolveGuestFloorY: (x, z, fallbackY) => {
+      const walkModelState = activeModelState.tourModelState || activeModelState;
+
+      if (!isAngjiProjectConfig(walkModelState.config)) {
+        return fallbackY;
+      }
+
+      return pickAngjiGuestFloorY(
+        BABYLON,
+        scene,
+        x,
+        z,
+        walkModelState.angjiBuildingFloor1Meshes,
+        walkModelState.angjiExternalFloorMeshes
+      ) ?? fallbackY;
+    }
   });
   preloadAngjiPriorityGuests();
 
@@ -3059,8 +3248,17 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
       return;
     }
 
-    void guestCharacterSystem?.preload(getAngjiPriorityGuestSpawns());
-    void guestCharacterSystem?.preload(getAngjiSimultaneousGuestSpawns(), { parallel: true });
+    const run = () => {
+      void guestCharacterSystem?.preload(getAngjiPriorityGuestSpawns(), { parallel: true });
+      void guestCharacterSystem?.preload(getAngjiSimultaneousGuestSpawns(), { parallel: true });
+    };
+
+    if (typeof window.requestIdleCallback === "function") {
+      window.requestIdleCallback(run, { timeout: 4000 });
+      return;
+    }
+
+    window.setTimeout(run, 2000);
   }
 
   function canUseAngjiGuests() {
@@ -3073,14 +3271,20 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
       return;
     }
 
-    guestCharacterSystem.show({ excludeIds: ANGJI_SIMULTANEOUS_GUEST_IDS });
+    guestCharacterSystem.hide();
 
     try {
-      await guestCharacterSystem.ensureSpawned(getAngjiPriorityGuestSpawns());
+      await guestCharacterSystem.ensureSpawned(getAngjiPriorityGuestSpawns(), { parallel: true });
+      guestCharacterSystem.show({ includeIds: ANGJI_PRIORITY_GUEST_IDS });
+
       await guestCharacterSystem.ensureSpawned(getAngjiSimultaneousGuestSpawns(), { parallel: true });
+      guestCharacterSystem.show({
+        includeIds: [...ANGJI_PRIORITY_GUEST_IDS, ...ANGJI_SIMULTANEOUS_GUEST_IDS]
+      });
 
       for (const spawn of getAngjiBackgroundGuestSpawns()) {
         await guestCharacterSystem.ensureSpawned([spawn]);
+        guestCharacterSystem.show();
       }
 
       window.auditAngjiTourElements?.();
@@ -3456,6 +3660,11 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     treeFacingFrameCounter = 0;
     activeModelState = nextModelState;
     preloadAngjiPriorityGuests();
+
+    if (walkMode && isAngjiProjectConfig(nextModelState.config)) {
+      void scheduleGuestSpawn();
+    }
+
     clearMovementKeys();
     verticalVelocity = 0;
     stepTargetY = null;
@@ -3662,9 +3871,30 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     return activeModelState.config?.tourCamera || DEFAULT_TOUR_CAMERA;
   }
 
+  function getWalkSpawnCameraConfig() {
+    const tourCamera = getActiveTourCameraConfig();
+    const tourStartNode = activeModelState.model?.tourStartNode;
+
+    if (!tourStartNode) {
+      return tourCamera;
+    }
+
+    tourStartNode.computeWorldMatrix(true);
+    const startPosition = tourStartNode.getAbsolutePosition();
+
+    return {
+      position: {
+        x: startPosition.x,
+        y: startPosition.y,
+        z: startPosition.z
+      },
+      target: tourCamera.target || DEFAULT_TOUR_CAMERA.target
+    };
+  }
+
   function resetWalkCameraToTourStart() {
     clearFireballs();
-    const tourCamera = getActiveTourCameraConfig();
+    const tourCamera = getWalkSpawnCameraConfig();
     walkCamera.position.set(tourCamera.position.x, tourCamera.position.y, tourCamera.position.z);
     walkCamera.setTarget(new BABYLON.Vector3(tourCamera.target.x, tourCamera.target.y, tourCamera.target.z));
     yaw = Math.atan2(
@@ -3678,8 +3908,18 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     lastStableGroundPose = null;
     lastLocalMeshPosition = null;
     refreshLocalMeshSets(true);
-    snapToGround();
-    tpsSystem?.reset?.(tourCamera);
+    snapToGround({ force: true });
+
+    const snappedTourCamera = {
+      position: {
+        x: walkCamera.position.x,
+        y: walkCamera.position.y,
+        z: walkCamera.position.z
+      },
+      target: tourCamera.target
+    };
+
+    tpsSystem?.reset?.(snappedTourCamera);
   }
 
   function isWalkCameraOutsideTourBounds() {
@@ -3740,22 +3980,25 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     return { forward, right };
   }
 
-  function snapToGround() {
+  function snapToGround(options = {}) {
     refreshLocalMeshSets(true);
     const hit = findGroundHit(BABYLON, scene, walkCamera.position, localGroundMeshSet);
 
     if (!hit?.pickedPoint) {
       isGrounded = false;
-      return;
+      return false;
     }
 
     const nextY = hit.pickedPoint.y + EYE_HEIGHT;
 
-    if (nextY <= walkCamera.position.y + 0.6) {
+    if (options.force || nextY <= walkCamera.position.y + 0.6) {
       walkCamera.position.y = nextY;
       isGrounded = true;
       rememberStableGround(hit, nextY);
+      return true;
     }
+
+    return false;
   }
 
   function rememberStableGround(hit, eyeY) {
@@ -3977,7 +4220,12 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     await tpsSystem?.ensureLoaded?.();
     scene.activeCamera = tpsCamera;
     walkMode = true;
-    activateModelState(activeModelState.tourModelState || activeModelState, "walk");
+
+    if (walkModelState === activeModelState) {
+      setModelState(walkModelState);
+    } else {
+      activateModelState(walkModelState, "walk");
+    }
     isResettingTour = false;
     tourResetFade?.classList.remove("is-active");
     resetWalkCameraToTourStart();
@@ -4167,14 +4415,22 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
       }
 
       const appliedMovement = direction.clone().scale(moveSpeed);
+      const angjiMoveOptions = isAngjiProjectConfig(activeModelState.config)
+        ? {
+          maxStairStepUp: ANGJI_MAX_STAIR_STEP_UP,
+          stairProbeDistances: ANGJI_STAIR_PROBE_DISTANCES
+        }
+        : {};
       const moveResult = tryMoveWithCollision(BABYLON, scene, walkCamera, appliedMovement, localCollisionMeshSet, activeModelState.model.bounds, localGroundMeshSet, {
-        allowStepUp: typeof stepTargetY !== "number"
+        allowStepUp: typeof stepTargetY !== "number",
+        ...angjiMoveOptions
       });
 
       if (typeof moveResult.stepTargetY === "number" && typeof stepTargetY !== "number") {
         const targetDelta = moveResult.stepTargetY - walkCamera.position.y;
+        const maxStepTarget = isAngjiProjectConfig(activeModelState.config) ? ANGJI_MAX_STAIR_STEP_UP : MAX_STEP_UP;
 
-        if (targetDelta >= MIN_STEP_UP && targetDelta <= MAX_STEP_UP) {
+        if (targetDelta >= MIN_STEP_UP && targetDelta <= maxStepTarget) {
           stepTargetY = moveResult.stepTargetY;
           stepTargetHit = moveResult.stepTargetHit || null;
         }
@@ -4459,6 +4715,18 @@ function renderModelDebug(modelState) {
   );
 }
 
+async function processTourMeshesInChunks(meshes, processor, chunkSize = 64) {
+  for (let index = 0; index < meshes.length; index += chunkSize) {
+    meshes.slice(index, index + chunkSize).forEach(processor);
+
+    if (index + chunkSize < meshes.length) {
+      await new Promise((resolve) => {
+        window.setTimeout(resolve, 0);
+      });
+    }
+  }
+}
+
 async function loadTourModelState(BABYLON, scene, config) {
   const fileName = `${config.file}?v=${Date.now()}`;
   const result = await BABYLON.SceneLoader.ImportMeshAsync("", MODEL_ROOT, fileName, scene);
@@ -4473,7 +4741,7 @@ async function loadTourModelState(BABYLON, scene, config) {
   const peopleTargetMeshes = [];
   const isAngjiProject = isAngjiProjectConfig(config);
 
-  meshes.forEach((mesh) => {
+  await processTourMeshesInChunks(meshes, (mesh) => {
     getCachedMeshBounds(BABYLON, mesh);
 
     const furniture = isChungjuProjectConfig(config) && isFurnitureMesh(mesh);
@@ -4481,8 +4749,15 @@ async function loadTourModelState(BABYLON, scene, config) {
     const angjiCollisionLayer = isAngjiProject && hasAngjiCollisionMaterial(mesh);
     const angjiFurnitureSurface = isAngjiProject && hasAngjiFurnitureMaterial(mesh);
     const angjiStairSurface = isAngjiProject && hasAngjiStairMaterial(mesh);
-    const angjiFloorSurface = isAngjiProject && hasAngjiGroundMaterial(mesh);
+    const angjiBuildingFloor1Surface = isAngjiProject && hasAngjiBuildingFloor1Material(mesh);
+    const angjiBuildingFloor2Surface = isAngjiProject && hasAngjiBuildingFloor2Material(mesh);
+    const angjiExternalFloorSurface = isAngjiProject && hasAngjiExternalFloorMaterial(mesh);
+    const angjiFloorSurface = angjiBuildingFloor1Surface || angjiBuildingFloor2Surface || angjiExternalFloorSurface;
     const angjiWallSurface = isAngjiProject && hasAngjiWallMaterial(mesh);
+    const angjiCameraBlockingSurface = angjiWallSurface
+      || angjiFurnitureSurface
+      || angjiBuildingFloor1Surface
+      || angjiBuildingFloor2Surface;
     const passThrough = isAngjiProject ? !angjiCollisionLayer : (propPassThrough || furniture);
     const peopleTarget = isPeopleFireballTarget(mesh);
 
@@ -4507,11 +4782,21 @@ async function loadTourModelState(BABYLON, scene, config) {
       furniture: furniture || angjiFurnitureSurface,
       tourProp: propPassThrough,
       angjiCollisionLayer,
+      angjiCollisionRole: isAngjiProject ? getAngjiCollisionMaterialRole(mesh) : null,
       angjiStairSurface,
       angjiWallSurface,
       angjiFurnitureSurface,
-      angjiFloorSurface
+      angjiFloorSurface,
+      angjiBuildingFloor1Surface,
+      angjiBuildingFloor2Surface,
+      angjiExternalFloorSurface,
+      angjiCameraBlockingSurface,
+      angjiCameraBlockingRequiresWallNormal: angjiBuildingFloor2Surface
     };
+
+    if (isAngjiProject && angjiCollisionLayer) {
+      applyAngjiCollisionInvisibility(mesh, BABYLON);
+    }
   });
 
   softenModelMaterialReflections(BABYLON, scene.materials);
@@ -4536,7 +4821,7 @@ async function loadTourModelState(BABYLON, scene, config) {
     ));
 
     if (collisionMeshes.length === 0) {
-      console.warn("Angji tour model has no COL_ collision meshes.");
+      console.warn("Angji tour model has no 0_COL_* collision meshes.");
     }
   } else {
     collisionMeshes = meshes.filter((mesh) => (
@@ -4566,6 +4851,20 @@ async function loadTourModelState(BABYLON, scene, config) {
   const floorSurfaceMeshes = isAngjiProject
     ? meshes.filter((mesh) => mesh.isEnabled() && !isDescendantOf(mesh, model.tourStartNode) && mesh.metadata?.angjiFloorSurface)
     : meshes.filter((mesh) => mesh.isEnabled() && !isDescendantOf(mesh, model.tourStartNode) && isFloorSurface(mesh));
+  const angjiBuildingFloor1Meshes = isAngjiProject
+    ? meshes.filter((mesh) => (
+      mesh.isEnabled()
+      && !isDescendantOf(mesh, model.tourStartNode)
+      && mesh.metadata?.angjiBuildingFloor1Surface
+    ))
+    : [];
+  const angjiExternalFloorMeshes = isAngjiProject
+    ? meshes.filter((mesh) => (
+      mesh.isEnabled()
+      && !isDescendantOf(mesh, model.tourStartNode)
+      && mesh.metadata?.angjiExternalFloorSurface
+    ))
+    : [];
 
   [...stairSurfaceMeshes, ...floorSurfaceMeshes].forEach((mesh) => {
     mesh.metadata = { ...(mesh.metadata || {}), passThrough: false, groundSurface: true };
@@ -4617,6 +4916,8 @@ async function loadTourModelState(BABYLON, scene, config) {
     walkableGroundMeshes: Array.from(groundMeshMap.values()),
     stairSurfaceMeshes,
     floorSurfaceMeshes,
+    angjiBuildingFloor1Meshes,
+    angjiExternalFloorMeshes,
     peopleTargetMeshes,
     treeMeshes,
     projectileHitMeshes: meshes.filter((mesh) => mesh.isEnabled() && !isDescendantOf(mesh, model.tourStartNode))
@@ -4673,7 +4974,10 @@ async function start() {
 
     return orbitModelState;
   }));
-  await bgmReady;
+  void bgmReady.catch((error) => {
+    console.warn("Tour BGM preload skipped:", error);
+  });
+  setLoadingTargetProgress(LOADING_PROGRESS.dataReady + LOADING_PROGRESS.modelsWeight);
 
   const allModelStates = modelStates.flatMap((modelState) => (
     modelState.tourModelState ? [modelState, modelState.tourModelState] : [modelState]

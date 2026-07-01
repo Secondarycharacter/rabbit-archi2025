@@ -1,5 +1,5 @@
 import { createAnimationController } from "./AnimationController.js?v=tps-jump-nocol-20260629";
-import { createCameraController } from "./CameraController.js?v=tps-jump-nocol-20260629";
+import { createCameraController } from "./CameraController.js?v=floor2-ceiling-camera-20260629";
 import { createCharacterStateMachine, ACTION } from "./CharacterStateMachine.js?v=tps-jump-nocol-20260629";
 import { createInputController } from "./InputController.js?v=tps-jump-nocol-20260629";
 import { createMovementController } from "./MovementController.js?v=tps-jump-nocol-20260629";
@@ -8,7 +8,7 @@ import {
   loadCharacterModel,
   CHARACTER_FILE,
   CHARACTER_ROOT
-} from "./CharacterController.js?v=tps-jump-nocol-20260629";
+} from "./CharacterController.js?v=character-spawn-fix-20260701";
 import { CLIP_NAMES } from "./AnimationController.js?v=tps-jump-nocol-20260629";
 import { createRootMotionNeutralizer, stripLocomotionRootMotion } from "./RootMotionNeutralizer.js?v=tps-jump-nocol-20260629";
 
@@ -78,6 +78,8 @@ export function createTpsSystem(BABYLON, scene, camera, options = {}) {
     autoReturnSpeed: controllerSettings.cameraAutoReturnSpeed ?? 2.4,
     positionDamping: controllerSettings.cameraPositionDamping ?? 8,
     stopPositionDamping: controllerSettings.cameraStopPositionDamping ?? 18,
+    cameraFloor2WallNormalMaxY: controllerSettings.cameraFloor2WallNormalMaxY ?? 0.35,
+    cameraFloor2CeilingMargin: controllerSettings.cameraFloor2CeilingMargin ?? 0.12,
     collisionMask: (mesh) => getCollisionMask()(mesh)
   });
 

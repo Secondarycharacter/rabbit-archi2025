@@ -36,9 +36,10 @@ export async function loadCharacterModel(BABYLON, scene, options = {}) {
   root.computeWorldMatrix(true);
   meshes.forEach((mesh) => mesh.computeWorldMatrix(true));
 
-  const bounds = meshes.reduce((combined, mesh) => {
+  const worldBounds = meshes.reduce((combined, mesh) => {
     mesh.computeWorldMatrix(true);
     const info = mesh.getBoundingInfo?.();
+
     if (!info) {
       return combined;
     }
@@ -60,10 +61,10 @@ export async function loadCharacterModel(BABYLON, scene, options = {}) {
 
   let rawHeight = 1.75;
 
-  if (bounds) {
-    const center = bounds.min.add(bounds.max).scale(0.5);
-    contentRoot.position.addInPlace(new BABYLON.Vector3(-center.x, -bounds.min.y, -center.z));
-    rawHeight = Math.max(bounds.max.y - bounds.min.y, 0.001);
+  if (worldBounds) {
+    const center = worldBounds.min.add(worldBounds.max).scale(0.5);
+    contentRoot.position.addInPlace(new BABYLON.Vector3(-center.x, -worldBounds.min.y, -center.z));
+    rawHeight = Math.max(worldBounds.max.y - worldBounds.min.y, 0.001);
   }
 
   const fitScale = (targetHeight / rawHeight) * scale;
@@ -71,7 +72,28 @@ export async function loadCharacterModel(BABYLON, scene, options = {}) {
   root.computeWorldMatrix(true);
   meshes.forEach((mesh) => mesh.computeWorldMatrix(true));
 
-  const visualHeight = rawHeight * fitScale;
+  const alignedBounds = meshes.reduce((combined, mesh) => {
+    const info = mesh.getBoundingInfo?.();
+
+    if (!info) {
+      return combined;
+    }
+
+    const min = info.boundingBox.minimumWorld;
+    const max = info.boundingBox.maximumWorld;
+
+    if (!combined) {
+      return { min: min.clone(), max: max.clone() };
+    }
+
+    combined.min.minimizeInPlace(min);
+    combined.max.maximizeInPlace(max);
+    return combined;
+  }, null);
+
+  const visualHeight = alignedBounds
+    ? Math.max(alignedBounds.max.y - alignedBounds.min.y, 0.001)
+    : rawHeight * fitScale;
 
   meshes.forEach((mesh) => {
     mesh.isPickable = false;

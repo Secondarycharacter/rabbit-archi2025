@@ -11,6 +11,12 @@ export const GROUND_SNAP_TOLERANCE = 0.08;
 
 export const ANGJI_MOVE_SPEED_MULTIPLIER = 3;
 
+/** |normal.y| above this = flat horizontal — floor vs ceiling decided by hit height. */
+export const ANGJI_CAMERA_FLOOR2_WALL_NORMAL_MAX_Y = 0.35;
+
+/** Flat Floor2 above aim point by this margin is treated as ceiling (blocks camera). */
+export const ANGJI_CAMERA_FLOOR2_CEILING_MARGIN = 0.12;
+
 export const ANGJI_TOUR_CAMERA = {
   position: { x: -46.61, y: 24.44, z: 30.49 },
   target: { x: 0, y: 6.81, z: 0 }
@@ -177,6 +183,8 @@ const BASE_CONTROLLER_SETTINGS = {
   cameraAutoReturnSpeed: 2.4,
   cameraPositionDamping: 8,
   cameraStopPositionDamping: 18,
+  cameraFloor2WallNormalMaxY: ANGJI_CAMERA_FLOOR2_WALL_NORMAL_MAX_Y,
+  cameraFloor2CeilingMargin: ANGJI_CAMERA_FLOOR2_CEILING_MARGIN,
   movementBlendInSpeed: 6.5,
   movementBlendOutSpeed: 7,
   characterRotationDamping: 10,

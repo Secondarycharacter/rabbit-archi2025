@@ -5,6 +5,13 @@ import {
 
 export const GUEST_ASSET_ROOT = "./assets/guest/";
 
+function encodeGuestAssetPath(filePath) {
+  return String(filePath || "")
+    .split("/")
+    .map((segment) => (/[^A-Za-z0-9._-]/.test(segment) ? encodeURIComponent(segment) : segment))
+    .join("/");
+}
+
 function normalizeClipName(name) {
   return String(name || "").trim().toLowerCase();
 }
@@ -126,7 +133,7 @@ function playGuestAnimation(guest) {
   }
 }
 
-function updateGuestPatrol(guest, deltaScale) {
+function updateGuestPatrol(guest, deltaScale, resolveFloorY) {
   const { movement } = guest.spawn;
   const targets = movement?.patrolTargets;
 
@@ -136,25 +143,25 @@ function updateGuestPatrol(guest, deltaScale) {
 
   const target = targets[guest.patrolTargetIndex];
   const position = guest.root.position;
-  const toTarget = {
-    x: target.x - position.x,
-    y: target.y - position.y,
-    z: target.z - position.z
-  };
-  const distance = Math.hypot(toTarget.x, toTarget.y, toTarget.z);
+  const toTargetX = target.x - position.x;
+  const toTargetZ = target.z - position.z;
+  const distance = Math.hypot(toTargetX, toTargetZ);
   const step = (movement.speed ?? 0.135) * deltaScale;
+  const snapY = (x, z, fallbackY) => resolveFloorY?.(x, z, fallbackY) ?? fallbackY;
 
   if (distance <= step) {
-    position.set(target.x, target.y, target.z);
+    position.x = target.x;
+    position.z = target.z;
+    position.y = snapY(target.x, target.z, target.y);
     guest.patrolTargetIndex = (guest.patrolTargetIndex + 1) % targets.length;
     return;
   }
 
   const invDistance = 1 / distance;
-  position.x += toTarget.x * invDistance * step;
-  position.y += toTarget.y * invDistance * step;
-  position.z += toTarget.z * invDistance * step;
-  guest.root.rotation.y = Math.atan2(toTarget.x, toTarget.z);
+  position.x += toTargetX * invDistance * step;
+  position.z += toTargetZ * invDistance * step;
+  position.y = snapY(position.x, position.z, position.y);
+  guest.root.rotation.y = Math.atan2(toTargetX, toTargetZ);
 }
 
 function collectMeshMaterials(meshes) {
@@ -197,12 +204,21 @@ async function loadGuestCharacter(BABYLON, scene, spawn, helpers) {
     targetHeight = 1.75
   } = helpers;
 
-  const result = await BABYLON.SceneLoader.ImportMeshAsync(
+  const encodedFile = encodeGuestAssetPath(spawn.file);
+  const loadTask = BABYLON.SceneLoader.ImportMeshAsync(
     "",
     GUEST_ASSET_ROOT,
-    spawn.file,
+    encodedFile,
     scene
   );
+  const result = await Promise.race([
+    loadTask,
+    new Promise((_, reject) => {
+      window.setTimeout(() => {
+        reject(new Error(`guest load timeout: ${spawn.id}`));
+      }, 45000);
+    })
+  ]);
 
   const root = new BABYLON.TransformNode(`guest-root-${spawn.id}`, scene);
   const contentRoot = new BABYLON.TransformNode(`guest-content-${spawn.id}`, scene);
@@ -260,33 +276,56 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
   const guestsById = new Map();
   let visible = false;
   const loadPromises = new Map();
+  const { resolveSpawnPosition, resolveGuestFloorY } = helpers;
+
+  function resolveGuestSpawn(spawn) {
+    const resolvedSpawn = resolveSpawnPosition?.(spawn);
+
+    if (!resolvedSpawn || resolvedSpawn === spawn) {
+      return spawn;
+    }
+
+    return resolvedSpawn;
+  }
 
   function getGuests() {
     return [...guestsById.values()];
   }
 
   function showGuest(guest) {
+    const resolvedSpawn = resolveGuestSpawn(guest.spawn);
+    guest.spawn = resolvedSpawn;
+
     if (guest.spawn.movement?.type === "patrol") {
       guest.patrolTargetIndex = 0;
-      guest.root.position.set(
-        guest.spawn.position.x,
-        guest.spawn.position.y,
-        guest.spawn.position.z
-      );
-      guest.root.rotation.set(0, guest.spawn.rotationY, 0);
     }
 
+    guest.root.position.set(
+      resolvedSpawn.position.x,
+      resolvedSpawn.position.y,
+      resolvedSpawn.position.z
+    );
+    guest.root.rotation.set(0, resolvedSpawn.rotationY, 0);
     guest.root.setEnabled(true);
     playGuestAnimation(guest);
   }
 
   function show(options = {}) {
     const excludeIds = new Set(options.excludeIds || []);
+    const includeIds = options.includeIds?.length ? new Set(options.includeIds) : null;
     visible = true;
     getGuests().forEach((guest) => {
-      if (!excludeIds.has(guest.spawn.id)) {
-        showGuest(guest);
+      const guestId = guest.spawn.id;
+
+      if (includeIds && !includeIds.has(guestId)) {
+        return;
       }
+
+      if (excludeIds.has(guestId)) {
+        return;
+      }
+
+      showGuest(guest);
     });
   }
 
@@ -314,8 +353,16 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
   }
 
   async function loadSpawn(spawn, { showOnLoad = true } = {}) {
-    if (guestsById.has(spawn.id)) {
-      const existing = guestsById.get(spawn.id);
+    const resolvedSpawn = resolveGuestSpawn(spawn);
+
+    if (guestsById.has(resolvedSpawn.id)) {
+      const existing = guestsById.get(resolvedSpawn.id);
+      existing.spawn = resolvedSpawn;
+      existing.root.position.set(
+        resolvedSpawn.position.x,
+        resolvedSpawn.position.y,
+        resolvedSpawn.position.z
+      );
 
       if (visible && showOnLoad) {
         showGuest(existing);
@@ -324,14 +371,15 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
       return existing;
     }
 
-    if (loadPromises.has(spawn.id)) {
-      return loadPromises.get(spawn.id);
+    if (loadPromises.has(resolvedSpawn.id)) {
+      return loadPromises.get(resolvedSpawn.id);
     }
 
-    const loadPromise = loadGuestCharacter(BABYLON, scene, spawn, helpers)
+    const loadPromise = loadGuestCharacter(BABYLON, scene, resolvedSpawn, helpers)
       .then((guest) => {
-        guestsById.set(spawn.id, guest);
-        loadPromises.delete(spawn.id);
+        guest.spawn = resolvedSpawn;
+        guestsById.set(resolvedSpawn.id, guest);
+        loadPromises.delete(resolvedSpawn.id);
 
         if (visible && showOnLoad) {
           showGuest(guest);
@@ -340,12 +388,12 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
         return guest;
       })
       .catch((error) => {
-        loadPromises.delete(spawn.id);
-        console.error(`[guest] failed to load ${spawn.id}`, error);
+        loadPromises.delete(resolvedSpawn.id);
+        console.error(`[guest] failed to load ${resolvedSpawn.id}`, error);
         return null;
       });
 
-    loadPromises.set(spawn.id, loadPromise);
+    loadPromises.set(resolvedSpawn.id, loadPromise);
     return loadPromise;
   }
 
@@ -397,7 +445,7 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
       resetGuestRootMotion(guest);
 
       if (guest.spawn.movement?.type === "patrol") {
-        updateGuestPatrol(guest, deltaScale);
+        updateGuestPatrol(guest, deltaScale, resolveGuestFloorY);
       }
     });
   }
