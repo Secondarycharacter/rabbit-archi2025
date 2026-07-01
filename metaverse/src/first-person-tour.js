@@ -24,6 +24,12 @@ import { createGuestCharacterSystem } from "./guest-character-system.js?v=angji-
 import { applyLocalDevToolsVisibility, isLocalDevEnvironment } from "./local-dev.js?v=local-dev-20260629";
 
 const MODEL_ROOT = "./assets/models/";
+const DEFAULT_MODEL_CACHE_VERSION = "1";
+
+function getModelLoadFileName(config) {
+  const version = config?.modelCacheVersion || DEFAULT_MODEL_CACHE_VERSION;
+  return `${config.file}?v=${version}`;
+}
 const ENEMY_ROOT = "./assets/guest/";
 const AUDIO_BGM_ROOT = "./assets/audio/bgm/";
 const TOUR_BGM_FADE_MS = 3000;
@@ -42,13 +48,14 @@ const MODEL_CONFIGS = [
   },
   {
     file: "Angji.glb",
+    modelCacheVersion: "20260629",
     label: "앵지",
     overviewId: "angji",
     tourBgm: "angji/angji_tour_bgm.mp3",
     moveSpeedMultiplier: 3,
     performance: {
-      localCollisionRadius: 34,
-      localGroundRadius: 48,
+      localCollisionRadius: 18,
+      localGroundRadius: 24,
       localMeshUpdateDistance: 4,
       treeFacingMinMoveDistance: 0.35,
       treeFacingIntervalFrames: 3
@@ -229,6 +236,14 @@ const GROUND_GRACE_VERTICAL_TOLERANCE = 0.18;
 const STAIR_GROUND_GRACE_MS = 1600;
 const STAIR_GROUND_GRACE_VERTICAL_TOLERANCE = 0.52;
 const STAIR_STAND_SNAP_TOLERANCE = 0.42;
+const ANGJI_SMART_GROUND_Y_BAND = 2.5;
+const GROUND_PROBE_OFFSETS_COMPACT = [
+  [0, 0],
+  [PLAYER_RADIUS * 0.55, 0],
+  [-PLAYER_RADIUS * 0.55, 0],
+  [0, PLAYER_RADIUS * 0.55],
+  [0, -PLAYER_RADIUS * 0.55]
+];
 const GROUND_PROBE_OFFSETS = [
   [0, 0],
   [PLAYER_RADIUS * 0.55, 0],
@@ -1239,25 +1254,55 @@ function hasAngjiWallMaterial(mesh) {
 
 function applyAngjiCollisionInvisibility(mesh, BABYLON) {
   mesh.visibility = 1;
-  mesh.isPickable = true;
 
   collectMeshMaterials(mesh).forEach((material) => {
     material.alpha = 0;
-    material.transparencyMode = BABYLON.Material.MATERIAL_ALPHATEST;
-    material.alphaCutOff = 1;
-    material.disableDepthWrite = false;
-    material.needDepthPrePass = true;
+    material.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+    material.disableDepthWrite = true;
     material.backFaceCulling = false;
   });
 }
 
-function buildLocalGroundMeshSet(BABYLON, position, groundMeshes, radius, config) {
-  if (isAngjiProjectConfig(config)) {
-    return new Set(groundMeshes);
+function isAngjiWalkableSurfaceMesh(mesh) {
+  return Boolean(mesh.metadata?.angjiFloorSurface || mesh.metadata?.angjiStairSurface);
+}
+
+function isMeshWithinVerticalBand(BABYLON, mesh, eyeY, bandHalfHeight) {
+  const bounds = getCachedMeshBounds(BABYLON, mesh);
+
+  if (!bounds) {
+    return true;
   }
 
+  const feetY = eyeY - EYE_HEIGHT;
+
+  return bounds.max.y >= feetY - bandHalfHeight && bounds.min.y <= feetY + bandHalfHeight;
+}
+
+function buildLocalGroundMeshSet(BABYLON, position, groundMeshes, radius, config) {
   const nearbyGroundMeshes = getMeshesNearPosition(BABYLON, groundMeshes, position, radius);
-  return nearbyGroundMeshes.length > 0 ? new Set(nearbyGroundMeshes) : new Set(groundMeshes);
+  const merged = new Map(
+    (nearbyGroundMeshes.length > 0 ? nearbyGroundMeshes : groundMeshes)
+      .map((mesh) => [mesh.uniqueId, mesh])
+  );
+
+  if (!isAngjiProjectConfig(config)) {
+    return new Set(merged.values());
+  }
+
+  groundMeshes.forEach((mesh) => {
+    if (!isAngjiWalkableSurfaceMesh(mesh)) {
+      return;
+    }
+
+    if (!isMeshWithinVerticalBand(BABYLON, mesh, position.y, ANGJI_SMART_GROUND_Y_BAND)) {
+      return;
+    }
+
+    merged.set(mesh.uniqueId, mesh);
+  });
+
+  return new Set(merged.values());
 }
 
 function hasMaterialKeyword(mesh, keywords) {
@@ -2724,13 +2769,15 @@ function findGroundHit(BABYLON, scene, position, groundMeshSet) {
   const rayOrigin = new BABYLON.Vector3(position.x, position.y + GROUND_RAY_UP, position.z);
   const ray = new BABYLON.Ray(rayOrigin, BABYLON.Vector3.Down(), GROUND_RAY_UP + GROUND_RAY_DOWN);
   const hits = getRayHits(scene, ray, (mesh) => groundMeshSet.has(mesh) && mesh.isPickable && mesh.isEnabled());
+
   return hits.map(getValidGroundHit).find(Boolean) || null;
 }
 
-function getGroundHitsAtPosition(BABYLON, scene, position, groundMeshSet) {
+function getGroundHitsAtPosition(BABYLON, scene, position, groundMeshSet, options = {}) {
+  const probeOffsets = options.compactProbes ? GROUND_PROBE_OFFSETS_COMPACT : GROUND_PROBE_OFFSETS;
   const hits = [];
 
-  for (const [offsetX, offsetZ] of GROUND_PROBE_OFFSETS) {
+  for (const [offsetX, offsetZ] of probeOffsets) {
     const rayOrigin = new BABYLON.Vector3(
       position.x + offsetX,
       position.y + GROUND_RAY_UP,
@@ -2746,8 +2793,8 @@ function getGroundHitsAtPosition(BABYLON, scene, position, groundMeshSet) {
     .sort((a, b) => b.pickedPoint.y - a.pickedPoint.y);
 }
 
-function getGroundPoseAtPosition(BABYLON, scene, position, groundMeshSet, referenceEyeY = null) {
-  const groundHits = getGroundHitsAtPosition(BABYLON, scene, position, groundMeshSet);
+function getGroundPoseAtPosition(BABYLON, scene, position, groundMeshSet, referenceEyeY = null, options = {}) {
+  const groundHits = getGroundHitsAtPosition(BABYLON, scene, position, groundMeshSet, options);
   let hit = groundHits[0] || null;
 
   if (typeof referenceEyeY === "number") {
@@ -2772,8 +2819,8 @@ function getGroundPoseAtPosition(BABYLON, scene, position, groundMeshSet, refere
   };
 }
 
-function getLandingGroundPoseAtPosition(BABYLON, scene, position, groundMeshSet, referenceEyeY) {
-  const groundHits = getGroundHitsAtPosition(BABYLON, scene, position, groundMeshSet);
+function getLandingGroundPoseAtPosition(BABYLON, scene, position, groundMeshSet, referenceEyeY, options = {}) {
+  const groundHits = getGroundHitsAtPosition(BABYLON, scene, position, groundMeshSet, options);
   const landingCandidate = groundHits
     .map((candidate) => ({
       hit: candidate,
@@ -3723,9 +3770,8 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
       walkCamera.position,
       performanceSettings.localCollisionRadius
     );
-    localCollisionMeshSet = isAngjiProjectConfig(activeModelState.config)
-      ? collisionMeshSet
-      : (nearbyCollisionMeshes.length > 0 ? new Set(nearbyCollisionMeshes) : collisionMeshSet);
+
+    localCollisionMeshSet = nearbyCollisionMeshes.length > 0 ? new Set(nearbyCollisionMeshes) : collisionMeshSet;
     localGroundMeshSet = buildLocalGroundMeshSet(
       BABYLON,
       walkCamera.position,
@@ -4102,7 +4148,14 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
       return { verticalVelocity, isGrounded };
     }
 
-    const groundPose = getLandingGroundPoseAtPosition(BABYLON, scene, walkCamera.position, localGroundMeshSet, walkCamera.position.y);
+    const groundPose = getLandingGroundPoseAtPosition(
+      BABYLON,
+      scene,
+      walkCamera.position,
+      localGroundMeshSet,
+      walkCamera.position.y,
+      { compactProbes: grounded && Math.abs(vy) <= 0.02 }
+    );
 
     if (groundPose) {
       const distanceToGround = walkCamera.position.y - groundPose.eyeY;
@@ -4473,7 +4526,8 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
           scene,
           position,
           localGroundMeshSet,
-          position.y
+          position.y,
+          { compactProbes: isGrounded }
         );
 
         return groundPose?.eyeY ?? position.y;
@@ -4717,7 +4771,7 @@ function renderModelDebug(modelState) {
   const { config, meshes, model, collisionMeshes, walkableGroundMeshes, stairSurfaceMeshes, floorSurfaceMeshes, peopleTargetMeshes } = modelState;
 
   modelStatus.textContent = `Loaded ${config.label}`;
-  modelSource.textContent = `${MODEL_ROOT}${config.file}`;
+  modelSource.textContent = `${MODEL_ROOT}${getModelLoadFileName(config)}`;
   modelStats.textContent = `${meshes.length} meshes / collision ${collisionMeshes.length} / walkable ${walkableGroundMeshes.length} / stairSurfaces ${stairSurfaceMeshes.length} / floorSurfaces ${floorSurfaceMeshes.length} / peopleTargets ${peopleTargetMeshes.length} / propPassThrough ${modelState.propPassThroughCount} / furniturePassThrough ${modelState.furniturePassThroughCount || 0} / angjiColLayer ${modelState.angjiCollisionLayerCount ?? "-"} / collisionFallback ${modelState.usedCollisionFallback ? "yes" : "no"} / scale ${model.scale.toExponential(3)} / full ${boundsToText(model.bounds)} / focus ${boundsToText(model.focusBounds)} / ${model.tourStartNode ? "Tour_Start found" : "Tour_Start not found"}`;
   meshList.replaceChildren(
     ...meshes.slice(0, 50).map((mesh) => {
@@ -4741,7 +4795,7 @@ async function processTourMeshesInChunks(meshes, processor, chunkSize = 64) {
 }
 
 async function loadTourModelState(BABYLON, scene, config) {
-  const fileName = `${config.file}?v=${Date.now()}`;
+  const fileName = getModelLoadFileName(config);
   const result = await BABYLON.SceneLoader.ImportMeshAsync("", MODEL_ROOT, fileName, scene);
   let meshes = getGeometryMeshes(result.meshes);
   const model = normalizeModel(BABYLON, scene, result, meshes);
