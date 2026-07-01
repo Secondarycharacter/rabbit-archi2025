@@ -47,8 +47,8 @@ const MODEL_CONFIGS = [
     tourBgm: "angji/angji_tour_bgm.mp3",
     moveSpeedMultiplier: 3,
     performance: {
-      localCollisionRadius: 18,
-      localGroundRadius: 24,
+      localCollisionRadius: 34,
+      localGroundRadius: 48,
       localMeshUpdateDistance: 4,
       treeFacingMinMoveDistance: 0.35,
       treeFacingIntervalFrames: 3
@@ -1239,13 +1239,25 @@ function hasAngjiWallMaterial(mesh) {
 
 function applyAngjiCollisionInvisibility(mesh, BABYLON) {
   mesh.visibility = 1;
+  mesh.isPickable = true;
 
   collectMeshMaterials(mesh).forEach((material) => {
     material.alpha = 0;
-    material.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
-    material.disableDepthWrite = true;
+    material.transparencyMode = BABYLON.Material.MATERIAL_ALPHATEST;
+    material.alphaCutOff = 1;
+    material.disableDepthWrite = false;
+    material.needDepthPrePass = true;
     material.backFaceCulling = false;
   });
+}
+
+function buildLocalGroundMeshSet(BABYLON, position, groundMeshes, radius, config) {
+  if (isAngjiProjectConfig(config)) {
+    return new Set(groundMeshes);
+  }
+
+  const nearbyGroundMeshes = getMeshesNearPosition(BABYLON, groundMeshes, position, radius);
+  return nearbyGroundMeshes.length > 0 ? new Set(nearbyGroundMeshes) : new Set(groundMeshes);
 }
 
 function hasMaterialKeyword(mesh, keywords) {
@@ -3711,15 +3723,16 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
       walkCamera.position,
       performanceSettings.localCollisionRadius
     );
-    const nearbyGroundMeshes = getMeshesNearPosition(
+    localCollisionMeshSet = isAngjiProjectConfig(activeModelState.config)
+      ? collisionMeshSet
+      : (nearbyCollisionMeshes.length > 0 ? new Set(nearbyCollisionMeshes) : collisionMeshSet);
+    localGroundMeshSet = buildLocalGroundMeshSet(
       BABYLON,
-      activeGroundMeshes,
       walkCamera.position,
-      performanceSettings.localGroundRadius
+      activeGroundMeshes,
+      performanceSettings.localGroundRadius,
+      activeModelState.config
     );
-
-    localCollisionMeshSet = nearbyCollisionMeshes.length > 0 ? new Set(nearbyCollisionMeshes) : collisionMeshSet;
-    localGroundMeshSet = nearbyGroundMeshes.length > 0 ? new Set(nearbyGroundMeshes) : groundMeshSet;
   }
 
   function updateInputDebug() {
