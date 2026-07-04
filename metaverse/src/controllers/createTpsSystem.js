@@ -186,6 +186,7 @@ export function createTpsSystem(BABYLON, scene, camera, options = {}) {
       isGrounded,
       modelSpeedMultiplier = 1,
       applyHorizontalMove,
+      forceWalkLocomotion = false,
       mouseDelta = { x: 0, y: 0 },
       wheelDelta = 0,
       onDiagnostics = null
@@ -226,6 +227,10 @@ export function createTpsSystem(BABYLON, scene, camera, options = {}) {
     const previewState = stateMachine.getPreviewState(isGrounded);
 
     inputFrame.blocksLocomotion = previewState.blocksHorizontalMovement;
+
+    if (forceWalkLocomotion) {
+      inputFrame.wantsRun = false;
+    }
 
     movementController.updateBlend(
       inputFrame,

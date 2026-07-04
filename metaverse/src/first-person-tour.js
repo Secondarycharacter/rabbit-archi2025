@@ -43,12 +43,28 @@ const DEFAULT_MODEL_FILE = "Angji.glb";
 const MODEL_CONFIGS = [
   {
     file: "Jinju.glb",
+    modelCacheVersion: "20260705-ramp-floors",
     label: "Glocal Jinju",
-    overviewId: "jinju"
+    overviewId: "jinju",
+    moveSpeedMultiplier: 3,
+    collision: {
+      stairMode: "discrete"
+    },
+    orbitCamera: {
+      zoomOutMultiplier: 3,
+      upperBetaDegrees: 82
+    },
+    performance: {
+      localCollisionRadius: 18,
+      localGroundRadius: 24,
+      localMeshUpdateDistance: 4,
+      treeFacingMinMoveDistance: 0.35,
+      treeFacingIntervalFrames: 3
+    }
   },
   {
     file: "Angji.glb",
-    modelCacheVersion: "20260629",
+    modelCacheVersion: "20260705-c-ramp-1f",
     label: "앵지",
     overviewId: "angji",
     tourBgm: "angji/angji_tour_bgm.mp3",
@@ -160,12 +176,25 @@ const TOUR_RESET_FALL_DISTANCE = 8;
 const TOUR_RESET_FADE_MS = 450;
 const MAX_STEP_UP = 0.32;
 const MAX_STAIR_STEP_UP = 0.48;
+const MAX_RAMP_STEP_UP = 0.72;
 const ANGJI_MAX_STAIR_STEP_UP = 1.05;
 const MAX_STEP_DOWN = 0.85;
 const MIN_STEP_DOWN = 0.025;
 const MIN_STEP_UP = 0.035;
 const STEP_PROBE_DISTANCES = [0.12, 0.2, 0.32, 0.45, 0.62];
+const SHORT_STAIR_PROBE_DISTANCES = [0.12, 0.24, 0.38];
 const ANGJI_STAIR_PROBE_DISTANCES = [...STEP_PROBE_DISTANCES, 0.85, 1.1, 1.4];
+const MOVE_COLLISION_SUBSTEP_STAIR = 0.14;
+const STAIR_CONTEXT_PROBE_OFFSETS = [
+  [0, 0],
+  [0.28, 0],
+  [-0.28, 0],
+  [0, 0.28],
+  [0, -0.28]
+];
+const STAIR_STEP_LATERAL_OFFSETS = [0, 0.14, -0.14, 0.24, -0.24];
+const RAMP_STEP_LATERAL_OFFSETS = [0, 0.14, -0.14];
+const NEAR_RAMP_PROBE_DISTANCES = [0.38, 0.75];
 const STAIR_MATERIAL_KEYWORDS = ["polishedconcreteold", "stone01", "stair01", "stair02"];
 const STAIR_NODE_KEYWORDS = ["3dgeom126", "3dgeom292", "3dgeom599", "3dgeom600", "stair01", "stair02"];
 const ANGJI_BUILDING_WALL_PREFIXES = ["0_col_b_wall"];
@@ -173,10 +202,22 @@ const ANGJI_BUILDING_FLOOR1_PREFIXES = ["0_col_b_floor1"];
 const ANGJI_BUILDING_FLOOR2_PREFIXES = ["0_col_b_floor2"];
 const ANGJI_BUILDING_FLOOR_PREFIXES = [...ANGJI_BUILDING_FLOOR1_PREFIXES, ...ANGJI_BUILDING_FLOOR2_PREFIXES];
 const ANGJI_BUILDING_STAIR_PREFIXES = ["0_col_b_stair"];
+const ANGJI_BUILDING_RAMP_PREFIXES = [
+  "0_col_b_ramp_1f",
+  "0_col_b_ramp_2f",
+  "0_col_b_ramp_3f",
+  "0_col_b_ramp"
+];
 const ANGJI_BUILDING_FURNITURE_PREFIXES = ["0_col_b_fur"];
 const ANGJI_EXTERNAL_FLOOR_PREFIXES = ["0_col_c_floor", "00_col_c_floor"];
 const ANGJI_EXTERNAL_WALL_PREFIXES = ["0_col_c_wall"];
 const ANGJI_EXTERNAL_STAIR_PREFIXES = ["0_col_c_stair"];
+const ANGJI_EXTERNAL_RAMP_PREFIXES = [
+  "0_col_c_ramp_1f",
+  "0_col_c_ramp_2f",
+  "0_col_c_ramp_3f",
+  "0_col_c_ramp"
+];
 const ANGJI_EXTERNAL_BUILDING_PREFIXES = ["0_col_c_bldg1"];
 const FLOOR_MATERIAL_KEYWORDS = [
   "colorm00",
@@ -229,6 +270,8 @@ const GROUND_NORMAL_MIN_Y = 0.55;
 const CLASSIFIED_GROUND_NORMAL_MIN_Y = 0.18;
 const WALL_NORMAL_MAX_Y = 0.9;
 const MIN_COLLISION_DISTANCE = 0.04;
+const MIN_WALL_SLIDE_DISTANCE = 0.012;
+const MAX_WALL_SLIDE_DEPTH = 2;
 const STEP_SMOOTHING = 0.35;
 const STEP_SETTLE_EPSILON = 0.015;
 const GROUND_GRACE_MS = 180;
@@ -237,6 +280,7 @@ const STAIR_GROUND_GRACE_MS = 1600;
 const STAIR_GROUND_GRACE_VERTICAL_TOLERANCE = 0.52;
 const STAIR_STAND_SNAP_TOLERANCE = 0.42;
 const ANGJI_SMART_GROUND_Y_BAND = 2.5;
+const ANGJI_SLOPE_GROUND_Y_BAND = 3;
 const GROUND_PROBE_OFFSETS_COMPACT = [
   [0, 0],
   [PLAYER_RADIUS * 0.55, 0],
@@ -1185,6 +1229,13 @@ function getAngjiCollisionMaterialRole(mesh) {
 
   for (const name of materialNames) {
     if (
+      angjiMaterialNameMatchesPrefix(name, ANGJI_BUILDING_RAMP_PREFIXES)
+      || angjiMaterialNameMatchesPrefix(name, ANGJI_EXTERNAL_RAMP_PREFIXES)
+    ) {
+      return "ramp";
+    }
+
+    if (
       angjiMaterialNameMatchesPrefix(name, ANGJI_BUILDING_STAIR_PREFIXES)
       || angjiMaterialNameMatchesPrefix(name, ANGJI_EXTERNAL_STAIR_PREFIXES)
     ) {
@@ -1220,6 +1271,132 @@ function hasAngjiCollisionMaterial(mesh) {
 
 function hasAngjiStairMaterial(mesh) {
   return getAngjiCollisionMaterialRole(mesh) === "stair";
+}
+
+function hasAngjiRampMaterial(mesh) {
+  return getAngjiCollisionMaterialRole(mesh) === "ramp";
+}
+
+function getAngjiRampFloorLevel(mesh) {
+  if (!mesh) {
+    return null;
+  }
+
+  const storedLevel = mesh.metadata?.angjiRampFloorLevel;
+
+  if (typeof storedLevel === "number") {
+    return storedLevel;
+  }
+
+  for (const name of getNormalizedMaterialNames(mesh)) {
+    if (!name.includes("ramp")) {
+      continue;
+    }
+
+    if (name.endsWith("_3f")) {
+      return 3;
+    }
+
+    if (name.endsWith("_2f")) {
+      return 2;
+    }
+
+    if (name.endsWith("_1f")) {
+      return 1;
+    }
+  }
+
+  return null;
+}
+
+function inferRampFloorLevelAtPosition(BABYLON, position, groundMeshes) {
+  const feetY = position.y - EYE_HEIGHT;
+  let onRampLevel = null;
+  let nearestLevel = null;
+  let nearestDistance = Infinity;
+
+  groundMeshes.forEach((mesh) => {
+    const level = getAngjiRampFloorLevel(mesh);
+
+    if (!level) {
+      return;
+    }
+
+    const bounds = getCachedMeshBounds(BABYLON, mesh);
+
+    if (!bounds) {
+      return;
+    }
+
+    if (feetY >= bounds.min.y - 0.35 && feetY <= bounds.max.y + 0.5) {
+      onRampLevel = level;
+      return;
+    }
+
+    const distance = feetY < bounds.min.y
+      ? bounds.min.y - feetY
+      : feetY > bounds.max.y
+        ? feetY - bounds.max.y
+        : 0;
+
+    if (distance < nearestDistance) {
+      nearestDistance = distance;
+      nearestLevel = level;
+    }
+  });
+
+  return onRampLevel ?? nearestLevel;
+}
+
+function selectBestRampCandidate(ramps, options = {}) {
+  if (!ramps.length) {
+    return null;
+  }
+
+  const preferredLevel = options.preferredRampFloorLevel;
+
+  if (typeof preferredLevel === "number") {
+    const sameFloor = ramps.filter((candidate) => candidate.rampFloorLevel === preferredLevel);
+
+    if (sameFloor.length) {
+      return sameFloor.sort(compareGroundCandidateDelta)[0];
+    }
+
+    const adjacentFloor = ramps.filter((candidate) => (
+      typeof candidate.rampFloorLevel === "number"
+      && Math.abs(candidate.rampFloorLevel - preferredLevel) <= 1
+    ));
+
+    if (adjacentFloor.length) {
+      return adjacentFloor.sort(compareGroundCandidateDelta)[0];
+    }
+  }
+
+  return ramps.sort(compareGroundCandidateDelta)[0];
+}
+
+function hasVisualStairMaterial(mesh) {
+  if (hasAngjiCollisionMaterial(mesh)) {
+    return false;
+  }
+
+  if (hasExactMaterialName(mesh, ["stair01", "stair02"])) {
+    return true;
+  }
+
+  let current = mesh;
+
+  while (current) {
+    const name = normalizeName(current.name || current.id);
+
+    if (STAIR_NODE_KEYWORDS.some((keyword) => name.includes(keyword))) {
+      return true;
+    }
+
+    current = current.parent;
+  }
+
+  return hasMaterialKeyword(mesh, STAIR_MATERIAL_KEYWORDS);
 }
 
 function hasAngjiFurnitureMaterial(mesh) {
@@ -1264,7 +1441,15 @@ function applyAngjiCollisionInvisibility(mesh, BABYLON) {
 }
 
 function isAngjiWalkableSurfaceMesh(mesh) {
-  return Boolean(mesh.metadata?.angjiFloorSurface || mesh.metadata?.angjiStairSurface);
+  if (mesh.metadata?.angjiVisualStairSurface) {
+    return false;
+  }
+
+  return Boolean(
+    mesh.metadata?.angjiFloorSurface
+    || mesh.metadata?.angjiRampSurface
+    || mesh.metadata?.angjiStairSurface
+  );
 }
 
 function isMeshWithinVerticalBand(BABYLON, mesh, eyeY, bandHalfHeight) {
@@ -1286,20 +1471,41 @@ function buildLocalGroundMeshSet(BABYLON, position, groundMeshes, radius, config
       .map((mesh) => [mesh.uniqueId, mesh])
   );
 
-  if (!isAngjiProjectConfig(config)) {
+  if (!hasColLayerConfig(config)) {
     return new Set(merged.values());
   }
+
+  const inferredRampFloor = inferRampFloorLevelAtPosition(BABYLON, position, groundMeshes);
 
   groundMeshes.forEach((mesh) => {
     if (!isAngjiWalkableSurfaceMesh(mesh)) {
       return;
     }
 
-    if (!isMeshWithinVerticalBand(BABYLON, mesh, position.y, ANGJI_SMART_GROUND_Y_BAND)) {
+    const rampFloorLevel = mesh.metadata?.angjiRampFloorLevel;
+
+    if (
+      typeof rampFloorLevel === "number"
+      && typeof inferredRampFloor === "number"
+      && Math.abs(rampFloorLevel - inferredRampFloor) > 1
+    ) {
       return;
     }
 
-    merged.set(mesh.uniqueId, mesh);
+    const colSlope = isColSlopeGroundMesh(mesh);
+    const yBand = colSlope ? ANGJI_SLOPE_GROUND_Y_BAND : ANGJI_SMART_GROUND_Y_BAND;
+
+    if (colSlope) {
+      if (isMeshWithinVerticalBand(BABYLON, mesh, position.y, yBand)) {
+        merged.set(mesh.uniqueId, mesh);
+      }
+
+      return;
+    }
+
+    if (isMeshWithinVerticalBand(BABYLON, mesh, position.y, yBand)) {
+      merged.set(mesh.uniqueId, mesh);
+    }
   });
 
   return new Set(merged.values());
@@ -1335,6 +1541,7 @@ function auditAngjiTourElements(modelState) {
     angjiWalls: [],
     angjiFurniture: [],
     angjiFloors: [],
+    angjiRamps: [],
     angjiStairs: [],
     angjiColOther: [],
     angjiLayerConflicts: []
@@ -1349,6 +1556,7 @@ function auditAngjiTourElements(modelState) {
     if (mesh.metadata?.angjiWallSurface) angjiLayers.push("wall");
     if (mesh.metadata?.angjiFurnitureSurface) angjiLayers.push("furniture");
     if (mesh.metadata?.angjiFloorSurface) angjiLayers.push("floor");
+    if (mesh.metadata?.angjiRampSurface) angjiLayers.push("ramp");
     if (mesh.metadata?.angjiStairSurface) angjiLayers.push("stair");
 
     if (angjiLayers.length > 1) {
@@ -1359,6 +1567,7 @@ function auditAngjiTourElements(modelState) {
       if (layer === "wall") categories.angjiWalls.push(entry);
       else if (layer === "furniture") categories.angjiFurniture.push(entry);
       else if (layer === "floor") categories.angjiFloors.push(entry);
+      else if (layer === "ramp") categories.angjiRamps.push(entry);
       else if (layer === "stair") categories.angjiStairs.push(entry);
     } else if (mesh.metadata?.angjiCollisionLayer) {
       categories.angjiColOther.push(entry);
@@ -1405,6 +1614,7 @@ function auditAngjiTourElements(modelState) {
     angjiWalls: categories.angjiWalls.length,
     angjiFurniture: categories.angjiFurniture.length,
     angjiFloors: categories.angjiFloors.length,
+    angjiRamps: categories.angjiRamps.length,
     angjiStairs: categories.angjiStairs.length,
     angjiColOther: categories.angjiColOther.length,
     angjiLayerConflicts: categories.angjiLayerConflicts.length,
@@ -1418,6 +1628,41 @@ function auditAngjiTourElements(modelState) {
 
 function isAngjiProjectConfig(config) {
   return config?.overviewId === "angji";
+}
+
+function isJinjuProjectConfig(config) {
+  return config?.overviewId === "jinju";
+}
+
+function isColLayerDiscreteStairConfig(config) {
+  return config?.collision?.stairMode === "discrete";
+}
+
+function isColDiscreteStairMesh(mesh) {
+  return Boolean(mesh?.metadata?.angjiStairSurface);
+}
+
+function isColRampGroundMesh(mesh) {
+  return Boolean(
+    mesh?.metadata?.angjiRampSurface
+    && mesh.metadata?.angjiCollisionLayer
+    && !mesh.metadata?.angjiStairSurface
+  );
+}
+
+function isColSlopeGroundMesh(mesh) {
+  return isColDiscreteStairMesh(mesh) || isColRampGroundMesh(mesh);
+}
+
+function isSteppableSlopeSurface(mesh) {
+  return isColDiscreteStairMesh(mesh)
+    || isColRampGroundMesh(mesh)
+    || (isStairSurface(mesh) && !isRampSurface(mesh))
+    || (isRampSurface(mesh) && !mesh.metadata?.angjiVisualStairSurface);
+}
+
+function hasColLayerConfig(config) {
+  return isAngjiProjectConfig(config) || isJinjuProjectConfig(config);
 }
 
 function getTourBgmUrl(config) {
@@ -1792,6 +2037,14 @@ function isStairSurface(mesh) {
   return hasMaterialKeyword(mesh, STAIR_MATERIAL_KEYWORDS);
 }
 
+function isRampSurface(mesh) {
+  return Boolean(mesh?.metadata?.angjiRampSurface);
+}
+
+function isWalkRestrictedSurface(mesh) {
+  return isRampSurface(mesh) || isStairSurface(mesh);
+}
+
 function isFloorSurface(mesh) {
   if (mesh.metadata?.angjiFloorSurface) {
     return true;
@@ -1825,7 +2078,7 @@ function isLikelyWalkableSurface(mesh) {
     return false;
   }
 
-  return isStairSurface(mesh) || isFloorSurface(mesh);
+  return isStairSurface(mesh) || isRampSurface(mesh) || isFloorSurface(mesh);
 }
 
 function pickAngjiGuestFloorY(BABYLON, scene, x, z, floor1Meshes, externalFloorMeshes) {
@@ -2209,8 +2462,12 @@ function getValidGroundHit(hit) {
 
   const normal = hit.getNormal?.(true);
 
-  if (isFloorSurface(hit.pickedMesh) || isStairSurface(hit.pickedMesh)) {
-    return !normal || Math.abs(normal.y) >= CLASSIFIED_GROUND_NORMAL_MIN_Y ? hit : null;
+  if (isFloorSurface(hit.pickedMesh) || isStairSurface(hit.pickedMesh) || isRampSurface(hit.pickedMesh)) {
+    const minNormalY = hit.pickedMesh.metadata?.angjiVisualStairSurface
+      ? 0.08
+      : CLASSIFIED_GROUND_NORMAL_MIN_Y;
+
+    return !normal || Math.abs(normal.y) >= minNormalY ? hit : null;
   }
 
   return !normal || normal.y >= GROUND_NORMAL_MIN_Y ? hit : null;
@@ -2237,6 +2494,22 @@ function getBlockingBodyHit(hit) {
   }
 
   const normal = hit.getNormal?.(true);
+
+  if (hit.pickedMesh.metadata?.angjiRampSurface && hit.pickedMesh.metadata?.angjiCollisionLayer) {
+    if (normal && normal.y >= WALL_NORMAL_MAX_Y) {
+      return null;
+    }
+
+    return hit;
+  }
+
+  if (hit.pickedMesh.metadata?.angjiRampSurface) {
+    if (normal && normal.y >= CLASSIFIED_GROUND_NORMAL_MIN_Y) {
+      return null;
+    }
+
+    return hit;
+  }
 
   if (hit.pickedMesh.metadata?.angjiStairSurface) {
     if (normal && normal.y >= WALL_NORMAL_MAX_Y) {
@@ -2765,12 +3038,125 @@ function softenModelMaterialReflections(BABYLON, materials) {
   });
 }
 
-function findGroundHit(BABYLON, scene, position, groundMeshSet) {
-  const rayOrigin = new BABYLON.Vector3(position.x, position.y + GROUND_RAY_UP, position.z);
-  const ray = new BABYLON.Ray(rayOrigin, BABYLON.Vector3.Down(), GROUND_RAY_UP + GROUND_RAY_DOWN);
-  const hits = getRayHits(scene, ray, (mesh) => groundMeshSet.has(mesh) && mesh.isPickable && mesh.isEnabled());
+function findGroundHit(BABYLON, scene, position, groundMeshSet, options = {}) {
+  const referenceEyeY = options.referenceEyeY ?? position.y;
+  const maxStepUp = options.maxStepUp ?? MAX_RAMP_STEP_UP;
+  const maxStepDown = options.maxStepDown ?? MAX_STEP_DOWN;
+  const groundHits = getGroundHitsAtPosition(BABYLON, scene, position, groundMeshSet, options);
 
-  return hits.map(getValidGroundHit).find(Boolean) || null;
+  if (!groundHits.length) {
+    return null;
+  }
+
+  const inRangeCandidates = dedupeGroundCandidates(
+    mapGroundHitCandidates(groundHits, referenceEyeY)
+      .filter((entry) => entry.delta >= -maxStepDown - GROUND_SNAP_TOLERANCE
+        && entry.delta <= maxStepUp + GROUND_SNAP_TOLERANCE)
+  );
+  const belowRampCandidates = mapGroundHitCandidates(groundHits, referenceEyeY)
+    .filter((entry) => entry.isRamp && entry.delta <= GROUND_SNAP_TOLERANCE);
+  const preferredRampFloorLevel = belowRampCandidates.length
+    ? belowRampCandidates.sort((a, b) => b.eyeY - a.eyeY)[0].rampFloorLevel ?? null
+    : null;
+  const groundSelect = {
+    ...(options.groundSelect || {}),
+    preferredRampFloorLevel
+  };
+
+  if (inRangeCandidates.length) {
+    const selected = selectBestGroundCandidate(inRangeCandidates, groundSelect);
+
+    return selected?.hit || null;
+  }
+
+  const belowReference = mapGroundHitCandidates(groundHits, referenceEyeY)
+    .filter((entry) => entry.delta <= GROUND_SNAP_TOLERANCE)
+    .sort((a, b) => b.eyeY - a.eyeY);
+
+  return belowReference[0]?.hit || null;
+}
+
+/** Spawn / reset snap — accepts large vertical offset from Tour_Start markers. */
+function findSpawnGroundHit(BABYLON, scene, position, groundMeshSet) {
+  const groundHits = getGroundHitsAtPosition(BABYLON, scene, position, groundMeshSet);
+
+  if (!groundHits.length) {
+    return null;
+  }
+
+  const referenceEyeY = position.y;
+  const candidates = dedupeGroundCandidates(mapGroundHitCandidates(groundHits, referenceEyeY));
+
+  if (!candidates.length) {
+    return null;
+  }
+
+  const below = candidates
+    .filter((entry) => entry.delta <= 0.5)
+    .sort((a, b) => b.eyeY - a.eyeY);
+
+  if (below.length) {
+    return below[0].hit;
+  }
+
+  const above = candidates
+    .filter((entry) => entry.delta > 0.5)
+    .sort((a, b) => a.delta - b.delta);
+
+  if (above.length) {
+    return above[0].hit;
+  }
+
+  return candidates.sort((a, b) => Math.abs(a.delta) - Math.abs(b.delta))[0].hit;
+}
+
+function mapGroundHitCandidates(groundHits, referenceEyeY) {
+  return groundHits.map((hit) => ({
+    hit,
+    eyeY: hit.pickedPoint.y + EYE_HEIGHT,
+    delta: hit.pickedPoint.y + EYE_HEIGHT - referenceEyeY,
+    isStair: isColDiscreteStairMesh(hit.pickedMesh)
+      || (isStairSurface(hit.pickedMesh) && !isRampSurface(hit.pickedMesh)),
+    isRamp: isColRampGroundMesh(hit.pickedMesh) || isRampSurface(hit.pickedMesh),
+    rampFloorLevel: getAngjiRampFloorLevel(hit.pickedMesh),
+    isFloor: Boolean(
+      hit.pickedMesh?.metadata?.angjiFloorSurface
+      || hit.pickedMesh?.metadata?.angjiRampSurface
+      || isFloorSurface(hit.pickedMesh)
+    )
+  }));
+}
+
+function dedupeGroundCandidates(candidates) {
+  const bestByMesh = new Map();
+
+  candidates.forEach((entry) => {
+    const meshId = entry.hit.pickedMesh.uniqueId;
+    const existing = bestByMesh.get(meshId);
+
+    if (!existing || Math.abs(entry.delta) < Math.abs(existing.delta)) {
+      bestByMesh.set(meshId, entry);
+    }
+  });
+
+  return [...bestByMesh.values()];
+}
+
+function compareGroundCandidateDelta(a, b) {
+  const absDelta = Math.abs(a.delta) - Math.abs(b.delta);
+
+  if (Math.abs(absDelta) > 0.04) {
+    return absDelta;
+  }
+
+  const aAbove = a.delta > GROUND_SNAP_TOLERANCE ? 1 : 0;
+  const bAbove = b.delta > GROUND_SNAP_TOLERANCE ? 1 : 0;
+
+  if (aAbove !== bAbove) {
+    return aAbove - bAbove;
+  }
+
+  return absDelta;
 }
 
 function getGroundHitsAtPosition(BABYLON, scene, position, groundMeshSet, options = {}) {
@@ -2795,18 +3181,30 @@ function getGroundHitsAtPosition(BABYLON, scene, position, groundMeshSet, option
 
 function getGroundPoseAtPosition(BABYLON, scene, position, groundMeshSet, referenceEyeY = null, options = {}) {
   const groundHits = getGroundHitsAtPosition(BABYLON, scene, position, groundMeshSet, options);
-  let hit = groundHits[0] || null;
+  const maxStepDelta = options.maxStepUp ?? MAX_STEP_UP;
 
   if (typeof referenceEyeY === "number") {
-    hit = groundHits
-      .map((candidate) => ({
-        hit: candidate,
-        eyeY: candidate.pickedPoint.y + EYE_HEIGHT,
-        delta: candidate.pickedPoint.y + EYE_HEIGHT - referenceEyeY
-      }))
-      .filter((candidate) => candidate.delta >= -MAX_STEP_DOWN && candidate.delta <= MAX_STEP_UP)
-      .sort((a, b) => Math.abs(a.delta) - Math.abs(b.delta))[0]?.hit || null;
+    const candidate = selectBestGroundCandidate(
+      dedupeGroundCandidates(
+        mapGroundHitCandidates(groundHits, referenceEyeY)
+          .filter((entry) => entry.delta >= -MAX_STEP_DOWN && entry.delta <= maxStepDelta)
+      ),
+      options.groundSelect || {}
+    );
+    const hit = candidate?.hit || null;
+
+    if (!hit?.pickedPoint) {
+      return null;
+    }
+
+    return {
+      hit,
+      groundY: hit.pickedPoint.y,
+      eyeY: hit.pickedPoint.y + EYE_HEIGHT
+    };
   }
+
+  let hit = groundHits[0] || null;
 
   if (!hit?.pickedPoint) {
     return null;
@@ -2866,9 +3264,22 @@ function getSweptLandingGroundPoseAtPosition(BABYLON, scene, position, groundMes
 function getStepPoseAtPosition(BABYLON, scene, position, groundMeshSet, referenceEyeY, options = {}) {
   const minVerticalDelta = options.minVerticalDelta ?? MIN_STEP_UP;
   const maxVerticalDelta = options.maxVerticalDelta ?? MAX_STAIR_STEP_UP;
-  const groundHits = getGroundHitsAtPosition(BABYLON, scene, position, groundMeshSet);
+  const groundHits = getGroundHitsAtPosition(BABYLON, scene, position, groundMeshSet, {
+    compactProbes: options.compactProbes
+  });
   const stepCandidate = groundHits
-    .filter((candidate) => isStairSurface(candidate.pickedMesh))
+    .filter((candidate) => {
+      if (options.slopeFilter === "stair") {
+        return isColDiscreteStairMesh(candidate.pickedMesh)
+          || (isStairSurface(candidate.pickedMesh) && !isRampSurface(candidate.pickedMesh));
+      }
+
+      if (options.slopeFilter === "ramp") {
+        return isColRampGroundMesh(candidate.pickedMesh) || isRampSurface(candidate.pickedMesh);
+      }
+
+      return isSteppableSlopeSurface(candidate.pickedMesh);
+    })
     .map((candidate) => ({
       hit: candidate,
       eyeY: candidate.pickedPoint.y + EYE_HEIGHT,
@@ -2890,6 +3301,18 @@ function getStepPoseAtPosition(BABYLON, scene, position, groundMeshSet, referenc
 
 function isRayPickableCollisionMesh(mesh, collisionMeshSet) {
   return collisionMeshSet.has(mesh) && mesh.isPickable && mesh.isEnabled() && !mesh.metadata?.passThrough;
+}
+
+function isOverheadBodyCollision(hit, eyeY) {
+  if (!hit?.pickedPoint) {
+    return false;
+  }
+
+  if (hit.pickedMesh?.metadata?.angjiWallSurface || hit.pickedMesh?.metadata?.angjiFurnitureSurface) {
+    return false;
+  }
+
+  return hit.pickedPoint.y > eyeY - 0.85;
 }
 
 function findBodyCollision(BABYLON, scene, position, movement, collisionMeshSet, modelBounds, options = {}) {
@@ -2919,7 +3342,9 @@ function findBodyCollision(BABYLON, scene, position, movement, collisionMeshSet,
       );
       const ray = new BABYLON.Ray(rayOrigin, direction, rayDistance);
       const hits = getRayHits(scene, ray, (mesh) => isRayPickableCollisionMesh(mesh, collisionMeshSet));
-      const hit = hits.map(getBlockingBodyHit).find(Boolean);
+      const hit = hits
+        .map(getBlockingBodyHit)
+        .find((candidate) => candidate && !isOverheadBodyCollision(candidate, position.y));
 
       if (hit) {
         hit.collisionHeightOffset = heightOffset;
@@ -2937,7 +3362,373 @@ function isLowStepCollision(hit) {
 }
 
 function isStairCollisionHit(hit) {
-  return Boolean(hit?.pickedMesh && isStairSurface(hit.pickedMesh));
+  return Boolean(hit?.pickedMesh && isSteppableSlopeSurface(hit.pickedMesh));
+}
+
+function isWallSlideCollisionHit(hit) {
+  if (!hit?.pickedMesh) {
+    return false;
+  }
+
+  if (hit.pickedMesh.metadata?.angjiWallSurface || hit.pickedMesh.metadata?.angjiFurnitureSurface) {
+    return true;
+  }
+
+  if (isStairCollisionHit(hit)) {
+    return false;
+  }
+
+  const normal = hit.getNormal?.(true);
+
+  if (!normal) {
+    return false;
+  }
+
+  const horizontal = normal.x * normal.x + normal.z * normal.z;
+
+  return horizontal > 0.12 && Math.abs(normal.y) < WALL_NORMAL_MAX_Y;
+}
+
+function getHorizontalHitNormal(hit, BABYLON) {
+  const normal = hit.getNormal?.(true);
+
+  if (!normal) {
+    return null;
+  }
+
+  const horizontal = new BABYLON.Vector3(normal.x, 0, normal.z);
+
+  if (horizontal.lengthSquared() < 1e-8) {
+    return null;
+  }
+
+  return horizontal.normalize();
+}
+
+function computeWallSlideMovement(BABYLON, movement, wallNormal) {
+  const intoWall = BABYLON.Vector3.Dot(movement, wallNormal);
+
+  if (intoWall <= 0) {
+    return null;
+  }
+
+  return movement.subtract(wallNormal.scale(intoWall));
+}
+
+function tryWallSlideMove(BABYLON, scene, camera, movement, collisionHit, collisionMeshSet, modelBounds, groundMeshSet, options) {
+  const wallSlideDepth = options.wallSlideDepth ?? 0;
+
+  if (wallSlideDepth >= MAX_WALL_SLIDE_DEPTH || !collisionHit || !isWallSlideCollisionHit(collisionHit)) {
+    return null;
+  }
+
+  if (isLowStepCollision(collisionHit) || isStairCollisionHit(collisionHit)) {
+    return null;
+  }
+
+  const wallNormal = getHorizontalHitNormal(collisionHit, BABYLON);
+
+  if (!wallNormal) {
+    return null;
+  }
+
+  const slideMovement = computeWallSlideMovement(BABYLON, movement, wallNormal);
+
+  if (!slideMovement || slideMovement.length() < MIN_WALL_SLIDE_DISTANCE) {
+    return null;
+  }
+
+  const slideResult = tryMoveWithCollision(
+    BABYLON,
+    scene,
+    camera,
+    slideMovement,
+    collisionMeshSet,
+    modelBounds,
+    groundMeshSet,
+    {
+      ...options,
+      wallSlideDepth: wallSlideDepth + 1
+    }
+  );
+
+  if (!slideResult.moved) {
+    return null;
+  }
+
+  return {
+    ...slideResult,
+    reason: `slide:${slideResult.reason}`
+  };
+}
+
+function tryAxisSeparatedWallSlide(BABYLON, scene, camera, movement, collisionMeshSet, modelBounds, groundMeshSet, options) {
+  if ((options.wallSlideDepth ?? 0) > 0) {
+    return null;
+  }
+
+  const axisMoves = [
+    new BABYLON.Vector3(movement.x, 0, 0),
+    new BABYLON.Vector3(0, 0, movement.z)
+  ];
+
+  for (const partial of axisMoves) {
+    if (partial.length() < MIN_WALL_SLIDE_DISTANCE) {
+      continue;
+    }
+
+    const partialResult = tryMoveWithCollision(
+      BABYLON,
+      scene,
+      camera,
+      partial,
+      collisionMeshSet,
+      modelBounds,
+      groundMeshSet,
+      {
+        ...options,
+        wallSlideDepth: MAX_WALL_SLIDE_DEPTH
+      }
+    );
+
+    if (partialResult.moved) {
+      return {
+        ...partialResult,
+        reason: `slide:${partialResult.reason}`
+      };
+    }
+  }
+
+  return null;
+}
+
+function tryWallSlideRecovery(BABYLON, scene, camera, movement, collisionHit, collisionMeshSet, modelBounds, groundMeshSet, options) {
+  const slideResult = tryWallSlideMove(
+    BABYLON,
+    scene,
+    camera,
+    movement,
+    collisionHit,
+    collisionMeshSet,
+    modelBounds,
+    groundMeshSet,
+    options
+  );
+
+  if (slideResult) {
+    return slideResult;
+  }
+
+  if (!collisionHit || !isWallSlideCollisionHit(collisionHit)) {
+    return null;
+  }
+
+  return tryAxisSeparatedWallSlide(
+    BABYLON,
+    scene,
+    camera,
+    movement,
+    collisionMeshSet,
+    modelBounds,
+    groundMeshSet,
+    options
+  );
+}
+
+function selectBestGroundCandidate(candidates, options = {}) {
+  if (!candidates.length) {
+    return null;
+  }
+
+  const stairs = candidates.filter((candidate) => candidate.isStair);
+  const ramps = candidates.filter((candidate) => candidate.isRamp);
+
+  if (options.preferStairDescent && (stairs.length || ramps.length)) {
+    const descending = [...stairs, ...ramps].filter((candidate) => candidate.delta < -MIN_STEP_DOWN);
+
+    if (descending.length) {
+      return descending.sort((a, b) => b.eyeY - a.eyeY)[0];
+    }
+  }
+
+  if (options.preferStairAscent && stairs.length) {
+    const ascending = stairs.filter((candidate) => candidate.delta > MIN_STEP_UP);
+
+    if (ascending.length) {
+      return ascending.sort((a, b) => a.delta - b.delta)[0];
+    }
+  }
+
+  if (options.preferRampAscent && ramps.length) {
+    const ascending = ramps.filter((candidate) => candidate.delta > MIN_STEP_UP);
+
+    if (ascending.length) {
+      return selectBestRampCandidate(ascending, options);
+    }
+  }
+
+  if (stairs.length) {
+    return stairs.sort(compareGroundCandidateDelta)[0];
+  }
+
+  if (options.preferRampSurface && ramps.length) {
+    return selectBestRampCandidate(ramps, options);
+  }
+
+  if (ramps.length) {
+    return selectBestRampCandidate(ramps, options);
+  }
+
+  return candidates.sort(compareGroundCandidateDelta)[0];
+}
+
+function isOnBuildingFloorAt(BABYLON, scene, position, groundMeshSet) {
+  const hit = findGroundHit(BABYLON, scene, position, groundMeshSet, {
+    referenceEyeY: position.y,
+    maxStepUp: MAX_STEP_UP
+  });
+
+  if (!hit?.pickedMesh) {
+    return false;
+  }
+
+  return Boolean(hit.pickedMesh.metadata?.angjiFloorSurface || isFloorSurface(hit.pickedMesh));
+}
+
+function isNearColDiscreteStairContext(BABYLON, scene, position, movement, groundMeshSet) {
+  if (isOnColDiscreteStairAt(BABYLON, scene, position, groundMeshSet)) {
+    return true;
+  }
+
+  const moveDistance = movement.length();
+
+  if (moveDistance <= 0.01) {
+    return false;
+  }
+
+  const direction = movement.normalizeToNew();
+
+  for (const distance of [0.18, 0.38, 0.62, 0.9]) {
+    const probePosition = position.add(direction.scale(Math.min(distance, moveDistance)));
+
+    if (isOnColDiscreteStairAt(BABYLON, scene, probePosition, groundMeshSet)) {
+      return true;
+    }
+
+    const stepPose = getStepPoseAtPosition(BABYLON, scene, probePosition, groundMeshSet, position.y, {
+      maxVerticalDelta: ANGJI_MAX_STAIR_STEP_UP,
+      slopeFilter: "stair"
+    });
+
+    if (stepPose) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function getLocomotionSurfaceState(BABYLON, scene, position, groundMeshSet) {
+  const hit = findGroundHit(BABYLON, scene, position, groundMeshSet, {
+    referenceEyeY: position.y,
+    maxStepUp: MAX_RAMP_STEP_UP,
+    compactProbes: true,
+    groundSelect: { preferRampSurface: true }
+  });
+  const mesh = hit?.pickedMesh;
+
+  return {
+    hit,
+    onColRamp: Boolean(mesh && isColRampGroundMesh(mesh)),
+    onColStair: Boolean(mesh && isColDiscreteStairMesh(mesh)),
+    onRamp: Boolean(mesh && (isColRampGroundMesh(mesh) || isRampSurface(mesh))),
+    onStair: Boolean(mesh && isStairSurface(mesh) && !isRampSurface(mesh))
+  };
+}
+
+function isNearColRampContext(BABYLON, scene, position, movement, groundMeshSet) {
+  const moveDistance = movement.length();
+
+  if (moveDistance <= 0.01) {
+    return false;
+  }
+
+  const direction = movement.normalizeToNew();
+
+  for (const distance of NEAR_RAMP_PROBE_DISTANCES) {
+    const probePosition = position.add(direction.scale(Math.min(distance, moveDistance)));
+    const hit = findGroundHit(BABYLON, scene, probePosition, groundMeshSet, {
+      referenceEyeY: position.y,
+      maxStepUp: MAX_RAMP_STEP_UP,
+      compactProbes: true,
+      groundSelect: { preferRampSurface: true }
+    });
+
+    if (hit?.pickedMesh && isColRampGroundMesh(hit.pickedMesh)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function isOnColDiscreteStairAt(BABYLON, scene, position, groundMeshSet) {
+  const hit = findGroundHit(BABYLON, scene, position, groundMeshSet, {
+    referenceEyeY: position.y,
+    maxStepUp: ANGJI_MAX_STAIR_STEP_UP,
+    compactProbes: true
+  });
+
+  return Boolean(hit?.pickedMesh && isColDiscreteStairMesh(hit.pickedMesh));
+}
+
+function isOnColRampSurfaceAt(BABYLON, scene, position, groundMeshSet) {
+  const hit = findGroundHit(BABYLON, scene, position, groundMeshSet, {
+    referenceEyeY: position.y,
+    maxStepUp: MAX_RAMP_STEP_UP,
+    compactProbes: true,
+    groundSelect: { preferRampSurface: true }
+  });
+
+  return Boolean(hit?.pickedMesh && isColRampGroundMesh(hit.pickedMesh));
+}
+
+/** @deprecated use isOnColDiscreteStairAt or isOnColRampSurfaceAt */
+function isOnColSlopeSurfaceAt(BABYLON, scene, position, groundMeshSet) {
+  return isOnColDiscreteStairAt(BABYLON, scene, position, groundMeshSet)
+    || isOnColRampSurfaceAt(BABYLON, scene, position, groundMeshSet);
+}
+
+function getCenterGroundPose(BABYLON, scene, position, groundMeshSet, referenceEyeY = null, options = {}) {
+  return getGroundPoseAtPosition(
+    BABYLON,
+    scene,
+    position,
+    groundMeshSet,
+    referenceEyeY ?? position.y,
+    options
+  );
+}
+
+function isOnStairSurfaceAt(BABYLON, scene, position, groundMeshSet) {
+  const hit = findGroundHit(BABYLON, scene, position, groundMeshSet, {
+    referenceEyeY: position.y,
+    maxStepUp: MAX_STAIR_STEP_UP,
+    compactProbes: true
+  });
+
+  return Boolean(hit?.pickedMesh && isStairSurface(hit.pickedMesh) && !isRampSurface(hit.pickedMesh));
+}
+
+function isOnRampSurfaceAt(BABYLON, scene, position, groundMeshSet) {
+  const hit = findGroundHit(BABYLON, scene, position, groundMeshSet, {
+    referenceEyeY: position.y,
+    maxStepUp: MAX_RAMP_STEP_UP,
+    compactProbes: true,
+    groundSelect: { preferRampSurface: true }
+  });
+
+  return Boolean(hit?.pickedMesh && isRampSurface(hit.pickedMesh));
 }
 
 function findStepUpPose(BABYLON, scene, previousPosition, movement, groundMeshSet, options = {}) {
@@ -2948,23 +3739,30 @@ function findStepUpPose(BABYLON, scene, previousPosition, movement, groundMeshSe
   }
 
   const direction = movement.normalizeToNew();
+  const lateralAxis = new BABYLON.Vector3(direction.z, 0, -direction.x).normalize();
   const probeDistances = options.probeDistances ?? STEP_PROBE_DISTANCES;
+  const lateralOffsets = options.lateralOffsets
+    ?? (options.tryLateralProbes ? STAIR_STEP_LATERAL_OFFSETS : [0]);
 
   for (const distance of probeDistances) {
     const probeDistance = Math.max(distance, moveDistance);
-    const probePosition = previousPosition.add(direction.scale(probeDistance));
-    const stepPose = getStepPoseAtPosition(BABYLON, scene, probePosition, groundMeshSet, previousPosition.y, options);
 
-    if (!stepPose) {
-      continue;
+    for (const lateralOffset of lateralOffsets) {
+      const lateral = lateralAxis.scale(lateralOffset);
+      const probePosition = previousPosition.add(direction.scale(probeDistance)).add(lateral);
+      const stepPose = getStepPoseAtPosition(BABYLON, scene, probePosition, groundMeshSet, previousPosition.y, options);
+
+      if (!stepPose) {
+        continue;
+      }
+
+      return {
+        hit: stepPose.hit,
+        eyeY: stepPose.eyeY,
+        verticalDelta: stepPose.verticalDelta,
+        probeDistance
+      };
     }
-
-    return {
-      hit: stepPose.hit,
-      eyeY: stepPose.eyeY,
-      verticalDelta: stepPose.verticalDelta,
-      probeDistance
-    };
   }
 
   return null;
@@ -2974,15 +3772,14 @@ function applyStepUp(BABYLON, camera, movement, stepPose) {
   const previousPosition = camera.position.clone();
   const desiredPosition = previousPosition.add(movement);
 
-  camera.position.set(desiredPosition.x, previousPosition.y, desiredPosition.z);
+  camera.position.set(desiredPosition.x, stepPose.eyeY, desiredPosition.z);
 
   return {
     moved: true,
     reason: `step ${stepPose.verticalDelta.toFixed(2)}`,
     distance: BABYLON.Vector3.Distance(previousPosition, camera.position),
     previousPosition,
-    stepTargetY: stepPose.eyeY,
-    stepTargetHit: stepPose.hit
+    groundHit: stepPose.hit
   };
 }
 
@@ -2990,13 +3787,134 @@ function tryMoveWithCollision(BABYLON, scene, camera, movement, collisionMeshSet
   const previousPosition = camera.position.clone();
   const desiredPosition = previousPosition.add(movement);
   const canStepUp = options.allowStepUp !== false;
-  const maxStairStepUp = options.maxStairStepUp ?? MAX_STAIR_STEP_UP;
+  const stairAssistMode = options.stairAssistMode ?? "none";
+  const colDiscreteAssist = stairAssistMode === "colDiscrete";
+  const locomotion = options.locomotion ?? getLocomotionSurfaceState(
+    BABYLON,
+    scene,
+    previousPosition,
+    groundMeshSet
+  );
+  const onColRamp = locomotion.onColRamp;
+  const onColStair = locomotion.onColStair;
+  const onRamp = locomotion.onRamp;
+  const onStair = locomotion.onStair;
+  const nearColRamp = options.nearColRamp ?? (
+    !onColRamp
+    && !onColStair
+    && isNearColRampContext(BABYLON, scene, previousPosition, movement, groundMeshSet)
+  );
+  const nearColStair = colDiscreteAssist
+    && !onColStair
+    && !onColRamp
+    && isNearColDiscreteStairContext(BABYLON, scene, previousPosition, movement, groundMeshSet);
+  const rampContext = onColRamp || onRamp || nearColRamp;
+  const lightStairAssist = stairAssistMode === "light";
+  const slopeContext = colDiscreteAssist && (onColStair || nearColStair);
+  const stairContext = lightStairAssist && onStair;
+  const assistContext = slopeContext || stairContext;
+  const maxStairStepUp = options.maxStairStepUp ?? (colDiscreteAssist ? ANGJI_MAX_STAIR_STEP_UP : MAX_STAIR_STEP_UP);
+  const maxRampStepUp = options.maxRampStepUp ?? MAX_RAMP_STEP_UP;
+  const activeMaxStepUp = assistContext ? maxStairStepUp : rampContext ? maxRampStepUp : MAX_STEP_UP;
+  const useCompactGroundProbes = true;
+  const groundSelect = {
+    preferStairDescent: options.preferSlopeTransition
+      && isOnBuildingFloorAt(BABYLON, scene, previousPosition, groundMeshSet),
+    preferStairAscent: slopeContext && nearColStair,
+    preferRampAscent: rampContext && canStepUp,
+    preferRampSurface: rampContext
+  };
+  const groundPoseOptions = {
+    maxStepUp: activeMaxStepUp,
+    groundSelect,
+    compactProbes: useCompactGroundProbes
+  };
+  const rampStepOptions = {
+    maxVerticalDelta: maxRampStepUp,
+    probeDistances: SHORT_STAIR_PROBE_DISTANCES,
+    tryLateralProbes: true,
+    lateralOffsets: RAMP_STEP_LATERAL_OFFSETS,
+    compactProbes: true,
+    slopeFilter: "ramp"
+  };
   const stairStepOptions = {
     maxVerticalDelta: maxStairStepUp,
-    probeDistances: options.stairProbeDistances ?? STEP_PROBE_DISTANCES
+    probeDistances: colDiscreteAssist ? STEP_PROBE_DISTANCES : SHORT_STAIR_PROBE_DISTANCES,
+    tryLateralProbes: colDiscreteAssist && nearColStair,
+    compactProbes: useCompactGroundProbes,
+    slopeFilter: "stair"
+  };
+  const resolveDestinationGround = (position, referenceEyeY) => {
+    const groundPose = getGroundPoseAtPosition(
+      BABYLON,
+      scene,
+      position,
+      groundMeshSet,
+      referenceEyeY,
+      groundPoseOptions
+    );
+
+    if (assistContext || onColStair || rampContext || !groundPose) {
+      return groundPose;
+    }
+
+    const centerPose = getCenterGroundPose(
+      BABYLON,
+      scene,
+      position,
+      groundMeshSet,
+      referenceEyeY,
+      { maxStepUp: activeMaxStepUp }
+    );
+
+    if (!centerPose) {
+      return null;
+    }
+
+    if (Math.abs(centerPose.eyeY - groundPose.eyeY) <= GROUND_SNAP_TOLERANCE) {
+      return groundPose;
+    }
+
+    return centerPose;
+  };
+  const rejectBlockedMove = (collisionHit, reason) => {
+    if (rampContext && canStepUp && collisionHit && isStairCollisionHit(collisionHit)) {
+      const rampStepPose = findStepUpPose(
+        BABYLON,
+        scene,
+        previousPosition,
+        movement,
+        groundMeshSet,
+        rampStepOptions
+      );
+
+      if (rampStepPose) {
+        return applyStepUp(BABYLON, camera, movement, rampStepPose);
+      }
+    }
+
+    const blocked = {
+      moved: false,
+      reason,
+      distance: 0,
+      previousPosition
+    };
+    const slideResult = tryWallSlideRecovery(
+      BABYLON,
+      scene,
+      camera,
+      movement,
+      collisionHit,
+      collisionMeshSet,
+      modelBounds,
+      groundMeshSet,
+      options
+    );
+
+    return slideResult || blocked;
   };
   const initialCollisionHit = findBodyCollision(BABYLON, scene, previousPosition, movement, collisionMeshSet, modelBounds);
-  const leadingStepPose = canStepUp
+  const leadingStepPose = slopeContext && nearColStair && canStepUp
     ? findStepUpPose(BABYLON, scene, previousPosition, movement, groundMeshSet, stairStepOptions)
     : null;
 
@@ -3005,38 +3923,52 @@ function tryMoveWithCollision(BABYLON, scene, camera, movement, collisionMeshSet
       return applyStepUp(BABYLON, camera, movement, leadingStepPose);
     }
 
-    return {
-      moved: false,
-      reason: `wall:${initialCollisionHit.pickedMesh?.name || initialCollisionHit.pickedMesh?.id || "object"}`,
-      distance: 0,
-      previousPosition
-    };
+    return rejectBlockedMove(
+      initialCollisionHit,
+      `wall:${initialCollisionHit.pickedMesh?.name || initialCollisionHit.pickedMesh?.id || "object"}`
+    );
   }
 
-  const groundPose = getGroundPoseAtPosition(BABYLON, scene, desiredPosition, groundMeshSet, previousPosition.y);
+  const groundPose = resolveDestinationGround(desiredPosition, previousPosition.y);
 
   if (!groundPose) {
+    if (assistContext && canStepUp) {
+      const stepPose = findStepUpPose(BABYLON, scene, previousPosition, movement, groundMeshSet, stairStepOptions);
+
+      if (stepPose) {
+        return applyStepUp(BABYLON, camera, movement, stepPose);
+      }
+    }
+
+    if ((rampContext) && canStepUp) {
+      const rampStepPose = findStepUpPose(BABYLON, scene, previousPosition, movement, groundMeshSet, rampStepOptions);
+
+      if (rampStepPose) {
+        return applyStepUp(BABYLON, camera, movement, rampStepPose);
+      }
+    }
+
     if (!initialCollisionHit) {
       camera.position.set(desiredPosition.x, previousPosition.y, desiredPosition.z);
       return {
         moved: true,
         reason: "flat",
         distance: BABYLON.Vector3.Distance(previousPosition, camera.position),
-        previousPosition
+        previousPosition,
+        losesSupport: !assistContext && !onColStair && !rampContext
       };
     }
 
-    return {
-      moved: false,
-      reason: `wall:${initialCollisionHit.pickedMesh?.name || initialCollisionHit.pickedMesh?.id || "object"}`,
-      distance: 0,
-      previousPosition
-    };
+    return rejectBlockedMove(
+      initialCollisionHit,
+      `wall:${initialCollisionHit.pickedMesh?.name || initialCollisionHit.pickedMesh?.id || "object"}`
+    );
   }
 
   const verticalDelta = groundPose.eyeY - previousPosition.y;
+  const maxNormalStepUp = activeMaxStepUp;
 
-  if (verticalDelta >= MIN_STEP_UP && verticalDelta <= MAX_STEP_UP) {
+  if (verticalDelta >= MIN_STEP_UP && verticalDelta <= maxNormalStepUp) {
     if (!canStepUp) {
       camera.position.set(desiredPosition.x, previousPosition.y, desiredPosition.z);
 
@@ -3049,12 +3981,10 @@ function tryMoveWithCollision(BABYLON, scene, camera, movement, collisionMeshSet
     }
 
     if (initialCollisionHit && !isLowStepCollision(initialCollisionHit)) {
-      return {
-        moved: false,
-        reason: `wall:${initialCollisionHit.pickedMesh?.name || initialCollisionHit.pickedMesh?.id || "object"}`,
-        distance: 0,
-        previousPosition
-      };
+      return rejectBlockedMove(
+        initialCollisionHit,
+        `wall:${initialCollisionHit.pickedMesh?.name || initialCollisionHit.pickedMesh?.id || "object"}`
+      );
     }
 
     camera.position.set(desiredPosition.x, groundPose.eyeY, desiredPosition.z);
@@ -3080,21 +4010,39 @@ function tryMoveWithCollision(BABYLON, scene, camera, movement, collisionMeshSet
     };
   }
 
-  if (verticalDelta > MAX_STEP_UP) {
-    if (canStepUp && verticalDelta <= maxStairStepUp) {
-      const stepPose = findStepUpPose(BABYLON, scene, previousPosition, movement, groundMeshSet, stairStepOptions);
+  if (verticalDelta > maxNormalStepUp) {
+    if (canStepUp) {
+      if (rampContext && verticalDelta <= maxRampStepUp) {
+        const rampStepPose = findStepUpPose(BABYLON, scene, previousPosition, movement, groundMeshSet, rampStepOptions);
 
-      if (stepPose) {
-        return applyStepUp(BABYLON, camera, movement, stepPose);
+        if (rampStepPose) {
+          return applyStepUp(BABYLON, camera, movement, rampStepPose);
+        }
+      }
+
+      if (verticalDelta <= maxStairStepUp) {
+        const stepPose = findStepUpPose(BABYLON, scene, previousPosition, movement, groundMeshSet, stairStepOptions);
+
+        if (stepPose) {
+          return applyStepUp(BABYLON, camera, movement, stepPose);
+        }
       }
     }
 
-    const aheadIsStair = Boolean(groundPose?.hit?.pickedMesh && isStairSurface(groundPose.hit.pickedMesh));
+    const aheadIsSlope = Boolean(
+      groundPose?.hit?.pickedMesh && isSteppableSlopeSurface(groundPose.hit.pickedMesh)
+    );
 
-    if (initialCollisionHit || aheadIsStair) {
+    if (initialCollisionHit || aheadIsSlope || assistContext) {
+      const blockReason = `wall:${aheadIsSlope ? "stair" : initialCollisionHit?.pickedMesh?.name || initialCollisionHit?.pickedMesh?.id || "too high"}`;
+
+      if (initialCollisionHit && !aheadIsSlope) {
+        return rejectBlockedMove(initialCollisionHit, blockReason);
+      }
+
       return {
         moved: false,
-        reason: `wall:${aheadIsStair ? "stair" : initialCollisionHit.pickedMesh?.name || initialCollisionHit.pickedMesh?.id || "too high"}`,
+        reason: blockReason,
         distance: 0,
         previousPosition
       };
@@ -3112,12 +4060,10 @@ function tryMoveWithCollision(BABYLON, scene, camera, movement, collisionMeshSet
 
   if (verticalDelta < -MAX_STEP_DOWN) {
     if (initialCollisionHit) {
-      return {
-        moved: false,
-        reason: `wall:${initialCollisionHit.pickedMesh?.name || initialCollisionHit.pickedMesh?.id || "drop"}`,
-        distance: 0,
-        previousPosition
-      };
+      return rejectBlockedMove(
+        initialCollisionHit,
+        `wall:${initialCollisionHit.pickedMesh?.name || initialCollisionHit.pickedMesh?.id || "drop"}`
+      );
     }
 
     camera.position.set(desiredPosition.x, previousPosition.y, desiredPosition.z);
@@ -3126,7 +4072,8 @@ function tryMoveWithCollision(BABYLON, scene, camera, movement, collisionMeshSet
       moved: true,
       reason: "flat drop-skip",
       distance: BABYLON.Vector3.Distance(previousPosition, camera.position),
-      previousPosition
+      previousPosition,
+      losesSupport: true
     };
   }
 
@@ -3135,7 +4082,7 @@ function tryMoveWithCollision(BABYLON, scene, camera, movement, collisionMeshSet
   });
 
   if (collisionHit) {
-    const stepPose = canStepUp
+    const stepPose = canStepUp && assistContext
       ? findStepUpPose(BABYLON, scene, previousPosition, movement, groundMeshSet, stairStepOptions)
       : null;
 
@@ -3143,12 +4090,10 @@ function tryMoveWithCollision(BABYLON, scene, camera, movement, collisionMeshSet
       return applyStepUp(BABYLON, camera, movement, stepPose);
     }
 
-    return {
-      moved: false,
-      reason: `wall:${collisionHit.pickedMesh?.name || collisionHit.pickedMesh?.id || "object"}`,
-      distance: 0,
-      previousPosition
-    };
+    return rejectBlockedMove(
+      collisionHit,
+      `wall:${collisionHit.pickedMesh?.name || collisionHit.pickedMesh?.id || "object"}`
+    );
   }
 
   camera.position.set(desiredPosition.x, groundPose.eyeY, desiredPosition.z);
@@ -3160,6 +4105,72 @@ function tryMoveWithCollision(BABYLON, scene, camera, movement, collisionMeshSet
     previousPosition,
     groundHit: groundPose.hit
   };
+}
+
+function tryMoveWithCollisionSubsteps(BABYLON, scene, camera, movement, collisionMeshSet, modelBounds, groundMeshSet, options = {}) {
+  const { onSubstep, substepSize, ...collisionOptions } = options;
+  const totalDistance = movement.length();
+  const stepLimit = typeof substepSize === "number" && substepSize > 0 ? substepSize : totalDistance;
+
+  if (totalDistance <= stepLimit) {
+    const stepResult = tryMoveWithCollision(
+      BABYLON,
+      scene,
+      camera,
+      movement,
+      collisionMeshSet,
+      modelBounds,
+      groundMeshSet,
+      collisionOptions
+    );
+
+    if (typeof onSubstep === "function") {
+      onSubstep(stepResult);
+    }
+
+    return stepResult;
+  }
+
+  const direction = movement.normalizeToNew();
+  const previousPosition = camera.position.clone();
+  let movedDistance = 0;
+  let remaining = totalDistance;
+  let lastResult = {
+    moved: false,
+    reason: "-",
+    distance: 0,
+    previousPosition
+  };
+
+  while (remaining > 1e-5) {
+    const stepDistance = Math.min(stepLimit, remaining);
+    const stepMovement = direction.clone().scale(stepDistance);
+    const stepResult = tryMoveWithCollision(
+      BABYLON,
+      scene,
+      camera,
+      stepMovement,
+      collisionMeshSet,
+      modelBounds,
+      groundMeshSet,
+      collisionOptions
+    );
+
+    if (typeof onSubstep === "function") {
+      onSubstep(stepResult);
+    }
+
+    movedDistance += typeof stepResult.distance === "number" ? stepResult.distance : stepDistance;
+    remaining -= stepDistance;
+    lastResult = { ...stepResult, distance: movedDistance, previousPosition };
+
+    if (!stepResult.moved) {
+      lastResult.moved = movedDistance > 0.001;
+      break;
+    }
+  }
+
+  return lastResult;
 }
 
 function createTpsCamera(BABYLON, scene, sourceCamera) {
@@ -3190,6 +4201,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
   const tpsCamera = createTpsCamera(BABYLON, scene, walkCamera);
   let tpsSystem = null;
   let walkMode = false;
+  let walkFrameLocomotion = null;
   let isGrounded = false;
   let verticalVelocity = 0;
   let stepTargetY = null;
@@ -4041,7 +5053,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
 
   function snapToGround(options = {}) {
     refreshLocalMeshSets(true);
-    const hit = findGroundHit(BABYLON, scene, walkCamera.position, localGroundMeshSet);
+    const hit = findSpawnGroundHit(BABYLON, scene, walkCamera.position, localGroundMeshSet);
 
     if (!hit?.pickedPoint) {
       isGrounded = false;
@@ -4064,13 +5076,23 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     lastStableGroundPose = {
       hit,
       eyeY,
-      isStair: Boolean(hit?.pickedMesh && isStairSurface(hit.pickedMesh)),
+      isStair: Boolean(
+        hit?.pickedMesh && (
+          isStairSurface(hit.pickedMesh)
+          || isColRampGroundMesh(hit.pickedMesh)
+          || isColDiscreteStairMesh(hit.pickedMesh)
+        )
+      ),
       time: performance.now()
     };
   }
 
   function tryUseGroundGrace() {
     if (!lastStableGroundPose) {
+      return false;
+    }
+
+    if (!getCenterGroundPose(BABYLON, scene, walkCamera.position, localGroundMeshSet, walkCamera.position.y)) {
       return false;
     }
 
@@ -4092,10 +5114,41 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     return true;
   }
 
+  function getWalkLocomotionState() {
+    if (walkFrameLocomotion) {
+      return walkFrameLocomotion;
+    }
+
+    walkFrameLocomotion = getLocomotionSurfaceState(
+      BABYLON,
+      scene,
+      walkCamera.position,
+      localGroundMeshSet
+    );
+
+    return walkFrameLocomotion;
+  }
+
   function trySnapToStairWhileStanding() {
+    const locomotion = getWalkLocomotionState();
+    const { onColRamp, onColStair, onStair } = locomotion;
+
+    if (!onColRamp && !onColStair && !onStair) {
+      return false;
+    }
+
+    const discreteStair = isColLayerDiscreteStairConfig(activeModelState.config);
+    const stairSnapTolerance = onColRamp
+      ? MAX_RAMP_STEP_UP
+      : discreteStair
+        ? ANGJI_MAX_STAIR_STEP_UP
+        : hasColLayerConfig(activeModelState.config)
+          ? MAX_STAIR_STEP_UP
+          : STAIR_STAND_SNAP_TOLERANCE;
     const stairPose = getStepPoseAtPosition(BABYLON, scene, walkCamera.position, localGroundMeshSet, walkCamera.position.y, {
-      minVerticalDelta: -STAIR_STAND_SNAP_TOLERANCE,
-      maxVerticalDelta: STAIR_STAND_SNAP_TOLERANCE
+      minVerticalDelta: -stairSnapTolerance,
+      maxVerticalDelta: stairSnapTolerance,
+      slopeFilter: onColRamp ? "ramp" : "stair"
     });
 
     if (!stairPose) {
@@ -4104,7 +5157,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
 
     const verticalGap = Math.abs(walkCamera.position.y - stairPose.eyeY);
 
-    if (verticalGap > STAIR_STAND_SNAP_TOLERANCE) {
+    if (verticalGap > stairSnapTolerance) {
       return false;
     }
 
@@ -4118,6 +5171,21 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
 
   function integrateVerticalPhysics(deltaScale, state) {
     let { verticalVelocity: vy, isGrounded: grounded, verticalImpulse = 0 } = state;
+
+    const locomotion = getWalkLocomotionState();
+    const { onColRamp, onColStair, onRamp, onStair } = locomotion;
+
+    if (
+      grounded
+      && !onColRamp
+      && !onColStair
+      && !onRamp
+      && !onStair
+      && !getCenterGroundPose(BABYLON, scene, walkCamera.position, localGroundMeshSet, walkCamera.position.y)
+    ) {
+      grounded = false;
+      vy = Math.min(vy, 0);
+    }
 
     if (verticalImpulse > 0 && grounded) {
       vy = verticalImpulse;
@@ -4148,19 +5216,37 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
       return { verticalVelocity, isGrounded };
     }
 
-    const groundPose = getLandingGroundPoseAtPosition(
-      BABYLON,
-      scene,
-      walkCamera.position,
-      localGroundMeshSet,
-      walkCamera.position.y,
-      { compactProbes: grounded && Math.abs(vy) <= 0.02 }
-    );
+    const snapStepUp = onColRamp || onRamp
+      ? MAX_RAMP_STEP_UP
+      : onColStair
+        ? ANGJI_MAX_STAIR_STEP_UP
+        : onStair
+          ? MAX_STAIR_STEP_UP
+          : MAX_STEP_UP;
+    const groundPose = (onColRamp || onColStair || onRamp || onStair)
+      ? getGroundPoseAtPosition(
+        BABYLON,
+        scene,
+        walkCamera.position,
+        localGroundMeshSet,
+        walkCamera.position.y,
+        {
+          maxStepUp: snapStepUp,
+          compactProbes: grounded && Math.abs(vy) <= 0.02
+        }
+      )
+      : getCenterGroundPose(
+        BABYLON,
+        scene,
+        walkCamera.position,
+        localGroundMeshSet,
+        walkCamera.position.y
+      );
 
     if (groundPose) {
       const distanceToGround = walkCamera.position.y - groundPose.eyeY;
 
-      if (distanceToGround <= GROUND_SNAP_TOLERANCE && distanceToGround >= -MAX_STEP_UP && vy <= 0) {
+      if (distanceToGround <= GROUND_SNAP_TOLERANCE && distanceToGround >= -snapStepUp && vy <= 0) {
         walkCamera.position.y = groundPose.eyeY;
         verticalVelocity = 0;
         isGrounded = true;
@@ -4169,7 +5255,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
         return { verticalVelocity, isGrounded };
       }
 
-      if (distanceToGround < -GROUND_SNAP_TOLERANCE && Math.abs(distanceToGround) <= MAX_STEP_UP) {
+      if (distanceToGround < -GROUND_SNAP_TOLERANCE && Math.abs(distanceToGround) <= snapStepUp) {
         walkCamera.position.y = groundPose.eyeY;
         verticalVelocity = 0;
         isGrounded = true;
@@ -4466,6 +5552,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     const deltaScale = Math.min(engine.getDeltaTime() / 16.6667, 2);
     const deltaSeconds = engine.getDeltaTime() / 1000;
     refreshLocalMeshSets();
+    walkFrameLocomotion = null;
     const modelSpeedMultiplier = ANGJI_MOVE_SPEED_MULTIPLIER;
 
     const applyHorizontalMove = (direction, moveSpeed, options = {}) => {
@@ -4480,30 +5567,91 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
         return;
       }
 
-      const appliedMovement = direction.clone().scale(moveSpeed);
-      const angjiMoveOptions = isAngjiProjectConfig(activeModelState.config)
+      const colLayer = hasColLayerConfig(activeModelState.config);
+      const discreteStair = colLayer && isColLayerDiscreteStairConfig(activeModelState.config);
+      const probeMovement = direction.clone().scale(moveSpeed);
+      const locomotion = colLayer ? getWalkLocomotionState() : null;
+      const onColRamp = Boolean(locomotion?.onColRamp);
+      const onColStair = Boolean(locomotion?.onColStair);
+      const onRamp = Boolean(locomotion?.onRamp);
+      const onStair = Boolean(locomotion?.onStair);
+      const nearColStair = discreteStair && !onColStair && !onColRamp && isNearColDiscreteStairContext(
+        BABYLON,
+        scene,
+        walkCamera.position,
+        probeMovement,
+        localGroundMeshSet
+      );
+      const nearColRamp = colLayer && !onColRamp && !onColStair && isNearColRampContext(
+        BABYLON,
+        scene,
+        walkCamera.position,
+        probeMovement,
+        localGroundMeshSet
+      );
+      const walkSpeedCap = CONTROLLER_SETTINGS.moveSpeed
+        * modelSpeedMultiplier
+        * CONTROLLER_SETTINGS.walkSpeedMultiplier
+        * deltaScale;
+      const effectiveMoveSpeed = (onColRamp || onColStair || onStair || onRamp || nearColRamp)
+        ? Math.min(moveSpeed, walkSpeedCap)
+        : moveSpeed;
+      const appliedMovement = direction.clone().scale(effectiveMoveSpeed);
+      const moveOptions = colLayer
         ? {
+          locomotion,
+          nearColRamp,
+          stairAssistMode: discreteStair && (onColStair || nearColStair) ? "colDiscrete" : "none",
+          preferSlopeTransition: true,
           maxStairStepUp: ANGJI_MAX_STAIR_STEP_UP,
-          stairProbeDistances: ANGJI_STAIR_PROBE_DISTANCES
+          maxRampStepUp: MAX_RAMP_STEP_UP
         }
         : {};
-      const moveResult = tryMoveWithCollision(BABYLON, scene, walkCamera, appliedMovement, localCollisionMeshSet, activeModelState.model.bounds, localGroundMeshSet, {
-        allowStepUp: typeof stepTargetY !== "number",
-        ...angjiMoveOptions
-      });
+      const useColSubsteps = discreteStair
+        && onColStair
+        && appliedMovement.length() > MOVE_COLLISION_SUBSTEP_STAIR;
+      const moveResult = useColSubsteps
+        ? tryMoveWithCollisionSubsteps(
+          BABYLON,
+          scene,
+          walkCamera,
+          appliedMovement,
+          localCollisionMeshSet,
+          activeModelState.model.bounds,
+          localGroundMeshSet,
+          {
+            substepSize: MOVE_COLLISION_SUBSTEP_STAIR,
+            ...moveOptions,
+            allowStepUp: typeof stepTargetY !== "number",
+            onSubstep: (stepResult) => {
+              if (stepResult.moved && stepResult.groundHit) {
+                rememberStableGround(stepResult.groundHit, walkCamera.position.y);
+              }
+            }
+          }
+        )
+        : tryMoveWithCollision(
+          BABYLON,
+          scene,
+          walkCamera,
+          appliedMovement,
+          localCollisionMeshSet,
+          activeModelState.model.bounds,
+          localGroundMeshSet,
+          {
+            allowStepUp: typeof stepTargetY !== "number",
+            ...moveOptions
+          }
+        );
 
-      if (typeof moveResult.stepTargetY === "number" && typeof stepTargetY !== "number") {
-        const targetDelta = moveResult.stepTargetY - walkCamera.position.y;
-        const maxStepTarget = isAngjiProjectConfig(activeModelState.config) ? ANGJI_MAX_STAIR_STEP_UP : MAX_STEP_UP;
-
-        if (targetDelta >= MIN_STEP_UP && targetDelta <= maxStepTarget) {
-          stepTargetY = moveResult.stepTargetY;
-          stepTargetHit = moveResult.stepTargetHit || null;
-        }
+      if (!useColSubsteps && moveResult.moved && moveResult.groundHit) {
+        rememberStableGround(moveResult.groundHit, walkCamera.position.y);
       }
 
-      if (moveResult.moved && moveResult.groundHit) {
-        rememberStableGround(moveResult.groundHit, walkCamera.position.y);
+      if (moveResult.losesSupport) {
+        isGrounded = false;
+        verticalVelocity = Math.min(verticalVelocity, 0);
+        lastStableGroundPose = null;
       }
 
       inputDiagnostics.lastCollision = moveResult.reason;
@@ -4519,6 +5667,12 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
       isGrounded,
       verticalVelocity,
       modelSpeedMultiplier,
+      forceWalkLocomotion: hasColLayerConfig(activeModelState.config)
+        && (() => {
+          const locomotion = getWalkLocomotionState();
+
+          return locomotion.onColRamp || locomotion.onColStair || locomotion.onRamp || locomotion.onStair;
+        })(),
       clearPlayerKeys: () => tpsSystem?.getInputController?.()?.clear(),
       resolveGroundEyeY: (position) => {
         const groundPose = getLandingGroundPoseAtPosition(
@@ -4807,28 +5961,44 @@ async function loadTourModelState(BABYLON, scene, config) {
   let furniturePassThroughCount = 0;
   const peopleTargetMeshes = [];
   const isAngjiProject = isAngjiProjectConfig(config);
+  const hasColLayer = hasColLayerConfig(config);
+  const treatStairAsRamp = config.collision?.treatStairAsRamp === true
+    && !isColLayerDiscreteStairConfig(config);
+  const includeVisualStairs = hasColLayer && config.collision?.includeVisualStairs === true;
 
   await processTourMeshesInChunks(meshes, (mesh) => {
     getCachedMeshBounds(BABYLON, mesh);
 
     const furniture = isChungjuProjectConfig(config) && isFurnitureMesh(mesh);
     const propPassThrough = isTourPropMesh(mesh);
-    const angjiCollisionLayer = isAngjiProject && hasAngjiCollisionMaterial(mesh);
-    const angjiFurnitureSurface = isAngjiProject && hasAngjiFurnitureMaterial(mesh);
-    const angjiStairSurface = isAngjiProject && hasAngjiStairMaterial(mesh);
-    const angjiBuildingFloor1Surface = isAngjiProject && hasAngjiBuildingFloor1Material(mesh);
-    const angjiBuildingFloor2Surface = isAngjiProject && hasAngjiBuildingFloor2Material(mesh);
-    const angjiExternalFloorSurface = isAngjiProject && hasAngjiExternalFloorMaterial(mesh);
+    const angjiCollisionLayer = hasColLayer && hasAngjiCollisionMaterial(mesh);
+    const angjiFurnitureSurface = hasColLayer && hasAngjiFurnitureMaterial(mesh);
+    let angjiRampSurface = hasColLayer && hasAngjiRampMaterial(mesh);
+    const angjiRampFloorLevel = angjiRampSurface ? getAngjiRampFloorLevel(mesh) : null;
+    let angjiStairSurface = hasColLayer && hasAngjiStairMaterial(mesh);
+    const angjiVisualStairSurface = includeVisualStairs && hasVisualStairMaterial(mesh);
+
+    if (treatStairAsRamp && angjiStairSurface) {
+      angjiRampSurface = true;
+      angjiStairSurface = false;
+    }
+
+    if (angjiVisualStairSurface) {
+      angjiRampSurface = true;
+    }
+    const angjiBuildingFloor1Surface = hasColLayer && hasAngjiBuildingFloor1Material(mesh);
+    const angjiBuildingFloor2Surface = hasColLayer && hasAngjiBuildingFloor2Material(mesh);
+    const angjiExternalFloorSurface = hasColLayer && hasAngjiExternalFloorMaterial(mesh);
     const angjiFloorSurface = angjiBuildingFloor1Surface || angjiBuildingFloor2Surface || angjiExternalFloorSurface;
-    const angjiWallSurface = isAngjiProject && hasAngjiWallMaterial(mesh);
+    const angjiWallSurface = hasColLayer && hasAngjiWallMaterial(mesh);
     const angjiCameraBlockingSurface = angjiWallSurface
       || angjiFurnitureSurface
       || angjiBuildingFloor1Surface
       || angjiBuildingFloor2Surface;
-    const passThrough = isAngjiProject ? !angjiCollisionLayer : (propPassThrough || furniture);
+    const passThrough = hasColLayer ? !angjiCollisionLayer : (propPassThrough || furniture);
     const peopleTarget = isPeopleFireballTarget(mesh);
 
-    if (propPassThrough || (isAngjiProject && passThrough)) {
+    if (propPassThrough || (hasColLayer && passThrough)) {
       propPassThroughCount += 1;
     }
 
@@ -4840,7 +6010,7 @@ async function loadTourModelState(BABYLON, scene, config) {
       peopleTargetMeshes.push(mesh);
     }
 
-    mesh.isPickable = mesh.isEnabled() && (passThrough ? peopleTarget : true);
+    mesh.isPickable = mesh.isEnabled() && (angjiVisualStairSurface || (passThrough ? peopleTarget : true));
     mesh.checkCollisions = passThrough ? false : ENABLE_MODEL_COLLISIONS;
     mesh.metadata = {
       ...(mesh.metadata || {}),
@@ -4849,8 +6019,11 @@ async function loadTourModelState(BABYLON, scene, config) {
       furniture: furniture || angjiFurnitureSurface,
       tourProp: propPassThrough,
       angjiCollisionLayer,
-      angjiCollisionRole: isAngjiProject ? getAngjiCollisionMaterialRole(mesh) : null,
+      angjiCollisionRole: hasColLayer ? getAngjiCollisionMaterialRole(mesh) : null,
+      angjiRampSurface,
+      angjiRampFloorLevel,
       angjiStairSurface,
+      angjiVisualStairSurface,
       angjiWallSurface,
       angjiFurnitureSurface,
       angjiFloorSurface,
@@ -4861,7 +6034,7 @@ async function loadTourModelState(BABYLON, scene, config) {
       angjiCameraBlockingRequiresWallNormal: angjiBuildingFloor2Surface
     };
 
-    if (isAngjiProject && angjiCollisionLayer) {
+    if (hasColLayer && angjiCollisionLayer) {
       applyAngjiCollisionInvisibility(mesh, BABYLON);
     }
   });
@@ -4879,7 +6052,7 @@ async function loadTourModelState(BABYLON, scene, config) {
   let usedCollisionFallback = false;
   let collisionMeshes;
 
-  if (isAngjiProject) {
+  if (hasColLayer) {
     collisionMeshes = meshes.filter((mesh) => (
       mesh.isEnabled()
       && !isDescendantOf(mesh, model.tourStartNode)
@@ -4888,7 +6061,7 @@ async function loadTourModelState(BABYLON, scene, config) {
     ));
 
     if (collisionMeshes.length === 0) {
-      console.warn("Angji tour model has no 0_COL_* collision meshes.");
+      console.warn(`${config.label} tour model has no 0_COL_* collision meshes.`);
     }
   } else {
     collisionMeshes = meshes.filter((mesh) => (
@@ -4912,20 +6085,23 @@ async function loadTourModelState(BABYLON, scene, config) {
     }
   }
 
-  const stairSurfaceMeshes = isAngjiProject
+  const rampSurfaceMeshes = hasColLayer
+    ? meshes.filter((mesh) => mesh.isEnabled() && !isDescendantOf(mesh, model.tourStartNode) && mesh.metadata?.angjiRampSurface)
+    : [];
+  const stairSurfaceMeshes = hasColLayer
     ? meshes.filter((mesh) => mesh.isEnabled() && !isDescendantOf(mesh, model.tourStartNode) && mesh.metadata?.angjiStairSurface)
     : meshes.filter((mesh) => mesh.isEnabled() && !isDescendantOf(mesh, model.tourStartNode) && isStairSurface(mesh));
-  const floorSurfaceMeshes = isAngjiProject
+  const floorSurfaceMeshes = hasColLayer
     ? meshes.filter((mesh) => mesh.isEnabled() && !isDescendantOf(mesh, model.tourStartNode) && mesh.metadata?.angjiFloorSurface)
     : meshes.filter((mesh) => mesh.isEnabled() && !isDescendantOf(mesh, model.tourStartNode) && isFloorSurface(mesh));
-  const angjiBuildingFloor1Meshes = isAngjiProject
+  const angjiBuildingFloor1Meshes = hasColLayer
     ? meshes.filter((mesh) => (
       mesh.isEnabled()
       && !isDescendantOf(mesh, model.tourStartNode)
       && mesh.metadata?.angjiBuildingFloor1Surface
     ))
     : [];
-  const angjiExternalFloorMeshes = isAngjiProject
+  const angjiExternalFloorMeshes = hasColLayer
     ? meshes.filter((mesh) => (
       mesh.isEnabled()
       && !isDescendantOf(mesh, model.tourStartNode)
@@ -4933,19 +6109,21 @@ async function loadTourModelState(BABYLON, scene, config) {
     ))
     : [];
 
-  [...stairSurfaceMeshes, ...floorSurfaceMeshes].forEach((mesh) => {
+  [...rampSurfaceMeshes, ...stairSurfaceMeshes, ...floorSurfaceMeshes].forEach((mesh) => {
     mesh.metadata = { ...(mesh.metadata || {}), passThrough: false, groundSurface: true };
     mesh.isPickable = true;
   });
 
   const collisionMeshMap = new Map(collisionMeshes.map((mesh) => [mesh.uniqueId, mesh]));
+  rampSurfaceMeshes.forEach((mesh) => collisionMeshMap.set(mesh.uniqueId, mesh));
   stairSurfaceMeshes.forEach((mesh) => collisionMeshMap.set(mesh.uniqueId, mesh));
   floorSurfaceMeshes.forEach((mesh) => collisionMeshMap.set(mesh.uniqueId, mesh));
   collisionMeshes = Array.from(collisionMeshMap.values());
 
   const groundMeshMap = new Map();
 
-  if (isAngjiProject) {
+  if (hasColLayer) {
+    rampSurfaceMeshes.forEach((mesh) => groundMeshMap.set(mesh.uniqueId, mesh));
     stairSurfaceMeshes.forEach((mesh) => groundMeshMap.set(mesh.uniqueId, mesh));
     floorSurfaceMeshes.forEach((mesh) => groundMeshMap.set(mesh.uniqueId, mesh));
   } else {
@@ -4981,6 +6159,7 @@ async function loadTourModelState(BABYLON, scene, config) {
     usedCollisionFallback,
     collisionMeshes,
     walkableGroundMeshes: Array.from(groundMeshMap.values()),
+    rampSurfaceMeshes,
     stairSurfaceMeshes,
     floorSurfaceMeshes,
     angjiBuildingFloor1Meshes,
