@@ -1,6 +1,6 @@
 /** Angji tour guest placements (Mark-1 … Mark-18). */
 
-export const ANGJI_GUEST_CONFIG_VERSION = "angji-guest-full-20260705";
+export const ANGJI_GUEST_CONFIG_VERSION = "angji-guest-mark3-adjust-20260705";
 
 export const ANGJI_PRIORITY_GUEST_IDS = ["Mark-1", "Mark-2"];
 export const ANGJI_SIMULTANEOUS_GUEST_IDS = ["Mark-4", "Mark-5", "Mark-6"];
@@ -10,7 +10,7 @@ const ANGJI_RESERVED_GUEST_IDS = new Set([
   ...ANGJI_SIMULTANEOUS_GUEST_IDS
 ]);
 
-/** Mark-1, Mark-2 and Mark-13+ are placed outside the building and appear in orbit view. */
+/** Mark-1, Mark-2 and Mark-13+ are outdoor; orbit shows them, tour keeps them and adds indoor guests. */
 export const ANGJI_OUTDOOR_GUEST_MIN_MARK = 13;
 
 function getGuestMarkNumber(spawnId) {
@@ -44,6 +44,10 @@ export function getAngjiIndoorGuestIds() {
 
 export function getAngjiOutdoorGuestIds() {
   return getAngjiOutdoorGuestSpawns().map((spawn) => spawn.id);
+}
+
+export function getAngjiAllGuestIds() {
+  return ANGJI_GUEST_MARKS.map((spawn) => spawn.id);
 }
 
 export function getAngjiIndoorBackgroundGuestSpawns() {
@@ -113,7 +117,7 @@ export const ANGJI_GUEST_MARKS = [
   {
     id: "Mark-3",
     file: "02 Shrooms/01 Shroom_Hip Hop Dancer/Shroom_Hip Hop Dancer.glb",
-    position: { x: 5.25, y: 22.41, z: -0.25 },
+    position: { x: 5.3, y: 22.47, z: -0.42 },
     sitYOffsetOverride: 0.17,
     rotationY: 16.0116,
     animation: { type: "loop", clips: ["Seat_Clapping"] }

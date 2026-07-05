@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jinju Indoor Guest Spawn Test</title>
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      overflow: hidden;
+      background: #1a2433;
+      color: #eef3fb;
+      font-family: "Segoe UI", sans-serif;
+    }
+
+    #gameCanvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    #status {
+      position: fixed;
+      top: 12px;
+      left: 12px;
+      max-width: min(520px, calc(100vw - 24px));
+      padding: 12px 14px;
+      border-radius: 10px;
+      background: rgba(8, 12, 20, 0.88);
+      font-size: 13px;
+      line-height: 1.5;
+      pointer-events: none;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="gameCanvas"></canvas>
+  <div id="status">Starting Jinju indoor guest spawn test…</div>
+
+  <script src="https://cdn.babylonjs.com/babylon.js"></script>
+  <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+  <script type="module">
+    import { runJinjuIndoorGuestSpawnTest } from "./src/jinju-indoor-guest-spawn-test.js?v=jinju-indoor-all16-outdoor-keep-20260705";
+
+    const statusEl = document.getElementById("status");
+    const canvas = document.getElementById("gameCanvas");
+
+    function formatResult(result) {
+      const lines = [
+        `config: ${result.configVersion}`,
+        `freeze threshold: ${result.freezeThresholdMs}ms`,
+        `overall: ${result.passed ? "PASS (no freeze)" : "FAIL (freeze detected)"}`,
+        `reproduced freeze: ${result.reproducedFreeze ? "YES" : "NO"}`,
+        ""
+      ];
+
+      for (const scenario of result.scenarios) {
+        lines.push(`--- ${scenario.scenario} ---`);
+        lines.push(`freezes: ${scenario.freezeCount}, janks: ${scenario.jankCount}, max frame: ${scenario.maxFrameMs}ms`);
+        lines.push(`load-phase freezes: ${scenario.janksDuringLoad.length}`);
+        lines.push(`reveal-phase freezes: ${scenario.janksDuringReveal.length}`);
+
+        if (scenario.freezes.length) {
+          lines.push("freeze events:");
+          scenario.freezes.slice(0, 8).forEach((event) => {
+            lines.push(`  ${event.deltaMs}ms @ ${event.phase} guest#${event.guestIndex} ${event.guestId}`);
+          });
+        }
+
+        const slowLoads = scenario.loadTimings.filter((entry) => entry.durationMs >= 300);
+        if (slowLoads.length) {
+          lines.push("slow loads (>=300ms):");
+          slowLoads.forEach((entry) => {
+            lines.push(`  ${entry.devLabel || entry.guestId}: ${entry.durationMs}ms`);
+          });
+        }
+
+        lines.push("");
+      }
+
+      return lines.join("\n");
+    }
+
+    runJinjuIndoorGuestSpawnTest(window.BABYLON, canvas)
+      .then((result) => {
+        statusEl.textContent = formatResult(result);
+        console.info("[jinju-indoor-spawn-test]", result);
+      })
+      .catch((error) => {
+        window.__JINJU_SPAWN_TEST_RESULT__ = { passed: false, error: String(error) };
+        statusEl.textContent = `Test failed: ${error?.message || error}`;
+        console.error("[jinju-indoor-spawn-test]", error);
+      });
+  </script>
+</body>
+</html>

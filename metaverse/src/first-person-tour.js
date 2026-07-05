@@ -19,6 +19,7 @@ import {
   getAngjiIndoorGuestSpawns,
   getAngjiIndoorGuestIds,
   getAngjiOutdoorGuestIds,
+  getAngjiAllGuestIds,
   getAngjiSimultaneousGuestSpawns,
   getBackgroundGuestRevealDelayMs,
   getBackgroundGuestLoadYieldFrames,
@@ -26,8 +27,47 @@ import {
   ANGJI_PRIORITY_GUEST_IDS,
   ANGJI_GUEST_CONFIG_VERSION,
   getAngjiGuestPositionYOffset
-} from "./angji-guest-config.js?v=angji-guest-full-20260705";
-import { createGuestCharacterSystem, shouldSnapPatrolFloorAtTarget } from "./guest-character-system.js?v=angji-guest-full-20260705";
+} from "./angji-guest-config.js?v=angji-guest-mark3-adjust-20260705";
+import {
+  getJinjuOutdoorBackgroundGuestSpawns,
+  getJinjuFixedGuestSpawns,
+  getJinjuOutdoorGuestIds,
+  JINJU_PRIORITY_GUEST_IDS,
+  JINJU_GUEST_CONFIG_VERSION,
+  resetJinjuGuestSession,
+  getJinjuGuestPositionYOffset,
+  getJinjuGuestLoadYieldFrames,
+  getJinjuGuestRevealDelayMs
+} from "./jinju-guest-config.js?v=jinju-marie-sit-clips-20260705";
+import {
+  getJinjuIndoorBackgroundGuestSpawns,
+  getJinjuIndoorGuestSpawns,
+  getJinjuIndoorGuestIds,
+  getJinjuIndoorPriorityGuestSpawns,
+  resetJinjuIndoorGuestSession,
+  getJinjuIndoorGuestPositionYOffset,
+  JINJU_INDOOR_PRIORITY_GUEST_IDS,
+  JINJU_INDOOR_GUEST_CONFIG_VERSION,
+  JINJU_INDOOR_ACTIVE_GUEST_MAX_MARK,
+  JINJU_INDOOR_RAMP_1F_PREFIXES,
+  JINJU_INDOOR_RAMP_2F_PREFIXES,
+  JINJU_INDOOR_UPPER_GUEST_ENABLED,
+  getJinjuIndoorGuestLoadYieldFrames,
+  getJinjuIndoorGuestRevealDelayMs
+} from "./jinju-indoor-guest-config.js?v=jinju-indoor-all16-outdoor-keep-20260705";
+import {
+  getJinjuRooftopGuestIds,
+  getJinjuRooftopGuestSpawns,
+  getJinjuRooftopPriorityGuestSpawns,
+  getJinjuRooftopBackgroundGuestSpawns,
+  resetJinjuRooftopGuestSession,
+  JINJU_ROOFTOP_SIMULTANEOUS_GUEST_IDS,
+  JINJU_ROOFTOP_GUEST_CONFIG_VERSION,
+  getJinjuRooftopGuestLoadYieldFrames,
+  getJinjuRooftopGuestRevealDelayMs,
+  getJinjuRooftopSequentialGuestSpawns
+} from "./jinju-rooftop-guest-config.js?v=jinju-rooftop-marie-sit-clips-20260705";
+import { createGuestCharacterSystem, shouldSnapPatrolFloorAtTarget } from "./guest-character-system.js?v=jinju-rooftop-lifecycle-20260705";
 import { applyLocalDevToolsVisibility, isLocalDevEnvironment } from "./local-dev.js?v=local-dev-20260629";
 
 const MODEL_ROOT = "./assets/models/";
@@ -207,7 +247,13 @@ const STAIR_NODE_KEYWORDS = ["3dgeom126", "3dgeom292", "3dgeom599", "3dgeom600",
 const ANGJI_BUILDING_WALL_PREFIXES = ["0_col_b_wall"];
 const ANGJI_BUILDING_FLOOR1_PREFIXES = ["0_col_b_floor1"];
 const ANGJI_BUILDING_FLOOR2_PREFIXES = ["0_col_b_floor2"];
-const ANGJI_BUILDING_FLOOR_PREFIXES = [...ANGJI_BUILDING_FLOOR1_PREFIXES, ...ANGJI_BUILDING_FLOOR2_PREFIXES];
+/** Rooftop / 3F floor — add to GLB as 0_COL_B_Floor3 when the slab exists. */
+const ANGJI_BUILDING_FLOOR3_PREFIXES = ["0_col_b_floor3"];
+const ANGJI_BUILDING_FLOOR_PREFIXES = [
+  ...ANGJI_BUILDING_FLOOR1_PREFIXES,
+  ...ANGJI_BUILDING_FLOOR2_PREFIXES,
+  ...ANGJI_BUILDING_FLOOR3_PREFIXES
+];
 const ANGJI_BUILDING_STAIR_PREFIXES = ["0_col_b_stair"];
 const ANGJI_BUILDING_RAMP_PREFIXES = [
   "0_col_b_ramp_1f",
@@ -1448,6 +1494,12 @@ function hasAngjiBuildingFloor2Material(mesh) {
   ));
 }
 
+function hasAngjiBuildingFloor3Material(mesh) {
+  return getNormalizedMaterialNames(mesh).some((name) => (
+    angjiMaterialNameMatchesPrefix(name, ANGJI_BUILDING_FLOOR3_PREFIXES)
+  ));
+}
+
 function hasAngjiExternalFloorMaterial(mesh) {
   return getNormalizedMaterialNames(mesh).some((name) => (
     angjiMaterialNameMatchesPrefix(name, ANGJI_EXTERNAL_FLOOR_PREFIXES)
@@ -2114,6 +2166,64 @@ function isLikelyWalkableSurface(mesh) {
   return isStairSurface(mesh) || isRampSurface(mesh) || isFloorSurface(mesh);
 }
 
+function pickGuestFloorYFromMeshes(BABYLON, scene, x, z, floorMeshes, fallbackY, maxHitY = null) {
+  const floorSet = new Set(floorMeshes || []);
+
+  if (!floorSet.size) {
+    return null;
+  }
+
+  const rayOriginY = Math.max((maxHitY ?? fallbackY) + 3, fallbackY + 3, 12);
+  const rayOrigin = new BABYLON.Vector3(x, rayOriginY, z);
+  const ray = new BABYLON.Ray(rayOrigin, new BABYLON.Vector3(0, -1, 0), rayOriginY + 8);
+  const hitLimitY = maxHitY ?? (fallbackY + 1.5);
+
+  const hits = getRayHits(scene, ray, (mesh) => (
+    floorSet.has(mesh)
+    && mesh.isEnabled()
+    && mesh.isPickable !== false
+  ));
+
+  const topHit = hits
+    .filter((hit) => {
+      const normal = hit.getNormal?.(true);
+      const hitY = hit.pickedPoint?.y;
+
+      if (typeof hitY !== "number") {
+        return false;
+      }
+
+      return (!normal || normal.y >= CLASSIFIED_GROUND_NORMAL_MIN_Y)
+        && hitY <= hitLimitY;
+    })
+    .sort((a, b) => b.pickedPoint.y - a.pickedPoint.y)[0];
+
+  return topHit?.pickedPoint?.y ?? null;
+}
+
+function getJinjuGuestFloorMeshesForLevel(guestModelState, floorLevel) {
+  if (!guestModelState) {
+    return [];
+  }
+
+  if (floorLevel === 1) {
+    return [
+      ...(guestModelState.angjiBuildingFloor1Meshes || []),
+      ...(guestModelState.angjiExternalFloorMeshes || [])
+    ];
+  }
+
+  if (floorLevel === 2) {
+    return guestModelState.angjiBuildingFloor2Meshes || [];
+  }
+
+  if (floorLevel === 3) {
+    return guestModelState.angjiBuildingFloor3Meshes || [];
+  }
+
+  return [];
+}
+
 function pickAngjiGuestFloorY(BABYLON, scene, x, z, floor1Meshes, externalFloorMeshes) {
   const floor1Set = new Set(floor1Meshes || []);
   const externalSet = new Set(externalFloorMeshes || []);
@@ -2150,6 +2260,10 @@ function pickAngjiGuestFloorY(BABYLON, scene, x, z, floor1Meshes, externalFloorM
   return pickTopFloorY(externalSet);
 }
 
+function pickJinjuIndoorFloorY(BABYLON, scene, x, z, floor2Meshes, fallbackY) {
+  return pickGuestFloorYFromMeshes(BABYLON, scene, x, z, floor2Meshes, fallbackY, fallbackY + 1.5);
+}
+
 function resolveAngjiGuestSpawn(BABYLON, scene, spawn, floor1Meshes, externalFloorMeshes) {
   const snapFloorY = (x, z, fallbackY) => {
     const groundY = pickAngjiGuestFloorY(BABYLON, scene, x, z, floor1Meshes, externalFloorMeshes);
@@ -2183,6 +2297,48 @@ function resolveAngjiGuestSpawn(BABYLON, scene, spawn, floor1Meshes, externalFlo
       }))
     }
   };
+}
+
+function resolveJinjuGuestSpawn(BABYLON, scene, spawn, guestModelState) {
+  const isIndoorGuest = spawn.id?.startsWith("Jinju-Indoor-");
+  const isRooftopGuest = spawn.id?.startsWith("Jinju-Rooftop-");
+  const sitYOffset = isIndoorGuest
+    ? getJinjuIndoorGuestPositionYOffset(spawn)
+    : getJinjuGuestPositionYOffset(spawn);
+
+  let baseY = spawn.position.y;
+  const floorLevel = isRooftopGuest ? 3 : isIndoorGuest ? 2 : 1;
+  const floorMeshes = getJinjuGuestFloorMeshesForLevel(guestModelState, floorLevel);
+
+  if (floorMeshes.length) {
+    const maxHitY = isIndoorGuest ? spawn.position.y + 1.5 : spawn.position.y + 2;
+    const snappedY = pickGuestFloorYFromMeshes(
+      BABYLON,
+      scene,
+      spawn.position.x,
+      spawn.position.z,
+      floorMeshes,
+      spawn.position.y,
+      maxHitY
+    );
+
+    if (typeof snappedY === "number") {
+      baseY = snappedY;
+    }
+  }
+
+  return {
+    ...spawn,
+    position: {
+      x: spawn.position.x,
+      y: baseY + sitYOffset,
+      z: spawn.position.z
+    }
+  };
+}
+
+function getJinjuAllGuestIds() {
+  return [...getJinjuOutdoorGuestIds(), ...getJinjuIndoorGuestIds(), ...getJinjuRooftopGuestIds()];
 }
 
 function getSurfaceDebugName(hit) {
@@ -3205,7 +3361,12 @@ function getGroundHitsAtPosition(BABYLON, scene, position, groundMeshSet, option
       position.z + offsetZ
     );
     const ray = new BABYLON.Ray(rayOrigin, BABYLON.Vector3.Down(), GROUND_RAY_UP + GROUND_RAY_DOWN);
-    hits.push(...getRayHits(scene, ray, (mesh) => groundMeshSet.has(mesh) && mesh.isPickable && mesh.isEnabled()));
+    hits.push(...getRayHits(scene, ray, (mesh) => (
+      groundMeshSet.has(mesh)
+      && mesh.isPickable !== false
+      && mesh.isEnabled()
+      && !isTourGuestMesh(mesh)
+    )));
   }
 
   return hits
@@ -3334,8 +3495,16 @@ function getStepPoseAtPosition(BABYLON, scene, position, groundMeshSet, referenc
   };
 }
 
+function isTourGuestMesh(mesh) {
+  return Boolean(mesh?.metadata?.tourGuest || mesh?.metadata?.guestId);
+}
+
 function isRayPickableCollisionMesh(mesh, collisionMeshSet) {
-  return collisionMeshSet.has(mesh) && mesh.isPickable && mesh.isEnabled() && !mesh.metadata?.passThrough;
+  return collisionMeshSet.has(mesh)
+    && mesh.isPickable
+    && mesh.isEnabled()
+    && !mesh.metadata?.passThrough
+    && !isTourGuestMesh(mesh);
 }
 
 function isOverheadBodyCollision(hit, eyeY) {
@@ -4254,6 +4423,29 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
   let lastTpsRuntimeState = null;
   let guestPlacementTool = null;
   let guestCharacterSystem = null;
+  let jinjuOutdoorGuestSpawnToken = 0;
+  let jinjuIndoorGuestSpawnToken = 0;
+  let angjiOutdoorGuestSpawnToken = 0;
+  let angjiIndoorGuestSpawnToken = 0;
+  let jinjuIndoorGuestActivationStarted = false;
+  let jinjuIndoorUpperGuestActivationStarted = false;
+  let jinjuIndoorPreloadToken = 0;
+  let jinjuIndoorPreloadPromise = null;
+  let jinjuIndoorGuestSpawnAttempts = 0;
+  let jinjuIndoorGuestSpawnRetryAfter = 0;
+  let jinjuIndoorGuestScheduleRunCount = 0;
+  let jinjuRooftopGuestActivationStarted = false;
+  let jinjuRooftopGuestSpawnToken = 0;
+  let jinjuRooftopGuestScheduleRunCount = 0;
+  let jinjuIndoorGuestSpawnComplete = false;
+  let jinjuRamp1FHasBeenContacted = false;
+  let jinjuOutdoorDisposedForIndoor = false;
+  let jinjuIndoorDisposedForRooftop = false;
+  let jinjuWasOnExternalGroundFloor = false;
+  let jinjuWasOnRamp1F = false;
+  let jinjuWasOnRamp2F = false;
+  const JINJU_INDOOR_GUEST_MAX_SPAWN_ATTEMPTS = 3;
+  const JINJU_INDOOR_GUEST_SPAWN_RETRY_COOLDOWN_MS = 5000;
   const enemyState = {
     asset: null,
     loadPromise: null,
@@ -4275,9 +4467,12 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     tpsCamera,
     createAngjiTpsOptions(walkCamera, {
       getCollisionMask: () => (mesh) => (
-        localCollisionMeshSet.has(mesh)
-        || Boolean(mesh.metadata?.angjiCameraBlockingSurface)
-        || Boolean(mesh.metadata?.angjiCollisionLayer)
+        !isTourGuestMesh(mesh)
+        && (
+          localCollisionMeshSet.has(mesh)
+          || Boolean(mesh.metadata?.angjiCameraBlockingSurface)
+          || Boolean(mesh.metadata?.angjiCollisionLayer)
+        )
       ),
       onLoadError: () => {
         setStatus("Character model could not be loaded. Walk mode will continue without avatar.");
@@ -4309,6 +4504,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
   renderGuestPlacementList([]);
 
   guestCharacterSystem = createGuestCharacterSystem(BABYLON, scene, {
+    showDevLabels: isLocalDevEnvironment(),
     getGeometryMeshes,
     getRootNodes,
     updateWorldMatrices,
@@ -4316,26 +4512,45 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     softenModelMaterialReflections,
     targetHeight: 1.75,
     resolveSpawnPosition: (spawn) => {
-      const angjiModelState = getAngjiGuestModelState();
+      const guestModelState = getActiveGuestModelState();
 
-      if (!angjiModelState || !isAngjiProjectConfig(angjiModelState.config)) {
+      if (!guestModelState) {
         return null;
       }
 
-      const floorMeshState = getAngjiGuestFloorMeshState();
+      if (isAngjiProjectConfig(guestModelState.config)) {
+        const floorMeshState = getAngjiGuestFloorMeshState();
 
-      return resolveAngjiGuestSpawn(
-        BABYLON,
-        scene,
-        spawn,
-        floorMeshState.angjiBuildingFloor1Meshes,
-        floorMeshState.angjiExternalFloorMeshes
-      );
+        return resolveAngjiGuestSpawn(
+          BABYLON,
+          scene,
+          spawn,
+          floorMeshState.angjiBuildingFloor1Meshes,
+          floorMeshState.angjiExternalFloorMeshes
+        );
+      }
+
+      if (isJinjuProjectConfig(guestModelState.config)) {
+        return resolveJinjuGuestSpawn(BABYLON, scene, spawn, guestModelState);
+      }
+
+      return null;
     },
     resolveGuestFloorY: (x, z, fallbackY) => {
-      const angjiModelState = getAngjiGuestModelState();
+      const guestModelState = getActiveGuestModelState();
 
-      if (!angjiModelState || !isAngjiProjectConfig(angjiModelState.config)) {
+      if (!guestModelState) {
+        return fallbackY;
+      }
+
+      if (isJinjuProjectConfig(guestModelState.config)) {
+        const floorMeshes = getJinjuGuestFloorMeshesForLevel(guestModelState, 1);
+
+        return pickGuestFloorYFromMeshes(BABYLON, scene, x, z, floorMeshes, fallbackY, fallbackY + 2)
+          ?? fallbackY;
+      }
+
+      if (!isAngjiProjectConfig(guestModelState.config)) {
         return fallbackY;
       }
 
@@ -4352,7 +4567,14 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     }
   });
   console.info(`[angji-guests] guest config ${ANGJI_GUEST_CONFIG_VERSION}`);
-  preloadAngjiOrbitGuests();
+  console.info(`[jinju-guests] outdoor config ${JINJU_GUEST_CONFIG_VERSION}`);
+  console.info(`[jinju-guests] indoor config ${JINJU_INDOOR_GUEST_CONFIG_VERSION}`);
+  console.info(`[jinju-guests] rooftop config ${JINJU_ROOFTOP_GUEST_CONFIG_VERSION}`);
+  preloadProjectGuests();
+
+  function getActiveGuestModelState() {
+    return activeModelState.tourModelState || activeModelState;
+  }
 
   function getAngjiGuestModelState() {
     return activeModelState.tourModelState || activeModelState;
@@ -4367,7 +4589,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
   }
 
   function preloadAngjiOrbitGuests() {
-    if (!isAngjiProjectConfig(activeModelState.config) || walkMode) {
+    if (!isAngjiProjectConfig(activeModelState.config)) {
       return;
     }
 
@@ -4384,13 +4606,567 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     window.setTimeout(run, 2000);
   }
 
+  function waitForIdle(timeoutMs = 3000) {
+    return new Promise((resolve) => {
+      if (typeof window.requestIdleCallback === "function") {
+        window.requestIdleCallback(() => resolve(), { timeout: timeoutMs });
+        return;
+      }
+
+      window.setTimeout(resolve, 200);
+    });
+  }
+
+  function resetJinjuIndoorGuestLoadingState() {
+    jinjuIndoorGuestActivationStarted = false;
+    jinjuIndoorUpperGuestActivationStarted = false;
+    jinjuIndoorGuestSpawnAttempts = 0;
+    jinjuIndoorGuestSpawnRetryAfter = 0;
+    jinjuIndoorGuestScheduleRunCount = 0;
+    jinjuIndoorPreloadToken += 1;
+    jinjuIndoorGuestSpawnToken += 1;
+    jinjuIndoorPreloadPromise = null;
+    jinjuRooftopGuestActivationStarted = false;
+    jinjuRooftopGuestScheduleRunCount = 0;
+    jinjuRooftopGuestSpawnToken += 1;
+    jinjuIndoorGuestSpawnComplete = false;
+    jinjuRamp1FHasBeenContacted = false;
+    jinjuOutdoorDisposedForIndoor = false;
+    jinjuIndoorDisposedForRooftop = false;
+    jinjuWasOnExternalGroundFloor = false;
+    jinjuWasOnRamp1F = false;
+    jinjuWasOnRamp2F = false;
+    resetJinjuIndoorGuestSession?.();
+    resetJinjuRooftopGuestSession?.();
+  }
+
+  function resetJinjuGuestSpawnStateForOrbit() {
+    jinjuOutdoorGuestSpawnToken += 1;
+    guestCharacterSystem?.disposeGuests?.({
+      onlyIds: [...getJinjuIndoorGuestIds(), ...getJinjuRooftopGuestIds()]
+    });
+    resetJinjuIndoorGuestLoadingState();
+  }
+
+  function resetJinjuTourGuestTriggerState() {
+    jinjuRamp1FHasBeenContacted = false;
+    jinjuOutdoorDisposedForIndoor = false;
+    jinjuIndoorDisposedForRooftop = false;
+    jinjuIndoorGuestSpawnComplete = false;
+    jinjuWasOnExternalGroundFloor = false;
+    jinjuWasOnRamp1F = false;
+    jinjuWasOnRamp2F = false;
+  }
+
+  function getGuestProjectKey(config) {
+    if (isAngjiProjectConfig(config)) {
+      return "angji";
+    }
+
+    if (isJinjuProjectConfig(config)) {
+      return "jinju";
+    }
+
+    return null;
+  }
+
+  function resetGuestProjectOnSwitch(previousConfig, nextConfig) {
+    const previousKey = getGuestProjectKey(previousConfig);
+    const nextKey = getGuestProjectKey(nextConfig);
+
+    if (!previousKey || previousKey === nextKey) {
+      return;
+    }
+
+    if (previousKey === "jinju") {
+      resetJinjuGuestSession();
+      resetJinjuIndoorGuestSession();
+      resetJinjuIndoorGuestLoadingState();
+      jinjuOutdoorGuestSpawnToken += 1;
+      guestCharacterSystem?.disposeGuests?.({ onlyIds: getJinjuAllGuestIds() });
+      console.info("[guests] cleared Jinju guests after project switch");
+    } else if (previousKey === "angji") {
+      angjiOutdoorGuestSpawnToken += 1;
+      angjiIndoorGuestSpawnToken += 1;
+      guestCharacterSystem?.disposeGuests?.({ onlyIds: getAngjiAllGuestIds() });
+      console.info("[guests] cleared Angji guests after project switch");
+    }
+
+    if (nextKey === "jinju") {
+      resetJinjuGuestSession();
+      resetJinjuIndoorGuestSession();
+      resetJinjuIndoorGuestLoadingState();
+      jinjuOutdoorGuestSpawnToken += 1;
+    }
+  }
+
+  async function preloadJinjuIndoorGuestsInBackground() {
+    // Disabled: background preload stacked 6 skinned GLBs on top of tour model + TPS and caused tab OOM/crash.
+    // Indoor guests load only via scheduleJinjuIndoorGuestSpawn() after ramp 1F contact.
+    return;
+  }
+
+  function meshMatchesJinjuIndoorRampPrefix(mesh, prefixes) {
+    if (!mesh) {
+      return false;
+    }
+
+    return getNormalizedMaterialNames(mesh).some((name) => (
+      angjiMaterialNameMatchesPrefix(name, prefixes)
+    ));
+  }
+
+  function isJinjuIndoorRamp1FMesh(mesh) {
+    if (!mesh) {
+      return false;
+    }
+
+    if (mesh.metadata?.angjiRampSurface && getAngjiRampFloorLevel(mesh) === 1) {
+      return true;
+    }
+
+    return meshMatchesJinjuIndoorRampPrefix(mesh, JINJU_INDOOR_RAMP_1F_PREFIXES);
+  }
+
+  function isJinjuIndoorRamp2FMesh(mesh) {
+    if (!mesh) {
+      return false;
+    }
+
+    if (mesh.metadata?.angjiRampSurface && getAngjiRampFloorLevel(mesh) === 2) {
+      return true;
+    }
+
+    return meshMatchesJinjuIndoorRampPrefix(mesh, JINJU_INDOOR_RAMP_2F_PREFIXES);
+  }
+
+  function getJinjuIndoorRampContactMesh(BABYLON, scene, position, groundMeshSet, isRampMesh) {
+    const locomotion = getWalkLocomotionState();
+
+    if (locomotion.onColRamp && isRampMesh(locomotion.hit?.pickedMesh)) {
+      return locomotion.hit.pickedMesh;
+    }
+
+    const candidateMeshes = [
+      locomotion.hit?.pickedMesh,
+      stepTargetHit?.pickedMesh,
+      lastStableGroundPose?.hit?.pickedMesh
+    ];
+
+    for (const mesh of candidateMeshes) {
+      if (isRampMesh(mesh)) {
+        return mesh;
+      }
+    }
+
+    const groundHit = findGroundHit(BABYLON, scene, position, groundMeshSet, {
+      referenceEyeY: position.y,
+      maxStepUp: MAX_RAMP_STEP_UP,
+      compactProbes: true,
+      groundSelect: { preferRampSurface: true }
+    });
+
+    if (isRampMesh(groundHit?.pickedMesh)) {
+      return groundHit.pickedMesh;
+    }
+
+    const eyeDownRay = new BABYLON.Ray(
+      position.clone(),
+      BABYLON.Vector3.Down(),
+      EYE_HEIGHT + 0.75
+    );
+    const eyeDownHit = scene.pickWithRay(
+      eyeDownRay,
+      (mesh) => groundMeshSet.has(mesh)
+        && mesh.isPickable !== false
+        && mesh.isEnabled()
+        && !isTourGuestMesh(mesh)
+    );
+
+    if (isRampMesh(eyeDownHit?.pickedMesh)) {
+      return eyeDownHit.pickedMesh;
+    }
+
+    return null;
+  }
+
+  function isJinjuPlayerContactingRamp1F() {
+    if (!walkMode || !isJinjuProjectConfig(activeModelState.config)) {
+      return false;
+    }
+
+    return Boolean(
+      getJinjuIndoorRampContactMesh(
+        BABYLON,
+        scene,
+        walkCamera.position,
+        localGroundMeshSet,
+        isJinjuIndoorRamp1FMesh
+      )
+    );
+  }
+
+  function isJinjuPlayerContactingRamp2F() {
+    if (!walkMode || !isJinjuProjectConfig(activeModelState.config)) {
+      return false;
+    }
+
+    return Boolean(
+      getJinjuIndoorRampContactMesh(
+        BABYLON,
+        scene,
+        walkCamera.position,
+        localGroundMeshSet,
+        isJinjuIndoorRamp2FMesh
+      )
+    );
+  }
+
+  function isJinjuExternalGroundFloorMesh(mesh) {
+    if (!mesh) {
+      return false;
+    }
+
+    if (mesh.metadata?.angjiExternalFloorSurface) {
+      return true;
+    }
+
+    return getNormalizedMaterialNames(mesh).some((name) => (
+      angjiMaterialNameMatchesPrefix(name, ANGJI_EXTERNAL_FLOOR_PREFIXES)
+    ));
+  }
+
+  function getJinjuPlayerGroundContactMesh(isSurfaceMesh) {
+    const locomotion = getWalkLocomotionState();
+
+    if (locomotion.onColRamp && isSurfaceMesh(locomotion.hit?.pickedMesh)) {
+      return locomotion.hit.pickedMesh;
+    }
+
+    const candidateMeshes = [
+      locomotion.hit?.pickedMesh,
+      stepTargetHit?.pickedMesh,
+      lastStableGroundPose?.hit?.pickedMesh
+    ];
+
+    for (const mesh of candidateMeshes) {
+      if (isSurfaceMesh(mesh)) {
+        return mesh;
+      }
+    }
+
+    const groundHit = findGroundHit(BABYLON, scene, walkCamera.position, localGroundMeshSet, {
+      referenceEyeY: walkCamera.position.y,
+      maxStepUp: MAX_RAMP_STEP_UP,
+      compactProbes: true
+    });
+
+    if (isSurfaceMesh(groundHit?.pickedMesh)) {
+      return groundHit.pickedMesh;
+    }
+
+    const eyeDownRay = new BABYLON.Ray(
+      walkCamera.position.clone(),
+      BABYLON.Vector3.Down(),
+      EYE_HEIGHT + 0.75
+    );
+    const eyeDownHit = scene.pickWithRay(
+      eyeDownRay,
+      (mesh) => localGroundMeshSet.has(mesh)
+        && mesh.isPickable !== false
+        && mesh.isEnabled()
+        && !isTourGuestMesh(mesh)
+    );
+
+    if (isSurfaceMesh(eyeDownHit?.pickedMesh)) {
+      return eyeDownHit.pickedMesh;
+    }
+
+    return null;
+  }
+
+  function isJinjuPlayerOnExternalGroundFloor() {
+    if (!walkMode || !isJinjuProjectConfig(activeModelState.config)) {
+      return false;
+    }
+
+    const contactMesh = getJinjuPlayerGroundContactMesh((mesh) => (
+      isJinjuExternalGroundFloorMesh(mesh)
+      && !isJinjuIndoorRamp1FMesh(mesh)
+      && !isJinjuIndoorRamp2FMesh(mesh)
+    ));
+
+    return Boolean(contactMesh);
+  }
+
+  function hasAnyJinjuIndoorGuests() {
+    return getJinjuIndoorGuestIds().some((guestId) => guestCharacterSystem?.isSpawned?.(guestId));
+  }
+
+  function hasAnyJinjuRooftopGuests() {
+    return getJinjuRooftopGuestIds().some((guestId) => guestCharacterSystem?.isSpawned?.(guestId));
+  }
+
+  function getJinjuRooftopMarkFromSpawnId(spawnId) {
+    return Number(String(spawnId).replace("Jinju-Rooftop-Mark-", ""));
+  }
+
+  function cancelJinjuIndoorGuestSpawn(reason) {
+    jinjuIndoorGuestSpawnToken += 1;
+    jinjuIndoorGuestActivationStarted = false;
+    jinjuIndoorGuestSpawnComplete = false;
+    guestCharacterSystem?.disposeGuests?.({ onlyIds: getJinjuIndoorGuestIds() });
+    console.info(`[jinju-indoor-guest] cancelled — ${reason}`);
+  }
+
+  function cancelJinjuRooftopGuestSpawn(reason) {
+    jinjuRooftopGuestSpawnToken += 1;
+    jinjuRooftopGuestActivationStarted = false;
+    guestCharacterSystem?.disposeGuests?.({ onlyIds: getJinjuRooftopGuestIds() });
+    console.info(`[jinju-rooftop-guest] cancelled — ${reason}`);
+  }
+
+  function disposeJinjuIndoorGuestsForRooftop() {
+    if (jinjuIndoorDisposedForRooftop) {
+      return;
+    }
+
+    guestCharacterSystem?.disposeGuests?.({ onlyIds: getJinjuIndoorGuestIds() });
+    jinjuIndoorDisposedForRooftop = true;
+    console.info("[jinju-rooftop-guest] indoor guests disposed after R10 reveal");
+  }
+
+  function disposeJinjuOutdoorGuestsForIndoor() {
+    if (jinjuOutdoorDisposedForIndoor) {
+      return;
+    }
+
+    guestCharacterSystem?.disposeGuests?.({ onlyIds: getJinjuOutdoorGuestIds() });
+    jinjuOutdoorDisposedForIndoor = true;
+    console.info("[jinju-indoor-guest] outdoor guests disposed after indoor spawn complete");
+  }
+
+  function restoreJinjuIndoorGuestsAfterRooftop(reason = "restore") {
+    if (!walkMode || !isJinjuProjectConfig(activeModelState.config) || !guestCharacterSystem) {
+      return;
+    }
+
+    if (!jinjuIndoorDisposedForRooftop) {
+      const spawnedIndoorIds = getJinjuIndoorGuestIds().filter((guestId) => (
+        guestCharacterSystem.isSpawned(guestId)
+      ));
+
+      if (spawnedIndoorIds.length) {
+        guestCharacterSystem.revealGuests(spawnedIndoorIds);
+      }
+
+      return;
+    }
+
+    jinjuIndoorDisposedForRooftop = false;
+    jinjuIndoorGuestActivationStarted = true;
+    console.info(`[jinju-indoor-guest] restoring after rooftop (${reason})`);
+    void scheduleJinjuIndoorGuestSpawn();
+  }
+
+  function ensureJinjuOutdoorGuestsVisibleInWalk(reason = "restore") {
+    if (!walkMode || !isJinjuProjectConfig(activeModelState.config) || !guestCharacterSystem) {
+      return;
+    }
+
+    const outdoorIds = getJinjuOutdoorGuestIds();
+    const missingOutdoor = outdoorIds.some((guestId) => !guestCharacterSystem.isSpawned(guestId));
+
+    if (!missingOutdoor) {
+      revealJinjuOutdoorGuestsIfSpawned();
+      return;
+    }
+
+    if (jinjuWalkOutdoorRestoreInFlight) {
+      return;
+    }
+
+    jinjuWalkOutdoorRestoreInFlight = true;
+    console.info(`[jinju-outdoor-guest] restoring outdoor guests (${reason})`);
+    void scheduleJinjuOutdoorGuestSpawn({ allowInWalk: true }).finally(() => {
+      jinjuWalkOutdoorRestoreInFlight = false;
+      jinjuOutdoorDisposedForIndoor = false;
+    });
+  }
+
+  function updateJinjuGuestFloorLifecycle() {
+    if (!walkMode || !isJinjuProjectConfig(activeModelState.config)) {
+      jinjuWasOnExternalGroundFloor = false;
+      jinjuWasOnRamp1F = false;
+      jinjuWasOnRamp2F = false;
+      return;
+    }
+
+    const onRamp1F = isJinjuPlayerContactingRamp1F();
+    const onRamp2F = isJinjuPlayerContactingRamp2F();
+    const onExternalFloor = isJinjuPlayerOnExternalGroundFloor();
+
+    if (onRamp1F && !jinjuWasOnRamp1F) {
+      if (jinjuRooftopGuestActivationStarted && !jinjuIndoorDisposedForRooftop) {
+        cancelJinjuRooftopGuestSpawn("ramp 1F during rooftop spawn before R10");
+      } else if (
+        jinjuIndoorGuestSpawnComplete
+        && (hasAnyJinjuRooftopGuests() || jinjuRooftopGuestActivationStarted)
+      ) {
+        cancelJinjuRooftopGuestSpawn("ramp 1F descent — indoor spawn complete, clearing rooftop");
+        restoreJinjuIndoorGuestsAfterRooftop("ramp 1F descent");
+      } else if (!jinjuIndoorGuestActivationStarted) {
+        jinjuRamp1FHasBeenContacted = true;
+        jinjuIndoorGuestActivationStarted = true;
+        console.info("[jinju-indoor-guest] ramp 1F contact — starting indoor guest spawn");
+        void scheduleJinjuIndoorGuestSpawn();
+      }
+    }
+
+    if (onRamp2F && !jinjuWasOnRamp2F) {
+      const returningFromRooftop = jinjuIndoorDisposedForRooftop
+        && (jinjuRooftopGuestActivationStarted || hasAnyJinjuRooftopGuests());
+
+      if (returningFromRooftop) {
+        cancelJinjuRooftopGuestSpawn("ramp 2F descent — restoring indoor guests");
+        restoreJinjuIndoorGuestsAfterRooftop("ramp 2F descent");
+      } else {
+        const rooftopStuck = jinjuRooftopGuestActivationStarted && !hasAnyJinjuRooftopGuests();
+        if (!jinjuRooftopGuestActivationStarted || rooftopStuck) {
+          if (rooftopStuck) {
+            console.warn("[jinju-rooftop-guest] ramp 2F contact — retrying stuck rooftop activation");
+            jinjuRooftopGuestActivationStarted = false;
+          }
+          jinjuRooftopGuestActivationStarted = true;
+          console.info(`[jinju-rooftop-guest] ramp 2F contact — starting rooftop guest spawn (${JINJU_ROOFTOP_GUEST_CONFIG_VERSION})`);
+          void scheduleJinjuRooftopGuestSpawn();
+        }
+      }
+    }
+
+    if (onExternalFloor && !jinjuWasOnExternalGroundFloor) {
+      const hadRooftop = jinjuRooftopGuestActivationStarted || hasAnyJinjuRooftopGuests();
+      const hadIndoor = jinjuIndoorGuestActivationStarted || hasAnyJinjuIndoorGuests();
+      const shouldResetIndoor = jinjuRamp1FHasBeenContacted || hadIndoor;
+      const shouldRestoreOutdoor = hadRooftop || shouldResetIndoor || jinjuOutdoorDisposedForIndoor;
+
+      if (hadRooftop) {
+        cancelJinjuRooftopGuestSpawn("external ground contact");
+      }
+
+      if (shouldResetIndoor) {
+        cancelJinjuIndoorGuestSpawn("external ground contact");
+      }
+
+      if (shouldRestoreOutdoor) {
+        ensureJinjuOutdoorGuestsVisibleInWalk("external ground contact");
+      }
+
+      resetJinjuTourGuestTriggerState();
+    }
+
+    jinjuWasOnRamp1F = onRamp1F;
+    jinjuWasOnRamp2F = onRamp2F;
+    jinjuWasOnExternalGroundFloor = onExternalFloor;
+  }
+
+  function preloadJinjuGuests() {
+    if (!isJinjuProjectConfig(activeModelState.config)) {
+      return;
+    }
+
+    // Orbit outdoor only — indoor guests load on ramp contact to avoid OOM (building + TPS + N GLBs).
+    const run = () => {
+      void guestCharacterSystem?.preload(getJinjuFixedGuestSpawns(), { parallel: false, showOnLoad: false });
+    };
+
+    if (typeof window.requestIdleCallback === "function") {
+      window.requestIdleCallback(run, { timeout: 4000 });
+      return;
+    }
+
+    window.setTimeout(run, 2000);
+  }
+
+  function preloadProjectGuests() {
+    if (isAngjiProjectConfig(activeModelState.config)) {
+      preloadAngjiOrbitGuests();
+      return;
+    }
+
+    if (isJinjuProjectConfig(activeModelState.config)) {
+      preloadJinjuGuests();
+    }
+  }
+
+  /** Jinju orbit: outdoor + rooftop. Tour: outdoor until indoor complete, then indoor/rooftop by ramp. */
   function canUseAngjiOutdoorGuests() {
-    return !walkMode && isAngjiProjectConfig(activeModelState.config);
+    return isAngjiProjectConfig(activeModelState.config);
   }
 
   function canUseAngjiIndoorGuests() {
     return walkMode && isAngjiProjectConfig(activeModelState.config);
   }
+
+  function canUseJinjuOutdoorGuests() {
+    return !walkMode && isJinjuProjectConfig(activeModelState.config);
+  }
+
+  function canUseJinjuIndoorGuests() {
+    return walkMode && isJinjuProjectConfig(activeModelState.config);
+  }
+
+  function canUseJinjuGuests() {
+    return isJinjuProjectConfig(activeModelState.config);
+  }
+
+  function revealJinjuOutdoorGuestsIfSpawned() {
+    if (!guestCharacterSystem || !isJinjuProjectConfig(activeModelState.config)) {
+      return;
+    }
+
+    const spawnedOutdoorIds = getJinjuOutdoorGuestIds().filter((guestId) => (
+      guestCharacterSystem.isSpawned(guestId)
+    ));
+
+    if (!spawnedOutdoorIds.length) {
+      return;
+    }
+
+    guestCharacterSystem.revealGuests(spawnedOutdoorIds);
+  }
+
+  function shouldSpawnJinjuOutdoorGuestsInWalk() {
+    if (!walkMode || !isJinjuProjectConfig(activeModelState.config)) {
+      return false;
+    }
+
+    // Indoor spawn complete disposes outdoor until the player returns to external ground.
+    if (jinjuOutdoorDisposedForIndoor) {
+      return false;
+    }
+
+    return true;
+  }
+
+  function ensureJinjuWalkTourOutdoorGuests(reason = "walk tour") {
+    if (!shouldSpawnJinjuOutdoorGuestsInWalk() || !guestCharacterSystem) {
+      return;
+    }
+
+    const missingOutdoor = getJinjuOutdoorGuestIds().some((guestId) => (
+      !guestCharacterSystem.isSpawned(guestId)
+    ));
+
+    if (!missingOutdoor) {
+      revealJinjuOutdoorGuestsIfSpawned();
+      return;
+    }
+
+    ensureJinjuOutdoorGuestsVisibleInWalk(reason);
+  }
+
+  let jinjuWalkOutdoorRestoreInFlight = false;
 
   function yieldFrames(frameCount = 2) {
     return new Promise((resolve) => {
@@ -4417,14 +5193,26 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
       return;
     }
 
+    const spawnToken = ++angjiOutdoorGuestSpawnToken;
+    guestCharacterSystem?.hide({ onlyIds: getJinjuAllGuestIds() });
+
     const allOutdoorSpawns = getAngjiOutdoorGuestSpawns();
     const outdoorBackgroundSpawns = getAngjiOutdoorBackgroundGuestSpawns();
 
     try {
       await guestCharacterSystem.ensureSpawned(allOutdoorSpawns, { parallel: true, showOnLoad: false });
+
+      if (spawnToken !== angjiOutdoorGuestSpawnToken) {
+        return;
+      }
+
       guestCharacterSystem.revealGuests(ANGJI_PRIORITY_GUEST_IDS);
 
       for (const spawn of outdoorBackgroundSpawns) {
+        if (spawnToken !== angjiOutdoorGuestSpawnToken) {
+          return;
+        }
+
         await yieldFrames(getBackgroundGuestLoadYieldFrames(spawn.id));
         guestCharacterSystem.revealGuest(spawn.id);
 
@@ -4443,7 +5231,315 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     if (canUseAngjiOutdoorGuests()) {
       void scheduleOutdoorGuestSpawn();
     }
+
+    if (canUseJinjuOutdoorGuests()) {
+      void scheduleJinjuOrbitGuests();
+    }
   };
+
+  async function scheduleJinjuOrbitGuests() {
+    if (!isJinjuProjectConfig(activeModelState.config) || walkMode) {
+      return;
+    }
+
+    await scheduleJinjuOutdoorGuestSpawn();
+    await scheduleJinjuRooftopGuestSpawn({ allowInOrbit: true });
+  }
+
+  async function scheduleJinjuOutdoorGuestSpawn(options = {}) {
+    if (!isJinjuProjectConfig(activeModelState.config)) {
+      guestCharacterSystem?.hide({ onlyIds: getJinjuOutdoorGuestIds() });
+      return;
+    }
+
+    if (walkMode && !options.allowInWalk) {
+      return;
+    }
+
+    const spawnToken = ++jinjuOutdoorGuestSpawnToken;
+    guestCharacterSystem?.hide({ onlyIds: getAngjiAllGuestIds() });
+
+    try {
+      await guestCharacterSystem.ensureSpawned(getJinjuFixedGuestSpawns(), {
+        parallel: false,
+        showOnLoad: false
+      });
+
+      if (spawnToken !== jinjuOutdoorGuestSpawnToken) {
+        return;
+      }
+
+      for (const spawn of getJinjuFixedGuestSpawns()) {
+        if (!guestCharacterSystem.isSpawned(spawn.id)) {
+          console.error(`[jinju-outdoor-guest] failed to load fixed guest ${spawn.id} (${spawn.file})`);
+        }
+      }
+
+      guestCharacterSystem.revealGuests(JINJU_PRIORITY_GUEST_IDS);
+
+      for (const spawn of getJinjuOutdoorBackgroundGuestSpawns()) {
+        if (spawnToken !== jinjuOutdoorGuestSpawnToken) {
+          return;
+        }
+
+        await guestCharacterSystem.ensureSpawned([spawn], { parallel: false, showOnLoad: false });
+        await yieldFrames(getJinjuGuestLoadYieldFrames(spawn.id));
+        guestCharacterSystem.revealGuest(spawn.id);
+
+        const delayMs = getJinjuGuestRevealDelayMs(spawn.id);
+
+        if (delayMs > 0) {
+          await wait(delayMs);
+        }
+      }
+    } catch (error) {
+      console.error("Jinju outdoor guest spawn failed", error);
+    }
+  }
+
+  function logJinjuIndoorGuestReveal(spawn) {
+    const guest = guestCharacterSystem?.getGuests?.().find((entry) => entry.spawn.id === spawn.id);
+    const y = guest?.resolvedSpawn?.position?.y ?? spawn.position.y;
+    console.info(`[jinju-indoor-guest] revealed ${spawn.id} at y=${typeof y === "number" ? y.toFixed(2) : y}`);
+  }
+
+  function logJinjuRooftopGuestReveal(spawn) {
+    const guest = guestCharacterSystem?.getGuests?.().find((entry) => entry.spawn.id === spawn.id);
+    const y = guest?.resolvedSpawn?.position?.y ?? spawn.position.y;
+    console.info(`[jinju-rooftop-guest] revealed ${spawn.id} at y=${typeof y === "number" ? y.toFixed(2) : y}`);
+  }
+
+  async function scheduleJinjuRooftopGuestSpawn(options = {}) {
+    const allowInOrbit = Boolean(options.allowInOrbit);
+
+    if (!isJinjuProjectConfig(activeModelState.config)) {
+      guestCharacterSystem?.hide({ onlyIds: getJinjuRooftopGuestIds() });
+      jinjuRooftopGuestActivationStarted = false;
+      return;
+    }
+
+    if (walkMode) {
+      if (!canUseJinjuIndoorGuests()) {
+        guestCharacterSystem?.hide({ onlyIds: getJinjuRooftopGuestIds() });
+        jinjuRooftopGuestActivationStarted = false;
+        return;
+      }
+    } else if (!allowInOrbit) {
+      return;
+    }
+
+    const spawnToken = ++jinjuRooftopGuestSpawnToken;
+    jinjuRooftopGuestScheduleRunCount += 1;
+    const scheduleRunId = jinjuRooftopGuestScheduleRunCount;
+    const sequentialSpawns = getJinjuRooftopSequentialGuestSpawns();
+    const simultaneousIds = new Set(JINJU_ROOFTOP_SIMULTANEOUS_GUEST_IDS);
+    let revealedAny = false;
+    let pendingSimultaneous = [];
+
+    console.info(`[jinju-rooftop-guest] schedule run #${scheduleRunId} start (token=${spawnToken})`);
+
+    const flushSimultaneousGroup = () => {
+      if (pendingSimultaneous.length !== JINJU_ROOFTOP_SIMULTANEOUS_GUEST_IDS.length) {
+        return;
+      }
+
+      guestCharacterSystem.revealGuests(
+        pendingSimultaneous.map((spawn) => spawn.id),
+        { syncAnimations: true }
+      );
+      pendingSimultaneous.forEach((spawn) => {
+        revealedAny = true;
+        logJinjuRooftopGuestReveal(spawn);
+      });
+      pendingSimultaneous = [];
+    };
+
+    try {
+      for (const spawn of sequentialSpawns) {
+        if (spawnToken !== jinjuRooftopGuestSpawnToken) {
+          return;
+        }
+
+        if (walkMode && !canUseJinjuIndoorGuests()) {
+          return;
+        }
+
+        if (guestCharacterSystem?.isSpawned?.(spawn.id)) {
+          if (simultaneousIds.has(spawn.id)) {
+            pendingSimultaneous.push(spawn);
+            flushSimultaneousGroup();
+          } else {
+            guestCharacterSystem.revealGuest(spawn.id);
+            revealedAny = true;
+            logJinjuRooftopGuestReveal(spawn);
+          }
+        } else {
+          await yieldFrames(getJinjuRooftopGuestLoadYieldFrames(spawn.id));
+          await guestCharacterSystem.ensureSpawned([spawn], { parallel: false, showOnLoad: false });
+
+          if (spawnToken !== jinjuRooftopGuestSpawnToken) {
+            return;
+          }
+
+          if (simultaneousIds.has(spawn.id)) {
+            pendingSimultaneous.push(spawn);
+            flushSimultaneousGroup();
+          } else {
+            guestCharacterSystem.revealGuest(spawn.id);
+            revealedAny = true;
+            logJinjuRooftopGuestReveal(spawn);
+          }
+        }
+
+        const markNumber = getJinjuRooftopMarkFromSpawnId(spawn.id);
+
+        if (walkMode && markNumber === 10) {
+          disposeJinjuIndoorGuestsForRooftop();
+        }
+
+        const delayMs = getJinjuRooftopGuestRevealDelayMs(spawn.id);
+
+        if (delayMs > 0) {
+          await wait(delayMs);
+        }
+      }
+    } catch (error) {
+      console.error("Jinju rooftop guest spawn failed", error);
+    } finally {
+      if (spawnToken !== jinjuRooftopGuestSpawnToken) {
+        return;
+      }
+
+      if (revealedAny) {
+        console.info(`[jinju-rooftop-guest] schedule run #${scheduleRunId} complete — spawn-once latch held`);
+        return;
+      }
+
+      jinjuRooftopGuestActivationStarted = false;
+    }
+  }
+
+  async function scheduleJinjuIndoorGuestSpawn() {
+    if (!canUseJinjuIndoorGuests()) {
+      guestCharacterSystem?.hide({ onlyIds: getJinjuIndoorGuestIds() });
+      jinjuIndoorGuestActivationStarted = false;
+      return;
+    }
+
+    const spawnToken = ++jinjuIndoorGuestSpawnToken;
+    jinjuIndoorPreloadToken += 1;
+    jinjuIndoorGuestScheduleRunCount += 1;
+    const scheduleRunId = jinjuIndoorGuestScheduleRunCount;
+
+    console.info(`[jinju-indoor-guest] schedule run #${scheduleRunId} start (token=${spawnToken})`);
+
+    const prioritySpawns = getJinjuIndoorPriorityGuestSpawns();
+    const backgroundSpawns = getJinjuIndoorBackgroundGuestSpawns();
+    let revealedAny = false;
+
+    try {
+      for (const spawn of prioritySpawns) {
+        if (spawnToken !== jinjuIndoorGuestSpawnToken || !canUseJinjuIndoorGuests()) {
+          return;
+        }
+
+        if (guestCharacterSystem?.isSpawned?.(spawn.id)) {
+          guestCharacterSystem.revealGuest(spawn.id);
+          revealedAny = true;
+          logJinjuIndoorGuestReveal(spawn);
+          continue;
+        }
+
+        await yieldFrames(getJinjuIndoorGuestLoadYieldFrames(spawn.id));
+        await guestCharacterSystem.ensureSpawned([spawn], { parallel: false, showOnLoad: false });
+
+        if (spawnToken !== jinjuIndoorGuestSpawnToken) {
+          return;
+        }
+
+        guestCharacterSystem.revealGuest(spawn.id);
+        revealedAny = true;
+        logJinjuIndoorGuestReveal(spawn);
+      }
+
+      for (const spawn of backgroundSpawns) {
+        if (spawnToken !== jinjuIndoorGuestSpawnToken || !canUseJinjuIndoorGuests()) {
+          return;
+        }
+
+        if (guestCharacterSystem?.isSpawned?.(spawn.id)) {
+          await yieldFrames(getJinjuIndoorGuestLoadYieldFrames(spawn.id));
+          guestCharacterSystem.revealGuest(spawn.id);
+          revealedAny = true;
+          logJinjuIndoorGuestReveal(spawn);
+        } else {
+          await yieldFrames(getJinjuIndoorGuestLoadYieldFrames(spawn.id));
+          await guestCharacterSystem.ensureSpawned([spawn], { parallel: false, showOnLoad: false });
+
+          if (spawnToken !== jinjuIndoorGuestSpawnToken) {
+            return;
+          }
+
+          await yieldFrames(getJinjuIndoorGuestLoadYieldFrames(spawn.id));
+          guestCharacterSystem.revealGuest(spawn.id);
+          revealedAny = true;
+          logJinjuIndoorGuestReveal(spawn);
+        }
+
+        const delayMs = getJinjuIndoorGuestRevealDelayMs(spawn.id);
+
+        if (delayMs > 0) {
+          await wait(delayMs);
+        }
+      }
+    } catch (error) {
+      console.error("Jinju indoor guest spawn failed", error);
+    } finally {
+      if (spawnToken !== jinjuIndoorGuestSpawnToken) {
+        return;
+      }
+
+      if (revealedAny) {
+        jinjuIndoorGuestSpawnAttempts = 0;
+        jinjuIndoorGuestSpawnRetryAfter = 0;
+        jinjuIndoorGuestSpawnComplete = true;
+        disposeJinjuOutdoorGuestsForIndoor();
+        console.info(
+          `[jinju-indoor-guest] schedule run #${scheduleRunId} complete — spawn-once latch held (audit: auditJinjuGuestState())`
+        );
+        return;
+      }
+
+      jinjuIndoorGuestActivationStarted = false;
+      jinjuIndoorGuestSpawnAttempts += 1;
+
+      if (jinjuIndoorGuestSpawnAttempts >= JINJU_INDOOR_GUEST_MAX_SPAWN_ATTEMPTS) {
+        console.warn(
+          `[jinju-indoor-guest] spawn gave up after ${JINJU_INDOOR_GUEST_MAX_SPAWN_ATTEMPTS} attempts`
+        );
+        return;
+      }
+
+      jinjuIndoorGuestSpawnRetryAfter = performance.now() + JINJU_INDOOR_GUEST_SPAWN_RETRY_COOLDOWN_MS;
+      console.warn(
+        `[jinju-indoor-guest] spawn attempt ${jinjuIndoorGuestSpawnAttempts}/${JINJU_INDOOR_GUEST_MAX_SPAWN_ATTEMPTS} failed; retry in ${JINJU_INDOOR_GUEST_SPAWN_RETRY_COOLDOWN_MS}ms`
+      );
+    }
+  }
+
+  async function scheduleJinjuGuestSpawn() {
+    if (!canUseJinjuGuests()) {
+      guestCharacterSystem?.hide({ onlyIds: getJinjuAllGuestIds() });
+      return;
+    }
+
+    if (walkMode) {
+      void scheduleJinjuIndoorGuestSpawn();
+      return;
+    }
+
+    void scheduleJinjuOutdoorGuestSpawn();
+  }
 
   async function scheduleIndoorGuestSpawn() {
     if (!canUseAngjiIndoorGuests()) {
@@ -4451,13 +5547,19 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
       return;
     }
 
+    const spawnToken = ++angjiIndoorGuestSpawnToken;
     guestCharacterSystem.hide({ onlyIds: getAngjiIndoorGuestIds() });
+    guestCharacterSystem?.hide({ onlyIds: getJinjuAllGuestIds() });
 
     const allIndoorSpawns = getAngjiIndoorGuestSpawns();
     const backgroundSpawns = getAngjiIndoorBackgroundGuestSpawns();
 
     try {
       await guestCharacterSystem.ensureSpawned(allIndoorSpawns, { parallel: true, showOnLoad: false });
+
+      if (spawnToken !== angjiIndoorGuestSpawnToken) {
+        return;
+      }
 
       const simultaneousGuests = guestCharacterSystem
         .getGuests()
@@ -4469,6 +5571,10 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
       }
 
       for (const spawn of backgroundSpawns) {
+        if (spawnToken !== angjiIndoorGuestSpawnToken) {
+          return;
+        }
+
         await yieldFrames(getBackgroundGuestLoadYieldFrames(spawn.id));
         guestCharacterSystem.revealGuest(spawn.id);
 
@@ -4562,6 +5668,49 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     console.info("[angji-tour-audit]", report?.summary || "no model");
     console.table(report?.summary || {});
     return report;
+  };
+
+  window.auditJinjuGuestState = () => {
+    const audit = guestCharacterSystem?.getGuestSceneAudit?.() ?? {};
+    const report = {
+      ...audit,
+      indoor: {
+        activationStarted: jinjuIndoorGuestActivationStarted,
+        scheduleRunCount: jinjuIndoorGuestScheduleRunCount,
+        spawnAttempts: jinjuIndoorGuestSpawnAttempts,
+        maxSpawnAttempts: JINJU_INDOOR_GUEST_MAX_SPAWN_ATTEMPTS,
+        retryInMs: Math.max(0, Math.round(jinjuIndoorGuestSpawnRetryAfter - performance.now())),
+        walkMode,
+        project: activeModelState.config?.file ?? "-",
+        activeGuestMaxMark: JINJU_INDOOR_ACTIVE_GUEST_MAX_MARK
+      }
+    };
+
+    console.info("[jinju-guest-audit]", report);
+    console.table({
+      guests: report.guestCount,
+      enabled: report.enabledGuestCount,
+      tourGuestMeshes: report.tourGuestMeshCount,
+      animationGroups: report.animationGroupCount,
+      skeletons: report.skeletonCount,
+      renderObservers: report.renderObserverCount,
+      scheduleRuns: report.indoor.scheduleRunCount,
+      revealStarted: report.revealAnimStartedCount,
+      revealSkipped: report.revealAnimSkippedCount,
+      spawnAttempts: report.indoor.spawnAttempts,
+      retryInMs: report.indoor.retryInMs
+    });
+
+    return report;
+  };
+
+  window.jinjuIndoorGuestTestInfo = () => {
+    const audit = window.auditJinjuGuestState();
+    console.info(
+      "[jinju-indoor-guest] manual test — ramp 1F climb after guests appear; "
+      + "scheduleRunCount must stay 1; revealSkipped should rise if re-reveal blocked"
+    );
+    return audit;
   };
 
   function clearMovementKeys() {
@@ -4848,14 +5997,28 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     lastLocalMeshPosition = null;
     lastTreeViewerPosition = null;
     treeFacingFrameCounter = 0;
+    const previousConfig = activeModelState?.config;
+    resetGuestProjectOnSwitch(previousConfig, nextModelState.config);
+
     activeModelState = nextModelState;
-    preloadAngjiOrbitGuests();
+    preloadProjectGuests();
 
     if (isAngjiProjectConfig(nextModelState.config)) {
       if (walkMode) {
         void scheduleIndoorGuestSpawn();
+        void scheduleOutdoorGuestSpawn();
       } else {
         void scheduleOutdoorGuestSpawn();
+      }
+    } else if (isJinjuProjectConfig(nextModelState.config)) {
+      if (walkMode) {
+        guestCharacterSystem?.disposeGuests({
+          onlyIds: [...getJinjuIndoorGuestIds(), ...getJinjuRooftopGuestIds()]
+        });
+        resetJinjuIndoorGuestLoadingState();
+        ensureJinjuWalkTourOutdoorGuests("model state walk");
+      } else {
+        void scheduleJinjuOrbitGuests();
       }
     } else {
       guestCharacterSystem?.hide();
@@ -5519,6 +6682,14 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     setStatus("Third-person walk mode active. WASD moves, Shift runs, Space jumps, J jump-over test, E throws, P dances, mouse looks, wheel zooms. Use Orbit View to return.");
     updateModeSwitchButtons();
     updateDebug();
+
+    if (isJinjuProjectConfig(activeModelState.config)) {
+      guestCharacterSystem?.disposeGuests({
+        onlyIds: [...getJinjuIndoorGuestIds(), ...getJinjuRooftopGuestIds()]
+      });
+      resetJinjuIndoorGuestLoadingState();
+      ensureJinjuWalkTourOutdoorGuests("enter walk mode");
+    }
   }
 
   function enterOrbitMode() {
@@ -5527,8 +6698,13 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     clearFireballs();
     resetEnemy();
 
+    const orbitModelState = activeModelState.orbitModelState || activeModelState;
+    const willSkipModelSwitch = orbitModelState === activeModelState;
+
     if (isAngjiProjectConfig(activeModelState.config)) {
       guestCharacterSystem?.hide({ onlyIds: getAngjiIndoorGuestIds() });
+    } else if (isJinjuProjectConfig(activeModelState.config)) {
+      resetJinjuGuestSpawnStateForOrbit();
     } else {
       guestCharacterSystem?.hide();
     }
@@ -5537,7 +6713,11 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     tpsSystem?.hide?.();
     document.exitPointerLock?.();
     const leavingTourConfig = activeModelState.config;
-    activateModelState(activeModelState.orbitModelState || activeModelState, "orbit");
+    activateModelState(orbitModelState, "orbit");
+
+    if (isJinjuProjectConfig(orbitModelState.config) && willSkipModelSwitch) {
+      void scheduleJinjuOrbitGuests();
+    }
     options.tourBgm?.onEnterOrbitMode(leavingTourConfig);
     orbitCamera.attachControl(canvas, false);
     scene.activeCamera = orbitCamera;
@@ -5862,6 +7042,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     updateFireballs(deltaScale);
     updateEnemy(deltaScale);
     guestCharacterSystem?.update(deltaScale);
+    updateJinjuGuestFloorLifecycle();
 
     if (isWalkCameraOutsideTourBounds()) {
       resetTourWithFade("out of bounds");
@@ -6120,13 +7301,18 @@ async function loadTourModelState(BABYLON, scene, config) {
     }
     const angjiBuildingFloor1Surface = hasColLayer && hasAngjiBuildingFloor1Material(mesh);
     const angjiBuildingFloor2Surface = hasColLayer && hasAngjiBuildingFloor2Material(mesh);
+    const angjiBuildingFloor3Surface = hasColLayer && hasAngjiBuildingFloor3Material(mesh);
     const angjiExternalFloorSurface = hasColLayer && hasAngjiExternalFloorMaterial(mesh);
-    const angjiFloorSurface = angjiBuildingFloor1Surface || angjiBuildingFloor2Surface || angjiExternalFloorSurface;
+    const angjiFloorSurface = angjiBuildingFloor1Surface
+      || angjiBuildingFloor2Surface
+      || angjiBuildingFloor3Surface
+      || angjiExternalFloorSurface;
     const angjiWallSurface = hasColLayer && hasAngjiWallMaterial(mesh);
     const angjiCameraBlockingSurface = angjiWallSurface
       || angjiFurnitureSurface
       || angjiBuildingFloor1Surface
-      || angjiBuildingFloor2Surface;
+      || angjiBuildingFloor2Surface
+      || angjiBuildingFloor3Surface;
     const passThrough = hasColLayer ? !angjiCollisionLayer : (propPassThrough || furniture);
     const peopleTarget = isPeopleFireballTarget(mesh);
 
@@ -6161,9 +7347,11 @@ async function loadTourModelState(BABYLON, scene, config) {
       angjiFloorSurface,
       angjiBuildingFloor1Surface,
       angjiBuildingFloor2Surface,
+      angjiBuildingFloor3Surface,
       angjiExternalFloorSurface,
       angjiCameraBlockingSurface,
       angjiCameraBlockingRequiresWallNormal: angjiBuildingFloor2Surface
+        || angjiBuildingFloor3Surface
     };
 
     if (hasColLayer && angjiCollisionLayer) {
@@ -6233,6 +7421,20 @@ async function loadTourModelState(BABYLON, scene, config) {
       && mesh.metadata?.angjiBuildingFloor1Surface
     ))
     : [];
+  const angjiBuildingFloor2Meshes = hasColLayer
+    ? meshes.filter((mesh) => (
+      mesh.isEnabled()
+      && !isDescendantOf(mesh, model.tourStartNode)
+      && mesh.metadata?.angjiBuildingFloor2Surface
+    ))
+    : [];
+  const angjiBuildingFloor3Meshes = hasColLayer
+    ? meshes.filter((mesh) => (
+      mesh.isEnabled()
+      && !isDescendantOf(mesh, model.tourStartNode)
+      && mesh.metadata?.angjiBuildingFloor3Surface
+    ))
+    : [];
   const angjiExternalFloorMeshes = hasColLayer
     ? meshes.filter((mesh) => (
       mesh.isEnabled()
@@ -6295,6 +7497,8 @@ async function loadTourModelState(BABYLON, scene, config) {
     stairSurfaceMeshes,
     floorSurfaceMeshes,
     angjiBuildingFloor1Meshes,
+    angjiBuildingFloor2Meshes,
+    angjiBuildingFloor3Meshes,
     angjiExternalFloorMeshes,
     peopleTargetMeshes,
     treeMeshes,

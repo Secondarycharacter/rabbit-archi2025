@@ -237,6 +237,8 @@ export function createRootMotionNeutralizer(BABYLON, asset) {
       return;
     }
 
+    const tempLocalPosition = new BABYLON.Vector3();
+
     asset.meshes.forEach((mesh) => {
       const skeleton = mesh.skeleton;
       if (!skeleton) {
@@ -253,7 +255,8 @@ export function createRootMotionNeutralizer(BABYLON, asset) {
           return;
         }
 
-        bone.setPosition(rest.clone(), BABYLON.Space.LOCAL);
+        tempLocalPosition.copyFrom(rest);
+        bone.setPosition(tempLocalPosition, BABYLON.Space.LOCAL);
       });
     });
 

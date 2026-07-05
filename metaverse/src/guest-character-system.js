@@ -1,4 +1,10 @@
 import {
+  createGuestDevLabel,
+  disposeGuestDevLabel,
+  setGuestDevLabelVisible,
+  updateGuestDevLabelHeight
+} from "./guest-dev-label.js?v=jinju-guest-label-scale-fix-20260705";
+import {
   createRootMotionNeutralizer,
   stripLocomotionRootMotion
 } from "./controllers/RootMotionNeutralizer.js?v=guest-root-motion-20260705";
@@ -10,6 +16,27 @@ const PATROL_DEFAULT_DECEL_DISTANCE = 2.8;
 const PATROL_MIN_SPEED_FACTOR = 0.15;
 const PATROL_ACCEL_RATE = 0.024;
 const PATROL_DEPART_TURN_SPEED = 0.14;
+
+function applyGuestMeshCollisionFlags(mesh, guestId) {
+  mesh.isPickable = false;
+  mesh.checkCollisions = false;
+  mesh.metadata = {
+    ...(mesh.metadata || {}),
+    passThrough: true,
+    tourGuest: true,
+    guestId
+  };
+}
+
+function applyGuestTreeCollisionFlags(root, guestId) {
+  if (typeof root?.getChildMeshes !== "function") {
+    return;
+  }
+
+  root.getChildMeshes(true).forEach((mesh) => {
+    applyGuestMeshCollisionFlags(mesh, guestId);
+  });
+}
 
 function normalizeAngle(angle) {
   let normalized = angle % (Math.PI * 2);
@@ -77,6 +104,15 @@ function resolveClip(animationGroups, clipName) {
     return exact;
   }
 
+  const compactTarget = normalized.replace(/[_\s-]/g, "");
+  const compactMatch = animationGroups.find((group) => (
+    normalizeClipName(group.name).replace(/[_\s-]/g, "") === compactTarget
+  ));
+
+  if (compactMatch) {
+    return compactMatch;
+  }
+
   return animationGroups.find((group) => (
     group.targetedAnimations?.some((targeted) => (
       normalizeClipName(targeted.animation?.name) === normalized
@@ -127,17 +163,28 @@ function getGuestLocomotionClipNames(spawn) {
   ].filter(Boolean);
 }
 
-function stripGuestLocomotionRootMotion(BABYLON, animationGroups, spawn) {
-  stripLocomotionRootMotion(BABYLON, animationGroups);
-
+function getGuestRootMotionClipNames(spawn) {
   const locomotionClips = getGuestLocomotionClipNames(spawn);
+  const animationClips = spawn.animation?.clips || [];
 
-  if (!locomotionClips.length) {
+  return [...new Set([...animationClips, ...locomotionClips])];
+}
+
+function stripGuestLocomotionRootMotion(BABYLON, animationGroups, spawn) {
+  if (spawn?.movement?.type === "rootMotion") {
+    // rootMotion guests intentionally keep translation keys; we apply them to the root transform at runtime.
     return;
   }
 
-  stripLocomotionRootMotion(BABYLON, animationGroups, locomotionClips, {
-    forceStripAllPosition: true
+  const clipNames = getGuestRootMotionClipNames(spawn);
+
+  if (!clipNames.length) {
+    stripLocomotionRootMotion(BABYLON, animationGroups, ["Idle", "IDLE", "Walking"]);
+    return;
+  }
+
+  stripLocomotionRootMotion(BABYLON, animationGroups, clipNames, {
+    forceStripAllPosition: spawn.movement?.type === "patrol"
   });
 }
 
@@ -290,14 +337,21 @@ function playGuestAnimation(guest) {
   }
 
   if (animation.type === "loop") {
-    const group = resolveClip(animationGroups, animation.clips[0]);
+    const clipCandidates = animation.clipAliases?.length
+      ? animation.clipAliases
+      : animation.clips;
 
-    if (!group) {
-        warnMissingClip(guest, animation.clips[0]);
+    for (const clipName of clipCandidates) {
+      const group = resolveClip(animationGroups, clipName);
+
+      if (group) {
+        startGuestClip(guest, group, true);
         return;
       }
 
-    startGuestClip(guest, group, true);
+      warnMissingClip(guest, clipName);
+    }
+
     return;
   }
 
@@ -423,10 +477,89 @@ function playSyncedSequenceAnimations(guests) {
   playClipIndex(0);
 }
 
+function pickRandomSpeedRatio(minRatio, maxRatio, step) {
+  const ratios = [];
+  const stepCount = Math.round((maxRatio - minRatio) / step);
+
+  for (let index = 0; index <= stepCount; index += 1) {
+    ratios.push(minRatio + index * step);
+  }
+
+  return ratios[Math.floor(Math.random() * ratios.length)];
+}
+
+function resolvePatrolBaseSpeed(movement) {
+  return movement.speed ?? 0.135;
+}
+
+function pickNextPatrolCycleSpeedRatio(movement, currentRatio) {
+  const minRatio = movement.speedRatioMin ?? 0.1;
+  const maxRatio = movement.speedRatioMax ?? 0.3;
+  const step = movement.speedRatioStep ?? 0.1;
+
+  if (typeof currentRatio !== "number") {
+    return pickRandomSpeedRatio(minRatio, maxRatio, step);
+  }
+
+  const choices = [currentRatio];
+
+  if (currentRatio + step <= maxRatio + 0.0001) {
+    choices.push(currentRatio + step);
+  }
+
+  if (currentRatio - step >= minRatio - 0.0001) {
+    choices.push(currentRatio - step);
+  }
+
+  return choices[Math.floor(Math.random() * choices.length)];
+}
+
+function applyPatrolCycleSpeed(guest, movement, nextRatio) {
+  const baseSpeed = resolvePatrolBaseSpeed(movement);
+  guest.patrolCycleSpeedRatio = nextRatio;
+  guest.patrolActiveSpeed = baseSpeed * nextRatio;
+}
+
+function initPatrolCycleSpeed(guest) {
+  const movement = guest.spawn.movement;
+
+  if (!movement?.randomSpeedCycle) {
+    guest.patrolCycleSpeedRatio = undefined;
+    guest.patrolActiveSpeed = undefined;
+    return;
+  }
+
+  applyPatrolCycleSpeed(guest, movement, pickNextPatrolCycleSpeedRatio(movement));
+}
+
+function rollPatrolCycleSpeedForNextCycle(guest) {
+  const movement = guest.spawn.movement;
+
+  if (!movement?.randomSpeedCycle) {
+    return;
+  }
+
+  applyPatrolCycleSpeed(
+    guest,
+    movement,
+    pickNextPatrolCycleSpeedRatio(movement, guest.patrolCycleSpeedRatio)
+  );
+}
+
 function advancePatrolTarget(guest) {
-  const targets = guest.spawn.movement?.patrolTargets || [];
-  guest.patrolTargetIndex = (guest.patrolTargetIndex + 1) % targets.length;
+  const movement = guest.spawn.movement;
+  const targets = movement?.patrolTargets || [];
+  const previousIndex = guest.patrolTargetIndex;
+  guest.patrolTargetIndex = (previousIndex + 1) % targets.length;
   guest.patrolSpeedFactor = 0;
+
+  if (
+    movement?.randomSpeedCycle
+    && targets.length > 0
+    && previousIndex === targets.length - 1
+  ) {
+    rollPatrolCycleSpeedForNextCycle(guest);
+  }
 }
 
 function resolveArrivalLookYaw(movement, position) {
@@ -631,7 +764,9 @@ function updateGuestPatrol(guest, deltaScale, resolveFloorY) {
   const toTargetX = target.x - position.x;
   const toTargetZ = target.z - position.z;
   const distance = Math.hypot(toTargetX, toTargetZ);
-  const baseSpeed = movement.speed ?? 0.135;
+  const baseSpeed = movement.randomSpeedCycle && typeof guest.patrolActiveSpeed === "number"
+    ? guest.patrolActiveSpeed
+    : resolvePatrolBaseSpeed(movement);
   const targetY = typeof target.y === "number" ? target.y : position.y;
   let speedFactor = 1;
 
@@ -736,6 +871,8 @@ async function loadGuestCharacter(BABYLON, scene, spawn, helpers) {
     targetHeight = GUEST_TARGET_HEIGHT
   } = helpers;
 
+  console.info(`[guest-spawn] loading ${spawn.id} (${spawn.file})`);
+
   const encodedFile = encodeGuestAssetPath(spawn.file);
   const loadTask = BABYLON.SceneLoader.ImportMeshAsync("", GUEST_ASSET_ROOT, encodedFile, scene);
   const result = await Promise.race([
@@ -765,20 +902,23 @@ async function loadGuestCharacter(BABYLON, scene, spawn, helpers) {
   updateWorldMatrices(root, meshes);
   const alignedBounds = getFullBounds(BABYLON, meshes);
   const rawHeight = Math.max(alignedBounds?.size?.y || 0, 0.001);
-  const fitScale = targetHeight / rawHeight;
+  const scaleMultiplier = spawn.scaleMultiplier ?? 1;
+  const baseFitScale = targetHeight / rawHeight;
+  const fitScale = baseFitScale * scaleMultiplier;
 
-  console.info(`[guest] ${spawn.id}: rawHeight=${rawHeight.toFixed(3)}m fitScale=${fitScale.toFixed(3)}`);
+  console.info(
+    `[guest] ${spawn.id}: rawHeight=${rawHeight.toFixed(3)}m fitScale=${fitScale.toFixed(3)} file=${spawn.file}`
+  );
 
   root.scaling.set(fitScale, fitScale, fitScale);
   updateWorldMatrices(root, meshes);
 
-  meshes.forEach((mesh) => {
-    mesh.isPickable = false;
-    mesh.checkCollisions = false;
-    mesh.metadata = { ...(mesh.metadata || {}), passThrough: true, tourGuest: true, guestId: spawn.id };
-  });
+  applyGuestTreeCollisionFlags(root, spawn.id);
+  const guestMeshes = typeof root.getChildMeshes === "function"
+    ? root.getChildMeshes(true).filter((mesh) => typeof mesh.getTotalVertices === "function" && mesh.getTotalVertices() > 0)
+    : meshes;
 
-  softenModelMaterialReflections(BABYLON, collectMeshMaterials(meshes));
+  softenModelMaterialReflections(BABYLON, collectMeshMaterials(guestMeshes));
 
   root.position.set(spawn.position.x, spawn.position.y, spawn.position.z);
   root.rotation.set(0, spawn.rotationY, 0);
@@ -786,13 +926,13 @@ async function loadGuestCharacter(BABYLON, scene, spawn, helpers) {
 
   const animationGroups = result.animationGroups || [];
   stripGuestLocomotionRootMotion(BABYLON, animationGroups, spawn);
-  const rootMotionNeutralizer = createRootMotionNeutralizer(BABYLON, { meshes });
+  const rootMotionNeutralizer = createRootMotionNeutralizer(BABYLON, { meshes: guestMeshes });
 
   return {
     spawn,
     root,
     contentRoot,
-    meshes,
+    meshes: guestMeshes,
     animationGroups,
     rootMotionNeutralizer,
     sequenceEndObserver: null,
@@ -804,8 +944,29 @@ async function loadGuestCharacter(BABYLON, scene, spawn, helpers) {
     patrolSpeedFactor: 0,
     isVisibleShown: false,
     fitScale,
-    rawHeight
+    baseFitScale,
+    rawHeight,
+    scaleMultiplier
   };
+}
+
+function applyGuestScale(guest, spawn) {
+  const scaleMultiplier = spawn.scaleMultiplier ?? 1;
+  const baseFitScale = guest.baseFitScale ?? guest.fitScale;
+  guest.scaleMultiplier = scaleMultiplier;
+  guest.fitScale = baseFitScale * scaleMultiplier;
+  guest.root.scaling.set(guest.fitScale, guest.fitScale, guest.fitScale);
+}
+
+function serializeGuestAnimation(animation) {
+  if (!animation) {
+    return "";
+  }
+
+  return JSON.stringify({
+    type: animation.type,
+    clips: animation.clips || []
+  });
 }
 
 function serializeGuestMovement(movement) {
@@ -822,19 +983,95 @@ function resetGuestPatrolState(guest) {
   guest.patrolArrivalPending = false;
   guest.patrolSpeedFactor = 0;
   guest.patrolFloorTick = 0;
+  initPatrolCycleSpeed(guest);
+}
+
+function disposeGuestRuntimeResources(guest) {
+  stopGuestAnimation(guest);
+  disposeGuestDevLabel(guest);
+
+  guest.animationGroups?.forEach((group) => {
+    try {
+      group.stop();
+      group.dispose();
+    } catch {
+      // ignore stale animation groups
+    }
+  });
+  guest.animationGroups = [];
+
+  const skeletons = new Set();
+  guest.meshes?.forEach((mesh) => {
+    if (mesh.skeleton) {
+      skeletons.add(mesh.skeleton);
+    }
+  });
+
+  guest.meshes?.forEach((mesh) => {
+    try {
+      mesh.dispose();
+    } catch {
+      // ignore stale meshes
+    }
+  });
+  guest.meshes = [];
+
+  skeletons.forEach((skeleton) => {
+    try {
+      skeleton.dispose();
+    } catch {
+      // ignore stale skeletons
+    }
+  });
+
+  guest.contentRoot?.dispose();
+  guest.root?.dispose();
+  guest.contentRoot = null;
+  guest.root = null;
+  guest.resolvedSpawn = null;
 }
 
 export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
   const guestsById = new Map();
   let visible = false;
   const loadPromises = new Map();
-  const { resolveSpawnPosition, resolveGuestFloorY } = helpers;
+  let guestProjectEpoch = 0;
+  let revealAnimStartedCount = 0;
+  let revealAnimSkippedCount = 0;
+  let sequenceNeutralizeFrame = 0;
+  const { resolveSpawnPosition, resolveGuestFloorY, showDevLabels = false } = helpers;
 
-  function resolveGuestSpawn(spawn) {
+  function resetRevealDiagnostics() {
+    revealAnimStartedCount = 0;
+    revealAnimSkippedCount = 0;
+  }
+
+  function attachGuestDevLabel(guest) {
+    if (!showDevLabels || !guest.spawn?.devLabel) {
+      return;
+    }
+
+    disposeGuestDevLabel(guest);
+    guest.devLabel = createGuestDevLabel(BABYLON, scene, guest, guest.spawn.devLabel);
+  }
+
+  function resolveGuestSpawn(spawn, guest = null) {
+    if (guest?.resolvedSpawn) {
+      return guest.resolvedSpawn;
+    }
+
     const resolvedSpawn = resolveSpawnPosition?.(spawn);
 
     if (!resolvedSpawn || resolvedSpawn === spawn) {
+      if (guest) {
+        guest.resolvedSpawn = spawn;
+      }
+
       return spawn;
+    }
+
+    if (guest) {
+      guest.resolvedSpawn = resolvedSpawn;
     }
 
     return resolvedSpawn;
@@ -845,7 +1082,7 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
   }
 
   function showGuest(guest, { force = false } = {}) {
-    const resolvedSpawn = resolveGuestSpawn(guest.spawn);
+    const resolvedSpawn = resolveGuestSpawn(guest.spawn, guest);
     guest.spawn = resolvedSpawn;
     const wasVisible = guest.isVisibleShown && guest.root.isEnabled();
 
@@ -854,6 +1091,7 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
       guest.patrolPhase = "moving";
       guest.patrolArrivalPending = false;
       guest.patrolSpeedFactor = 0;
+      initPatrolCycleSpeed(guest);
     }
 
     guest.root.position.set(
@@ -863,6 +1101,7 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
     );
     guest.root.rotation.set(0, resolvedSpawn.rotationY, 0);
     guest.root.setEnabled(true);
+    setGuestDevLabelVisible(guest, true);
 
     if (!wasVisible || force) {
       guest.isVisibleShown = true;
@@ -888,16 +1127,19 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
     const idSet = new Set(guestIds);
     visible = true;
     const guests = getGuests().filter((guest) => idSet.has(guest.spawn.id));
+    const guestsToAnimate = [];
 
     guests.forEach((guest) => {
-      const resolvedSpawn = resolveGuestSpawn(guest.spawn);
+      const resolvedSpawn = resolveGuestSpawn(guest.spawn, guest);
       guest.spawn = resolvedSpawn;
+      const wasVisible = guest.isVisibleShown && guest.root.isEnabled();
 
-      if (!guest.isVisibleShown && guest.spawn.movement?.type === "patrol") {
+      if (!wasVisible && guest.spawn.movement?.type === "patrol") {
         guest.patrolTargetIndex = 0;
         guest.patrolPhase = "moving";
         guest.patrolArrivalPending = false;
         guest.patrolSpeedFactor = 0;
+        initPatrolCycleSpeed(guest);
       }
 
       guest.root.position.set(
@@ -908,6 +1150,13 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
       guest.root.rotation.set(0, resolvedSpawn.rotationY, 0);
       guest.root.setEnabled(true);
       guest.isVisibleShown = true;
+      setGuestDevLabelVisible(guest, true);
+
+      if (!wasVisible) {
+        guestsToAnimate.push(guest);
+      } else {
+        revealAnimSkippedCount += 1;
+      }
     });
 
     if (options.syncAnimations) {
@@ -915,12 +1164,17 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
       return;
     }
 
+    if (!guestsToAnimate.length) {
+      return;
+    }
+
     requestAnimationFrame(() => {
-      guests.forEach((guest) => {
-        if (!guest.root.isEnabled()) {
+      guestsToAnimate.forEach((guest) => {
+        if (!guest.root?.isEnabled()) {
           return;
         }
 
+        revealAnimStartedCount += 1;
         playGuestAnimation(guest);
       });
     });
@@ -963,6 +1217,31 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
       guest.patrolSpeedFactor = 0;
       guest.isVisibleShown = false;
       guest.root.setEnabled(false);
+      setGuestDevLabelVisible(guest, false);
+    });
+
+    if (!onlyIds) {
+      visible = false;
+      return;
+    }
+
+    visible = getGuests().some((guest) => guest.root.isEnabled());
+  }
+
+  function disposeGuests(options = {}) {
+    const onlyIds = options.onlyIds?.length ? new Set(options.onlyIds) : null;
+    guestProjectEpoch += 1;
+
+    getGuests().forEach((guest) => {
+      const guestId = guest.spawn.id;
+
+      if (onlyIds && !onlyIds.has(guestId)) {
+        return;
+      }
+
+      disposeGuestRuntimeResources(guest);
+      guestsById.delete(guestId);
+      loadPromises.delete(guestId);
     });
 
     if (!onlyIds) {
@@ -975,57 +1254,108 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
 
   async function dispose() {
     hide();
+    guestProjectEpoch += 1;
 
     getGuests().forEach((guest) => {
-      stopGuestAnimation(guest);
-      guest.meshes?.forEach((mesh) => mesh.dispose());
-      guest.contentRoot?.dispose();
-      guest.root?.dispose();
+      disposeGuestRuntimeResources(guest);
     });
 
     guestsById.clear();
     loadPromises.clear();
   }
 
+  async function disposeGuestInstance(guest) {
+    disposeGuestRuntimeResources(guest);
+  }
+
+  function getGuestSceneAudit() {
+    const guests = getGuests();
+    const tourGuestMeshes = scene.meshes.filter((mesh) => mesh.metadata?.tourGuest);
+    const enabledGuests = guests.filter((guest) => guest.root?.isEnabled?.());
+
+    return {
+      guestCount: guests.length,
+      enabledGuestCount: enabledGuests.length,
+      tourGuestMeshCount: tourGuestMeshes.length,
+      animationGroupCount: scene.animationGroups?.length ?? 0,
+      skeletonCount: scene.skeletons?.length ?? 0,
+      renderObserverCount: scene.onBeforeRenderObservable?.observers?.length ?? 0,
+      guestIds: guests.map((guest) => guest.spawn.id),
+      enabledGuestIds: enabledGuests.map((guest) => guest.spawn.id),
+      revealAnimStartedCount,
+      revealAnimSkippedCount
+    };
+  }
+
   async function loadSpawn(spawn, { showOnLoad = true } = {}) {
-    const resolvedSpawn = resolveGuestSpawn(spawn);
+    const existingGuest = guestsById.get(spawn.id);
+    const resolvedSpawn = resolveGuestSpawn(spawn, existingGuest);
 
     if (guestsById.has(resolvedSpawn.id)) {
       const existing = guestsById.get(resolvedSpawn.id);
-      const previousMovementKey = serializeGuestMovement(existing.spawn?.movement);
-      const nextMovementKey = serializeGuestMovement(resolvedSpawn.movement);
-      existing.spawn = resolvedSpawn;
-      existing.root.position.set(
-        resolvedSpawn.position.x,
-        resolvedSpawn.position.y,
-        resolvedSpawn.position.z
-      );
 
-      if (previousMovementKey !== nextMovementKey && resolvedSpawn.movement?.type === "patrol") {
-        resetGuestPatrolState(existing);
+      if (existing.spawn?.file !== resolvedSpawn.file) {
+        await disposeGuestInstance(existing);
+        guestsById.delete(resolvedSpawn.id);
+        loadPromises.delete(resolvedSpawn.id);
+      } else {
+        const previousMovementKey = serializeGuestMovement(existing.spawn?.movement);
+        const nextMovementKey = serializeGuestMovement(resolvedSpawn.movement);
+        const previousAnimationKey = serializeGuestAnimation(existing.spawn?.animation);
+        const nextAnimationKey = serializeGuestAnimation(resolvedSpawn.animation);
+        existing.spawn = resolvedSpawn;
+        existing.root.position.set(
+          resolvedSpawn.position.x,
+          resolvedSpawn.position.y,
+          resolvedSpawn.position.z
+        );
+        applyGuestScale(existing, resolvedSpawn);
+        attachGuestDevLabel(existing);
 
-        if (existing.isVisibleShown && existing.root.isEnabled()) {
+        if (previousMovementKey !== nextMovementKey && resolvedSpawn.movement?.type === "patrol") {
+          resetGuestPatrolState(existing);
+
+          if (existing.isVisibleShown && existing.root.isEnabled()) {
+            stopGuestAnimation(existing);
+            playGuestAnimation(existing);
+          }
+        } else if (
+          previousAnimationKey !== nextAnimationKey
+          && existing.isVisibleShown
+          && existing.root.isEnabled()
+        ) {
           stopGuestAnimation(existing);
           playGuestAnimation(existing);
         }
-      }
 
-      if (visible && showOnLoad) {
-        showGuest(existing);
-      }
+        if (visible && showOnLoad) {
+          showGuest(existing);
+        }
 
-      return existing;
+        return existing;
+      }
     }
 
     if (loadPromises.has(resolvedSpawn.id)) {
       return loadPromises.get(resolvedSpawn.id);
     }
 
+    const loadEpoch = guestProjectEpoch;
     const loadPromise = loadGuestCharacter(BABYLON, scene, resolvedSpawn, helpers)
       .then((guest) => {
+        if (!guest || loadEpoch !== guestProjectEpoch) {
+          if (guest) {
+            disposeGuestInstance(guest);
+          }
+
+          return null;
+        }
+
         guest.spawn = resolvedSpawn;
+        guest.resolvedSpawn = resolvedSpawn;
         guestsById.set(resolvedSpawn.id, guest);
         loadPromises.delete(resolvedSpawn.id);
+        attachGuestDevLabel(guest);
 
         if (visible && showOnLoad) {
           showGuest(guest);
@@ -1083,13 +1413,30 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
       return;
     }
 
+    sequenceNeutralizeFrame += 1;
+    const shouldNeutralizeSequence = sequenceNeutralizeFrame % 2 === 0;
+
     getGuests().forEach((guest) => {
-      if (!guest.root.isEnabled()) {
+      if (!guest.root?.isEnabled()) {
         return;
       }
 
       if (guest.spawn.movement?.type === "patrol") {
         updateGuestPatrol(guest, deltaScale, resolveGuestFloorY);
+        return;
+      }
+
+      if (guest.spawn.movement?.type === "rootMotion") {
+        const delta = guest.rootMotionNeutralizer?.consumePlanarRootMotionDelta?.();
+        if (delta) {
+          guest.root.position.x += delta.x;
+          guest.root.position.z += delta.z;
+        }
+        return;
+      }
+
+      if (guest.spawn.animation?.type === "sequence" && shouldNeutralizeSequence) {
+        guest.rootMotionNeutralizer?.neutralize?.({ syncSample: true });
       }
     });
   }
@@ -1101,9 +1448,12 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
     revealGuest,
     revealGuests,
     hide,
+    disposeGuests,
     dispose,
     update,
     getGuests,
+    getGuestSceneAudit,
+    resetRevealDiagnostics,
     isSpawned
   };
 }
