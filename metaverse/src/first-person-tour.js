@@ -16,17 +16,18 @@ import {
   getAngjiIndoorBackgroundGuestSpawns,
   getAngjiOutdoorBackgroundGuestSpawns,
   getAngjiOutdoorGuestSpawns,
+  getAngjiIndoorGuestSpawns,
   getAngjiIndoorGuestIds,
   getAngjiOutdoorGuestIds,
-  getAngjiPriorityGuestSpawns,
   getAngjiSimultaneousGuestSpawns,
   getBackgroundGuestRevealDelayMs,
   getBackgroundGuestLoadYieldFrames,
   ANGJI_SIMULTANEOUS_GUEST_IDS,
   ANGJI_PRIORITY_GUEST_IDS,
+  ANGJI_GUEST_CONFIG_VERSION,
   getAngjiGuestPositionYOffset
-} from "./angji-guest-config.js?v=angji-lookat-point-20260705";
-import { createGuestCharacterSystem, shouldSnapPatrolFloorAtTarget } from "./guest-character-system.js?v=angji-lookat-point-20260705";
+} from "./angji-guest-config.js?v=angji-guest-full-20260705";
+import { createGuestCharacterSystem, shouldSnapPatrolFloorAtTarget } from "./guest-character-system.js?v=angji-guest-full-20260705";
 import { applyLocalDevToolsVisibility, isLocalDevEnvironment } from "./local-dev.js?v=local-dev-20260629";
 
 const MODEL_ROOT = "./assets/models/";
@@ -4350,6 +4351,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
       ) ?? fallbackY;
     }
   });
+  console.info(`[angji-guests] guest config ${ANGJI_GUEST_CONFIG_VERSION}`);
   preloadAngjiOrbitGuests();
 
   function getAngjiGuestModelState() {
@@ -4370,7 +4372,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     }
 
     const run = () => {
-      void guestCharacterSystem?.preload(getAngjiPriorityGuestSpawns(), { parallel: true, showOnLoad: false });
+      void guestCharacterSystem?.preload(getAngjiOutdoorGuestSpawns(), { parallel: true, showOnLoad: false });
       void guestCharacterSystem?.preload(getAngjiSimultaneousGuestSpawns(), { parallel: true, showOnLoad: false });
     };
 
@@ -4415,18 +4417,15 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
       return;
     }
 
+    const allOutdoorSpawns = getAngjiOutdoorGuestSpawns();
     const outdoorBackgroundSpawns = getAngjiOutdoorBackgroundGuestSpawns();
 
     try {
-      await guestCharacterSystem.ensureSpawned(getAngjiPriorityGuestSpawns(), { parallel: true, showOnLoad: false });
+      await guestCharacterSystem.ensureSpawned(allOutdoorSpawns, { parallel: true, showOnLoad: false });
       guestCharacterSystem.revealGuests(ANGJI_PRIORITY_GUEST_IDS);
 
       for (const spawn of outdoorBackgroundSpawns) {
-        await guestCharacterSystem.ensureSpawned([spawn], { showOnLoad: false });
         await yieldFrames(getBackgroundGuestLoadYieldFrames(spawn.id));
-      }
-
-      for (const spawn of outdoorBackgroundSpawns) {
         guestCharacterSystem.revealGuest(spawn.id);
 
         const delayMs = getBackgroundGuestRevealDelayMs(spawn.id);
@@ -4454,25 +4453,23 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
 
     guestCharacterSystem.hide({ onlyIds: getAngjiIndoorGuestIds() });
 
+    const allIndoorSpawns = getAngjiIndoorGuestSpawns();
+    const backgroundSpawns = getAngjiIndoorBackgroundGuestSpawns();
+
     try {
-      const simultaneousGuests = await guestCharacterSystem.ensureSpawned(
-        getAngjiSimultaneousGuestSpawns(),
-        { parallel: true, showOnLoad: false }
-      );
-      const loadedIds = new Set(simultaneousGuests.filter(Boolean).map((guest) => guest.spawn.id));
+      await guestCharacterSystem.ensureSpawned(allIndoorSpawns, { parallel: true, showOnLoad: false });
+
+      const simultaneousGuests = guestCharacterSystem
+        .getGuests()
+        .filter((guest) => ANGJI_SIMULTANEOUS_GUEST_IDS.includes(guest.spawn.id));
+      const loadedIds = new Set(simultaneousGuests.map((guest) => guest.spawn.id));
 
       if (ANGJI_SIMULTANEOUS_GUEST_IDS.every((guestId) => loadedIds.has(guestId))) {
         guestCharacterSystem.revealGuests(ANGJI_SIMULTANEOUS_GUEST_IDS, { syncAnimations: true });
       }
 
-      const backgroundSpawns = getAngjiIndoorBackgroundGuestSpawns();
-
       for (const spawn of backgroundSpawns) {
-        await guestCharacterSystem.ensureSpawned([spawn], { showOnLoad: false });
         await yieldFrames(getBackgroundGuestLoadYieldFrames(spawn.id));
-      }
-
-      for (const spawn of backgroundSpawns) {
         guestCharacterSystem.revealGuest(spawn.id);
 
         const delayMs = getBackgroundGuestRevealDelayMs(spawn.id);

@@ -1,5 +1,7 @@
 /** Angji tour guest placements (Mark-1 … Mark-18). */
 
+export const ANGJI_GUEST_CONFIG_VERSION = "angji-guest-full-20260705";
+
 export const ANGJI_PRIORITY_GUEST_IDS = ["Mark-1", "Mark-2"];
 export const ANGJI_SIMULTANEOUS_GUEST_IDS = ["Mark-4", "Mark-5", "Mark-6"];
 
@@ -394,3 +396,4 @@ function validateUniqueGuestIds() {
 
 ANGJI_GUEST_MARKS.forEach(validateGuestSpawnConfig);
 validateUniqueGuestIds();
+console.info(`[guest-config] loaded ${ANGJI_GUEST_CONFIG_VERSION}`);

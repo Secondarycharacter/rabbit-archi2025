@@ -808,6 +808,22 @@ async function loadGuestCharacter(BABYLON, scene, spawn, helpers) {
   };
 }
 
+function serializeGuestMovement(movement) {
+  if (!movement) {
+    return "";
+  }
+
+  return JSON.stringify(movement);
+}
+
+function resetGuestPatrolState(guest) {
+  guest.patrolTargetIndex = 0;
+  guest.patrolPhase = "moving";
+  guest.patrolArrivalPending = false;
+  guest.patrolSpeedFactor = 0;
+  guest.patrolFloorTick = 0;
+}
+
 export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
   const guestsById = new Map();
   let visible = false;
@@ -976,12 +992,23 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
 
     if (guestsById.has(resolvedSpawn.id)) {
       const existing = guestsById.get(resolvedSpawn.id);
+      const previousMovementKey = serializeGuestMovement(existing.spawn?.movement);
+      const nextMovementKey = serializeGuestMovement(resolvedSpawn.movement);
       existing.spawn = resolvedSpawn;
       existing.root.position.set(
         resolvedSpawn.position.x,
         resolvedSpawn.position.y,
         resolvedSpawn.position.z
       );
+
+      if (previousMovementKey !== nextMovementKey && resolvedSpawn.movement?.type === "patrol") {
+        resetGuestPatrolState(existing);
+
+        if (existing.isVisibleShown && existing.root.isEnabled()) {
+          stopGuestAnimation(existing);
+          playGuestAnimation(existing);
+        }
+      }
 
       if (visible && showOnLoad) {
         showGuest(existing);
