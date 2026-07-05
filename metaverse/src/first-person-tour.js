@@ -372,6 +372,7 @@ const ENEMY_SETTINGS = {
 };
 
 const canvas = document.getElementById("gameCanvas");
+let refreshAngjiOrbitGuests = null;
 const metaverseLoading = document.getElementById("metaverseLoading");
 const loadingProgress = document.getElementById("loadingProgress");
 const loadingProgressBar = document.getElementById("loadingProgressBar");
@@ -532,6 +533,7 @@ function hideLoadingOverlay() {
 
   metaverseLoading.classList.add("is-hidden");
   metaverseLoading.setAttribute("aria-busy", "false");
+  refreshAngjiOrbitGuests?.();
 }
 
 startLoadingOverlay();
@@ -916,6 +918,30 @@ function boundsToText(bounds) {
 function booleanParam(name, fallback) {
   const value = new URLSearchParams(window.location.search).get(name);
   return value === null ? fallback : value !== "0" && value !== "false";
+}
+
+function resolveInitialModelIndex(modelStates) {
+  const params = new URLSearchParams(window.location.search);
+  const project = params.get("project");
+  const modelFile = params.get("model");
+
+  if (project) {
+    const projectIndex = modelStates.findIndex((modelState) => modelState.config.overviewId === project);
+
+    if (projectIndex >= 0) {
+      return projectIndex;
+    }
+  }
+
+  if (modelFile) {
+    const fileIndex = modelStates.findIndex((modelState) => modelState.config.file === modelFile);
+
+    if (fileIndex >= 0) {
+      return fileIndex;
+    }
+  }
+
+  return Math.max(0, MODEL_CONFIGS.findIndex((config) => config.file === DEFAULT_MODEL_FILE));
 }
 
 function normalizeName(name) {
@@ -4414,9 +4440,11 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     }
   }
 
-  if (isAngjiProjectConfig(activeModelState.config) && !walkMode) {
-    void scheduleOutdoorGuestSpawn();
-  }
+  refreshAngjiOrbitGuests = () => {
+    if (canUseAngjiOutdoorGuests()) {
+      void scheduleOutdoorGuestSpawn();
+    }
+  };
 
   async function scheduleIndoorGuestSpawn() {
     if (!canUseAngjiIndoorGuests()) {
@@ -6336,7 +6364,7 @@ async function start() {
     modelState.tourModelState ? [modelState, modelState.tourModelState] : [modelState]
   ));
   const slideDistance = getSlideDistance(modelStates);
-  let activeModelIndex = Math.max(0, MODEL_CONFIGS.findIndex((config) => config.file === DEFAULT_MODEL_FILE));
+  let activeModelIndex = resolveInitialModelIndex(modelStates);
   let displayedModelState = modelStates[activeModelIndex];
   let transitionState = null;
   let isTransitioning = false;
@@ -6495,6 +6523,7 @@ async function start() {
     },
     onActiveModelStateChange: showActiveModelState
   });
+  controls.setModelState(modelStates[activeModelIndex]);
   void controls.preloadCharacter?.().catch((error) => {
     console.warn("Character preload failed", error);
   });
