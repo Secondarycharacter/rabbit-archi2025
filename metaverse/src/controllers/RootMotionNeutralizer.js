@@ -135,6 +135,7 @@ function shouldStripPositionAnimation(target, animation) {
 export function stripLocomotionRootMotion(BABYLON, animationGroups, clipNames = [], options = {}) {
   const clipSet = new Set(clipNames);
   const preserveVerticalClipNames = new Set(options.preserveVerticalClipNames || []);
+  const forceStripAllPosition = Boolean(options.forceStripAllPosition);
 
   animationGroups.forEach((group) => {
     if (clipSet.size > 0 && !clipSet.has(group.name)) {
@@ -148,7 +149,11 @@ export function stripLocomotionRootMotion(BABYLON, animationGroups, clipNames = 
       || group.targetedAnimations.some((ta) => preserveVerticalClipNames.has(ta.animation?.name));
 
     group.targetedAnimations.forEach((targeted) => {
-      if (!shouldStripPositionAnimation(targeted.target, targeted.animation)) {
+      const shouldStrip = forceStripAllPosition
+        ? targeted.animation?.targetProperty === "position"
+        : shouldStripPositionAnimation(targeted.target, targeted.animation);
+
+      if (!shouldStrip) {
         return;
       }
 

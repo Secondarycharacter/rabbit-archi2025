@@ -13,14 +13,20 @@ import {
 } from "./character-tps-bindings.js?v=tps-jump-nocol-20260629";
 import { createGuestPlacementTool } from "./guest-placement-tool.js?v=tps-jump-nocol-20260629";
 import {
-  getAngjiBackgroundGuestSpawns,
+  getAngjiIndoorBackgroundGuestSpawns,
+  getAngjiOutdoorBackgroundGuestSpawns,
+  getAngjiOutdoorGuestSpawns,
+  getAngjiIndoorGuestIds,
+  getAngjiOutdoorGuestIds,
   getAngjiPriorityGuestSpawns,
   getAngjiSimultaneousGuestSpawns,
+  getBackgroundGuestRevealDelayMs,
+  getBackgroundGuestLoadYieldFrames,
   ANGJI_SIMULTANEOUS_GUEST_IDS,
   ANGJI_PRIORITY_GUEST_IDS,
   getAngjiGuestPositionYOffset
-} from "./angji-guest-config.js?v=angji-mark3-height-20260629";
-import { createGuestCharacterSystem } from "./guest-character-system.js?v=angji-guest-priority-20260629";
+} from "./angji-guest-config.js?v=angji-lookat-point-20260705";
+import { createGuestCharacterSystem, shouldSnapPatrolFloorAtTarget } from "./guest-character-system.js?v=angji-lookat-point-20260705";
 import { applyLocalDevToolsVisibility, isLocalDevEnvironment } from "./local-dev.js?v=local-dev-20260629";
 
 const MODEL_ROOT = "./assets/models/";
@@ -2142,9 +2148,11 @@ function resolveAngjiGuestSpawn(BABYLON, scene, spawn, floor1Meshes, externalFlo
     position,
     movement: {
       ...spawn.movement,
-      patrolTargets: spawn.movement.patrolTargets.map((target) => ({
+      patrolTargets: spawn.movement.patrolTargets.map((target, targetIndex) => ({
         ...target,
-        y: snapFloorY(target.x, target.z, target.y)
+        y: shouldSnapPatrolFloorAtTarget(spawn.movement, targetIndex)
+          ? snapFloorY(target.x, target.z, target.y)
+          : target.y
       }))
     }
   };
@@ -4281,47 +4289,63 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     softenModelMaterialReflections,
     targetHeight: 1.75,
     resolveSpawnPosition: (spawn) => {
-      const walkModelState = activeModelState.tourModelState || activeModelState;
+      const angjiModelState = getAngjiGuestModelState();
 
-      if (!isAngjiProjectConfig(walkModelState.config)) {
+      if (!angjiModelState || !isAngjiProjectConfig(angjiModelState.config)) {
         return null;
       }
+
+      const floorMeshState = getAngjiGuestFloorMeshState();
 
       return resolveAngjiGuestSpawn(
         BABYLON,
         scene,
         spawn,
-        walkModelState.angjiBuildingFloor1Meshes,
-        walkModelState.angjiExternalFloorMeshes
+        floorMeshState.angjiBuildingFloor1Meshes,
+        floorMeshState.angjiExternalFloorMeshes
       );
     },
     resolveGuestFloorY: (x, z, fallbackY) => {
-      const walkModelState = activeModelState.tourModelState || activeModelState;
+      const angjiModelState = getAngjiGuestModelState();
 
-      if (!isAngjiProjectConfig(walkModelState.config)) {
+      if (!angjiModelState || !isAngjiProjectConfig(angjiModelState.config)) {
         return fallbackY;
       }
+
+      const floorMeshState = getAngjiGuestFloorMeshState();
 
       return pickAngjiGuestFloorY(
         BABYLON,
         scene,
         x,
         z,
-        walkModelState.angjiBuildingFloor1Meshes,
-        walkModelState.angjiExternalFloorMeshes
+        floorMeshState.angjiBuildingFloor1Meshes,
+        floorMeshState.angjiExternalFloorMeshes
       ) ?? fallbackY;
     }
   });
-  preloadAngjiPriorityGuests();
+  preloadAngjiOrbitGuests();
 
-  function preloadAngjiPriorityGuests() {
-    if (!isAngjiProjectConfig(activeModelState.config)) {
+  function getAngjiGuestModelState() {
+    return activeModelState.tourModelState || activeModelState;
+  }
+
+  function getAngjiGuestFloorMeshState() {
+    if (!walkMode && activeModelState.tourModelState) {
+      return activeModelState;
+    }
+
+    return getAngjiGuestModelState();
+  }
+
+  function preloadAngjiOrbitGuests() {
+    if (!isAngjiProjectConfig(activeModelState.config) || walkMode) {
       return;
     }
 
     const run = () => {
-      void guestCharacterSystem?.preload(getAngjiPriorityGuestSpawns(), { parallel: true });
-      void guestCharacterSystem?.preload(getAngjiSimultaneousGuestSpawns(), { parallel: true });
+      void guestCharacterSystem?.preload(getAngjiPriorityGuestSpawns(), { parallel: true, showOnLoad: false });
+      void guestCharacterSystem?.preload(getAngjiSimultaneousGuestSpawns(), { parallel: true, showOnLoad: false });
     };
 
     if (typeof window.requestIdleCallback === "function") {
@@ -4332,35 +4356,105 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     window.setTimeout(run, 2000);
   }
 
-  function canUseAngjiGuests() {
+  function canUseAngjiOutdoorGuests() {
+    return !walkMode && isAngjiProjectConfig(activeModelState.config);
+  }
+
+  function canUseAngjiIndoorGuests() {
     return walkMode && isAngjiProjectConfig(activeModelState.config);
   }
 
-  async function scheduleGuestSpawn() {
-    if (!canUseAngjiGuests()) {
-      guestCharacterSystem?.hide();
+  function yieldFrames(frameCount = 2) {
+    return new Promise((resolve) => {
+      let remaining = frameCount;
+
+      const step = () => {
+        remaining -= 1;
+
+        if (remaining <= 0) {
+          resolve();
+          return;
+        }
+
+        requestAnimationFrame(step);
+      };
+
+      requestAnimationFrame(step);
+    });
+  }
+
+  async function scheduleOutdoorGuestSpawn() {
+    if (!canUseAngjiOutdoorGuests()) {
+      guestCharacterSystem?.hide({ onlyIds: getAngjiOutdoorGuestIds() });
       return;
     }
 
-    guestCharacterSystem.hide();
+    const outdoorBackgroundSpawns = getAngjiOutdoorBackgroundGuestSpawns();
 
     try {
-      await guestCharacterSystem.ensureSpawned(getAngjiPriorityGuestSpawns(), { parallel: true });
-      guestCharacterSystem.show({ includeIds: ANGJI_PRIORITY_GUEST_IDS });
+      await guestCharacterSystem.ensureSpawned(getAngjiPriorityGuestSpawns(), { parallel: true, showOnLoad: false });
+      guestCharacterSystem.revealGuests(ANGJI_PRIORITY_GUEST_IDS);
 
-      await guestCharacterSystem.ensureSpawned(getAngjiSimultaneousGuestSpawns(), { parallel: true });
-      guestCharacterSystem.show({
-        includeIds: [...ANGJI_PRIORITY_GUEST_IDS, ...ANGJI_SIMULTANEOUS_GUEST_IDS]
-      });
-
-      for (const spawn of getAngjiBackgroundGuestSpawns()) {
-        await guestCharacterSystem.ensureSpawned([spawn]);
-        guestCharacterSystem.show();
+      for (const spawn of outdoorBackgroundSpawns) {
+        await guestCharacterSystem.ensureSpawned([spawn], { showOnLoad: false });
+        await yieldFrames(getBackgroundGuestLoadYieldFrames(spawn.id));
       }
 
-      window.auditAngjiTourElements?.();
+      for (const spawn of outdoorBackgroundSpawns) {
+        guestCharacterSystem.revealGuest(spawn.id);
+
+        const delayMs = getBackgroundGuestRevealDelayMs(spawn.id);
+
+        if (delayMs > 0) {
+          await wait(delayMs);
+        }
+      }
     } catch (error) {
-      console.error("Guest spawn failed", error);
+      console.error("Outdoor guest spawn failed", error);
+    }
+  }
+
+  if (isAngjiProjectConfig(activeModelState.config) && !walkMode) {
+    void scheduleOutdoorGuestSpawn();
+  }
+
+  async function scheduleIndoorGuestSpawn() {
+    if (!canUseAngjiIndoorGuests()) {
+      guestCharacterSystem?.hide({ onlyIds: getAngjiIndoorGuestIds() });
+      return;
+    }
+
+    guestCharacterSystem.hide({ onlyIds: getAngjiIndoorGuestIds() });
+
+    try {
+      const simultaneousGuests = await guestCharacterSystem.ensureSpawned(
+        getAngjiSimultaneousGuestSpawns(),
+        { parallel: true, showOnLoad: false }
+      );
+      const loadedIds = new Set(simultaneousGuests.filter(Boolean).map((guest) => guest.spawn.id));
+
+      if (ANGJI_SIMULTANEOUS_GUEST_IDS.every((guestId) => loadedIds.has(guestId))) {
+        guestCharacterSystem.revealGuests(ANGJI_SIMULTANEOUS_GUEST_IDS, { syncAnimations: true });
+      }
+
+      const backgroundSpawns = getAngjiIndoorBackgroundGuestSpawns();
+
+      for (const spawn of backgroundSpawns) {
+        await guestCharacterSystem.ensureSpawned([spawn], { showOnLoad: false });
+        await yieldFrames(getBackgroundGuestLoadYieldFrames(spawn.id));
+      }
+
+      for (const spawn of backgroundSpawns) {
+        guestCharacterSystem.revealGuest(spawn.id);
+
+        const delayMs = getBackgroundGuestRevealDelayMs(spawn.id);
+
+        if (delayMs > 0) {
+          await wait(delayMs);
+        }
+      }
+    } catch (error) {
+      console.error("Indoor guest spawn failed", error);
     }
   }
 
@@ -4730,10 +4824,16 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     lastTreeViewerPosition = null;
     treeFacingFrameCounter = 0;
     activeModelState = nextModelState;
-    preloadAngjiPriorityGuests();
+    preloadAngjiOrbitGuests();
 
-    if (walkMode && isAngjiProjectConfig(nextModelState.config)) {
-      void scheduleGuestSpawn();
+    if (isAngjiProjectConfig(nextModelState.config)) {
+      if (walkMode) {
+        void scheduleIndoorGuestSpawn();
+      } else {
+        void scheduleOutdoorGuestSpawn();
+      }
+    } else {
+      guestCharacterSystem?.hide();
     }
 
     clearMovementKeys();
@@ -5383,7 +5483,6 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     resetWalkCameraToTourStart();
     tpsSystem?.show?.();
     scheduleEnemySpawn();
-    void scheduleGuestSpawn();
     options.onModeChange?.("walk");
     currentLabel = "third-person tour";
 
@@ -5402,7 +5501,13 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     document.body.classList.remove("walk-mode-active");
     clearFireballs();
     resetEnemy();
-    guestCharacterSystem?.hide();
+
+    if (isAngjiProjectConfig(activeModelState.config)) {
+      guestCharacterSystem?.hide({ onlyIds: getAngjiIndoorGuestIds() });
+    } else {
+      guestCharacterSystem?.hide();
+    }
+
     clearMovementKeys();
     tpsSystem?.hide?.();
     document.exitPointerLock?.();
@@ -5536,6 +5641,8 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     updateTreeMeshesFacingViewer();
 
     if (!walkMode) {
+      const deltaScale = Math.min(engine.getDeltaTime() / 16.6667, 2);
+      guestCharacterSystem?.update(deltaScale);
       inputDiagnostics.lastCollision = "-";
       inputDiagnostics.movementBlocked = false;
       if (treeFacingFrameCounter % 3 === 0) {
