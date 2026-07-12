@@ -1,9 +1,27 @@
-/** Angji tour guest placements (Mark-1 … Mark-18). */
+/** Angji tour guest placements (Mark-1 … Mark-22). */
 
-export const ANGJI_GUEST_CONFIG_VERSION = "angji-guest-mark3-adjust-20260705";
+export const ANGJI_GUEST_CONFIG_VERSION = "angji-guest-mark21-22-offset-20260713";
 
 export const ANGJI_PRIORITY_GUEST_IDS = ["Mark-1", "Mark-2"];
 export const ANGJI_SIMULTANEOUS_GUEST_IDS = ["Mark-4", "Mark-5", "Mark-6"];
+
+/** Thriller trio (Mark-4~6) keep in-place dance; all other Angji dance clips may move with root motion. */
+export const ANGJI_DANCE_ROOT_MOTION_EXCLUDED_GUEST_IDS = [...ANGJI_SIMULTANEOUS_GUEST_IDS];
+
+const ANGJI_DANCE_CLIP_PATTERN = /dance|samba dancing|swing dancing/i;
+
+export function isAngjiGuestId(spawnId) {
+  return /^Mark-\d+$/.test(String(spawnId || ""));
+}
+
+export function isAngjiDanceAnimationClip(clipName) {
+  return ANGJI_DANCE_CLIP_PATTERN.test(String(clipName || ""));
+}
+
+export function shouldAngjiGuestAllowDanceRootMotion(spawnId) {
+  return isAngjiGuestId(spawnId)
+    && !ANGJI_DANCE_ROOT_MOTION_EXCLUDED_GUEST_IDS.includes(spawnId);
+}
 
 const ANGJI_RESERVED_GUEST_IDS = new Set([
   ...ANGJI_PRIORITY_GUEST_IDS,
@@ -13,11 +31,18 @@ const ANGJI_RESERVED_GUEST_IDS = new Set([
 /** Mark-1, Mark-2 and Mark-13+ are outdoor; orbit shows them, tour keeps them and adds indoor guests. */
 export const ANGJI_OUTDOOR_GUEST_MIN_MARK = 13;
 
+/** New-area guests (Mark-19+) use walk-tour indoor spawn despite mark number. */
+export const ANGJI_INDOOR_GUEST_OVERRIDE_IDS = ["Mark-19", "Mark-20", "Mark-21", "Mark-22"];
+
 function getGuestMarkNumber(spawnId) {
   return Number(String(spawnId).replace("Mark-", ""));
 }
 
 export function isAngjiOutdoorGuestId(spawnId) {
+  if (ANGJI_INDOOR_GUEST_OVERRIDE_IDS.includes(spawnId)) {
+    return false;
+  }
+
   if (ANGJI_PRIORITY_GUEST_IDS.includes(spawnId)) {
     return true;
   }
@@ -85,6 +110,22 @@ export const ANGJI_GUEST_WORLD_OFFSET = { x: 0.29, y: 5.03, z: -1.63 };
 export const ANGJI_SIT_GUEST_Y_OFFSET = 0.12;
 
 const SIT_CLIP_PATTERN = /sit|seat/i;
+
+/** Patrol loop for Mark-19 (new area Mark-1~12 coordinates). */
+const ANGJI_MARK19_PATROL_WAYPOINTS = [
+  { x: 18.37, y: 22.17, z: 2.18 },
+  { x: 18.55, y: 22.17, z: 2.61 },
+  { x: 18.54, y: 22.17, z: 3.23 },
+  { x: 18.22, y: 22.17, z: 3.56 },
+  { x: 17.47, y: 22.17, z: 3.8 },
+  { x: 16.77, y: 22.17, z: 3.7 },
+  { x: 14.08, y: 22.17, z: -0.17 },
+  { x: 13.73, y: 22.17, z: -0.72 },
+  { x: 13.76, y: 22.17, z: -1.24 },
+  { x: 14.19, y: 22.17, z: -1.66 },
+  { x: 14.9, y: 22.17, z: -1.98 },
+  { x: 15.77, y: 22.17, z: -1.58 }
+];
 
 export function getAngjiGuestPositionYOffset(spawn) {
   if (typeof spawn.sitYOffsetOverride === "number") {
@@ -356,6 +397,47 @@ export const ANGJI_GUEST_MARKS = [
         { x: 41.98, y: 23.37, z: -44.43 }
       ]
     }
+  },
+  {
+    id: "Mark-19",
+    devLabel: "N01",
+    file: "01 Happycats/01 Skeleton_Dancer/Happycats_Skeleton_Dancer.glb",
+    position: { x: 15.77, y: 22.17, z: -1.58 },
+    rotationY: -5.6892,
+    movement: {
+      type: "patrol",
+      clip: "Walking",
+      cycleRestClip: "Dance_Hiphop1",
+      cycleRestCount: 1,
+      speed: 0.12,
+      snapToFloor: true,
+      patrolTargets: ANGJI_MARK19_PATROL_WAYPOINTS
+    }
+  },
+  {
+    id: "Mark-20",
+    devLabel: "N13",
+    file: "03 rabbit04_Staff01/rabbit_Staff01.glb",
+    assetRoot: "./assets/character/",
+    position: { x: 12.33, y: 22.17, z: 3.07 },
+    rotationY: -16.4217,
+    animation: { type: "loop", clips: ["IDLE"] }
+  },
+  {
+    id: "Mark-21",
+    devLabel: "N14",
+    file: "05 Edition/01 Marie Antoinette Fox/Edition_Marie.glb",
+    position: { x: 12.6, y: 21.87, z: 8.99 },
+    rotationY: -15.9708,
+    animation: { type: "loop", clips: ["Sit_Footcross"] }
+  },
+  {
+    id: "Mark-22",
+    devLabel: "N15",
+    file: "02 Shrooms/04 Shroom_Gangnam style Dancer/Shroom_Gangnam style Dancer.glb",
+    position: { x: 9.562, y: 22.17, z: -0.239 },
+    rotationY: -11.1391,
+    animation: { type: "loop", clips: ["Sit_Idle"] }
   }
 ];
 

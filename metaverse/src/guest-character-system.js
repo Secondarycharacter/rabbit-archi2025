@@ -1,4 +1,8 @@
 import {
+  isAngjiDanceAnimationClip,
+  shouldAngjiGuestAllowDanceRootMotion
+} from "./angji-guest-config.js?v=angji-guest-mark21-22-offset-20260713";
+import {
   createGuestDevLabel,
   disposeGuestDevLabel,
   setGuestDevLabelVisible,
@@ -178,6 +182,22 @@ function stripGuestLocomotionRootMotion(BABYLON, animationGroups, spawn) {
 
   const clipNames = getGuestRootMotionClipNames(spawn);
 
+  if (shouldAngjiGuestAllowDanceRootMotion(spawn?.id)) {
+    const strippedClipNames = new Set([
+      ...clipNames.filter((clipName) => !isAngjiDanceAnimationClip(clipName)),
+      "Idle",
+      "IDLE",
+      "Walking",
+      "Run_Fast",
+      "Running"
+    ]);
+
+    stripLocomotionRootMotion(BABYLON, animationGroups, [...strippedClipNames], {
+      forceStripAllPosition: spawn.movement?.type === "patrol"
+    });
+    return;
+  }
+
   if (!clipNames.length) {
     stripLocomotionRootMotion(BABYLON, animationGroups, ["Idle", "IDLE", "Walking"]);
     return;
@@ -186,6 +206,23 @@ function stripGuestLocomotionRootMotion(BABYLON, animationGroups, spawn) {
   stripLocomotionRootMotion(BABYLON, animationGroups, clipNames, {
     forceStripAllPosition: spawn.movement?.type === "patrol"
   });
+}
+
+function applyGuestPlanarRootMotion(guest) {
+  const delta = guest.rootMotionNeutralizer?.consumePlanarRootMotionDelta?.();
+
+  if (delta) {
+    guest.root.position.x += delta.x;
+    guest.root.position.z += delta.z;
+  }
+}
+
+function isGuestPlayingAngjiDanceRootMotion(guest) {
+  if (!shouldAngjiGuestAllowDanceRootMotion(guest.spawn?.id)) {
+    return false;
+  }
+
+  return isAngjiDanceAnimationClip(guest.activeAnimationGroup?.name);
 }
 
 function resetGuestRootMotion(guest) {
@@ -873,8 +910,9 @@ async function loadGuestCharacter(BABYLON, scene, spawn, helpers) {
 
   console.info(`[guest-spawn] loading ${spawn.id} (${spawn.file})`);
 
+  const assetRoot = spawn.assetRoot || GUEST_ASSET_ROOT;
   const encodedFile = encodeGuestAssetPath(spawn.file);
-  const loadTask = BABYLON.SceneLoader.ImportMeshAsync("", GUEST_ASSET_ROOT, encodedFile, scene);
+  const loadTask = BABYLON.SceneLoader.ImportMeshAsync("", assetRoot, encodedFile, scene);
   const result = await Promise.race([
     loadTask,
     new Promise((_, reject) => {
@@ -1423,15 +1461,21 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
 
       if (guest.spawn.movement?.type === "patrol") {
         updateGuestPatrol(guest, deltaScale, resolveGuestFloorY);
+
+        if (guest.patrolPhase === "idle" && isGuestPlayingAngjiDanceRootMotion(guest)) {
+          applyGuestPlanarRootMotion(guest);
+        }
+
         return;
       }
 
       if (guest.spawn.movement?.type === "rootMotion") {
-        const delta = guest.rootMotionNeutralizer?.consumePlanarRootMotionDelta?.();
-        if (delta) {
-          guest.root.position.x += delta.x;
-          guest.root.position.z += delta.z;
-        }
+        applyGuestPlanarRootMotion(guest);
+        return;
+      }
+
+      if (isGuestPlayingAngjiDanceRootMotion(guest)) {
+        applyGuestPlanarRootMotion(guest);
         return;
       }
 

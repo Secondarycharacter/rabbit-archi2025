@@ -27,7 +27,7 @@ import {
   ANGJI_PRIORITY_GUEST_IDS,
   ANGJI_GUEST_CONFIG_VERSION,
   getAngjiGuestPositionYOffset
-} from "./angji-guest-config.js?v=angji-guest-mark3-adjust-20260705";
+} from "./angji-guest-config.js?v=angji-guest-mark21-22-offset-20260713";
 import {
   getJinjuOutdoorBackgroundGuestSpawns,
   getJinjuFixedGuestSpawns,
@@ -67,7 +67,7 @@ import {
   getJinjuRooftopGuestRevealDelayMs,
   getJinjuRooftopSequentialGuestSpawns
 } from "./jinju-rooftop-guest-config.js?v=jinju-rooftop-marie-sit-clips-20260705";
-import { createGuestCharacterSystem, shouldSnapPatrolFloorAtTarget } from "./guest-character-system.js?v=jinju-rooftop-lifecycle-20260705";
+import { createGuestCharacterSystem, shouldSnapPatrolFloorAtTarget } from "./guest-character-system.js?v=angji-guest-mark21-22-offset-20260713";
 import { applyLocalDevToolsVisibility, isLocalDevEnvironment } from "./local-dev.js?v=local-dev-20260629";
 
 const MODEL_ROOT = "./assets/models/";
