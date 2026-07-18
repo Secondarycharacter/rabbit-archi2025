@@ -140,6 +140,22 @@ body {
   transition: opacity 1s ease;
 }
 
+.metaverse-menu {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+}
+
+.metaverse-beta {
+  display: inline-block;
+  font-size: 70%;
+  color: #ff0000;
+  letter-spacing: 1px;
+  transform: rotate(-30deg);
+  transform-origin: center center;
+  line-height: 1;
+}
+
 .roadmap-menu.show,
 .metaverse-menu.show {
   opacity: 1;
@@ -351,7 +367,7 @@ body {
 
   <div class="top-menu">
     <div class="roadmap-menu" id="roadmapMenu">HISTORY</div>
-    <div class="metaverse-menu" id="metaverseMenu">METAVERSE</div>
+    <div class="metaverse-menu" id="metaverseMenu"><span class="metaverse-beta">BETA</span>METAVERSE</div>
   </div>
 
 </div>

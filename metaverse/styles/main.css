@@ -156,6 +156,7 @@ aside.debug-panel.local-dev-only[hidden] {
 
 #tourModeButton,
 #orbitViewButton,
+#nightModeButton,
 #debugToggleButton,
 #sunToggleButton,
 #copyDebugButton,
@@ -174,11 +175,17 @@ aside.debug-panel.local-dev-only[hidden] {
 
 #tourModeButton:hover,
 #orbitViewButton:hover,
+#nightModeButton:hover,
 #debugToggleButton:hover,
 #sunToggleButton:hover,
 #copyDebugButton:hover,
 .hud__link-button:hover {
   background: rgba(54, 87, 150, 0.9);
+}
+
+#nightModeButton.is-night {
+  background: rgba(28, 36, 78, 0.95);
+  border-color: rgba(255, 210, 120, 0.55);
 }
 
 .hud__actions button.is-active {

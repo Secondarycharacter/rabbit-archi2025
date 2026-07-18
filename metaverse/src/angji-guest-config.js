@@ -1,9 +1,94 @@
 /** Angji tour guest placements (Mark-1 … Mark-22). */
 
-export const ANGJI_GUEST_CONFIG_VERSION = "angji-guest-mark21-22-offset-20260713";
+export const ANGJI_NIGHT_DEVI_ASSET_ROOT = "./assets/Enemy/";
+export const ANGJI_NIGHT_DEVI_FILE = "01 Devi/Devi.glb";
+export const ANGJI_NIGHT_MARIE_FILE = "05 Edition/01 Marie Antoinette Fox/Edition_Marie.glb";
+export const ANGJI_NIGHT_MARIE_GUEST_ID = "Mark-Night-Marie";
+export const ANGJI_GUEST_CONFIG_VERSION = "angji-guest-night-marie-extra-20260719";
 
 export const ANGJI_PRIORITY_GUEST_IDS = ["Mark-1", "Mark-2"];
 export const ANGJI_SIMULTANEOUS_GUEST_IDS = ["Mark-4", "Mark-5", "Mark-6"];
+
+/**
+ * Night-only extra guest (does not replace Mark-1).
+ * Mark-1 keeps its original spot as Devi; Marie stands at this overlook.
+ */
+export const ANGJI_NIGHT_MARIE_SPAWN = {
+  id: ANGJI_NIGHT_MARIE_GUEST_ID,
+  position: { x: -81.81, y: 72.07, z: -211.39 },
+  positionYOverride: 72.07,
+  rotationY: -6.5153,
+  file: ANGJI_NIGHT_MARIE_FILE,
+  assetRoot: "./assets/guest/",
+  animation: {
+    type: "loop",
+    clips: ["Idle"],
+    clipAliases: ["Idle", "IDLE", "Armature|Idle", "mixamo.com"]
+  }
+};
+
+/** Night-mode Devi: aggro / attack / leash return. */
+export const ANGJI_NIGHT_DEVI_BEHAVIOR = {
+  type: "nightDeviChase",
+  /** Start following when rabbit enters this radius. */
+  aggroRange: 5,
+  /** Attack while rabbit is within this radius. */
+  attackRange: 1,
+  /** Keep chasing (after engage) while rabbit is within this radius. */
+  chaseRange: 10,
+  /** Start leash timer when rabbit is at/beyond this distance. */
+  leashRange: 8,
+  leashTimeoutMs: 5000,
+  /** Full run speed; chase uses half of this. */
+  runSpeed: 0.2,
+  /** Home return speed (Walking). */
+  walkSpeed: 0.075,
+  pathRecordDistance: 0.45,
+  idleClip: "Idle",
+  chaseClip: "Walking",
+  walkClip: "Walking",
+  runClip: "Run_Fast",
+  runClipAliases: ["Run_Fast", "Run", "Running", "Jump_Run"],
+  attackClipPrefix: "Attack"
+};
+
+export function toAngjiNightGuestSpawn(spawn) {
+  return {
+    id: spawn.id,
+    position: { ...spawn.position },
+    rotationY: spawn.rotationY,
+    scaleMultiplier: spawn.scaleMultiplier,
+    devLabel: spawn.devLabel,
+    file: ANGJI_NIGHT_DEVI_FILE,
+    assetRoot: ANGJI_NIGHT_DEVI_ASSET_ROOT,
+    behavior: { ...ANGJI_NIGHT_DEVI_BEHAVIOR },
+    animation: {
+      type: "loop",
+      clips: ["Idle"],
+      clipAliases: ["Idle", "IDLE", "Armature|Idle", "mixamo.com"]
+    }
+  };
+}
+
+export function getAngjiNightExtraGuestSpawns() {
+  return [{
+    ...ANGJI_NIGHT_MARIE_SPAWN,
+    position: { ...ANGJI_NIGHT_MARIE_SPAWN.position },
+    animation: {
+      type: ANGJI_NIGHT_MARIE_SPAWN.animation.type,
+      clips: [...ANGJI_NIGHT_MARIE_SPAWN.animation.clips],
+      clipAliases: [...ANGJI_NIGHT_MARIE_SPAWN.animation.clipAliases]
+    }
+  }];
+}
+
+export function mapAngjiGuestSpawnsForMode(spawns, nightMode) {
+  if (!nightMode) {
+    return spawns;
+  }
+
+  return spawns.map((spawn) => toAngjiNightGuestSpawn(spawn));
+}
 
 /** Thriller trio (Mark-4~6) keep in-place dance; all other Angji dance clips may move with root motion. */
 export const ANGJI_DANCE_ROOT_MOTION_EXCLUDED_GUEST_IDS = [...ANGJI_SIMULTANEOUS_GUEST_IDS];
@@ -72,7 +157,10 @@ export function getAngjiOutdoorGuestIds() {
 }
 
 export function getAngjiAllGuestIds() {
-  return ANGJI_GUEST_MARKS.map((spawn) => spawn.id);
+  return [
+    ...ANGJI_GUEST_MARKS.map((spawn) => spawn.id),
+    ANGJI_NIGHT_MARIE_GUEST_ID
+  ];
 }
 
 export function getAngjiIndoorBackgroundGuestSpawns() {

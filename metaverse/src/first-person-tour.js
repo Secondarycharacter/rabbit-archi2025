@@ -21,13 +21,17 @@ import {
   getAngjiOutdoorGuestIds,
   getAngjiAllGuestIds,
   getAngjiSimultaneousGuestSpawns,
+  getAngjiNightExtraGuestSpawns,
   getBackgroundGuestRevealDelayMs,
   getBackgroundGuestLoadYieldFrames,
   ANGJI_SIMULTANEOUS_GUEST_IDS,
   ANGJI_PRIORITY_GUEST_IDS,
+  ANGJI_NIGHT_MARIE_GUEST_ID,
   ANGJI_GUEST_CONFIG_VERSION,
-  getAngjiGuestPositionYOffset
-} from "./angji-guest-config.js?v=angji-guest-mark21-22-offset-20260713";
+  getAngjiGuestPositionYOffset,
+  mapAngjiGuestSpawnsForMode,
+  toAngjiNightGuestSpawn
+} from "./angji-guest-config.js?v=angji-guest-night-marie-extra-20260719";
 import {
   getJinjuOutdoorBackgroundGuestSpawns,
   getJinjuFixedGuestSpawns,
@@ -67,7 +71,7 @@ import {
   getJinjuRooftopGuestRevealDelayMs,
   getJinjuRooftopSequentialGuestSpawns
 } from "./jinju-rooftop-guest-config.js?v=jinju-rooftop-marie-sit-clips-20260705";
-import { createGuestCharacterSystem, shouldSnapPatrolFloorAtTarget } from "./guest-character-system.js?v=angji-guest-mark21-22-offset-20260713";
+import { createGuestCharacterSystem, shouldSnapPatrolFloorAtTarget } from "./guest-character-system.js?v=angji-night-marie-extra-20260719";
 import { applyLocalDevToolsVisibility, isLocalDevEnvironment } from "./local-dev.js?v=local-dev-20260629";
 
 const MODEL_ROOT = "./assets/models/";
@@ -82,6 +86,11 @@ const AUDIO_BGM_ROOT = "./assets/audio/bgm/";
 const TOUR_BGM_FADE_MS = 3000;
 const TOUR_BGM_VOLUME = 1;
 const TOUR_BGM_ENABLED = true;
+const NIGHT_TOUR_BGM_FILE = "BGM_Night01.mp3";
+const NIGHT_CRY_SFX_FILE = "EFT_Crying.mp3";
+const NIGHT_CRY_MIN_INTERVAL_MS = 20000;
+const NIGHT_CRY_MAX_INTERVAL_MS = 30000;
+const NIGHT_CRY_VOLUME = 0.85;
 
 function canUseTourBgm() {
   return TOUR_BGM_ENABLED && isLocalDevEnvironment();
@@ -430,6 +439,7 @@ const healthLabel = document.getElementById("healthLabel");
 const monsterLabel = document.getElementById("monsterLabel");
 const tourModeButton = document.getElementById("tourModeButton");
 const orbitViewButton = document.getElementById("orbitViewButton");
+const nightModeButton = document.getElementById("nightModeButton");
 const sunToggleButton = document.getElementById("sunToggleButton");
 const sunPanel = document.getElementById("sunPanel");
 const seasonSlider = document.getElementById("seasonSlider");
@@ -1764,10 +1774,13 @@ function getTourBgmUrl(config) {
   return `${AUDIO_BGM_ROOT}${fileName}`;
 }
 
-function createTourBgmController() {
+function createTourBgmController(options = {}) {
   let audio = null;
   let fadeFrameId = null;
   let loadedUrl = null;
+  let cryAudio = null;
+  let cryTimerId = null;
+  let nightAmbienceActive = false;
 
   function clampVolume(value) {
     return Math.max(0, Math.min(1, value));
@@ -1838,7 +1851,7 @@ function createTourBgmController() {
 
     const track = getTrack(url);
 
-    if (keepBgm && !track.paused) {
+    if (keepBgm && !track.paused && loadedUrl === url) {
       cancelFade();
 
       if (track.volume < TOUR_BGM_VOLUME - 0.01) {
@@ -1876,14 +1889,151 @@ function createTourBgmController() {
     }
   }
 
-  function preload(config) {
-    const url = getTourBgmUrl(config);
+  function getNightTourBgmUrl() {
+    if (!canUseTourBgm()) {
+      return null;
+    }
 
+    return `${AUDIO_BGM_ROOT}${NIGHT_TOUR_BGM_FILE}`;
+  }
+
+  function stopCryScheduler() {
+    if (cryTimerId !== null) {
+      window.clearTimeout(cryTimerId);
+      cryTimerId = null;
+    }
+  }
+
+  function ensureCryAudio() {
+    if (!cryAudio) {
+      cryAudio = document.createElement("audio");
+      cryAudio.preload = "auto";
+      cryAudio.src = `${AUDIO_BGM_ROOT}${NIGHT_CRY_SFX_FILE}`;
+      cryAudio.load();
+    }
+
+    return cryAudio;
+  }
+
+  function playCryOnce() {
+    if (!canUseTourBgm() || !nightAmbienceActive) {
+      return;
+    }
+
+    const track = ensureCryAudio();
+    track.volume = NIGHT_CRY_VOLUME;
+
+    try {
+      track.currentTime = 0;
+      const playAttempt = track.play();
+
+      if (playAttempt && typeof playAttempt.then === "function") {
+        playAttempt.catch((error) => {
+          console.warn("Night cry SFX play failed:", error);
+        });
+      }
+    } catch (error) {
+      console.warn("Night cry SFX play failed:", error);
+    }
+  }
+
+  function scheduleNextCry() {
+    stopCryScheduler();
+
+    if (!nightAmbienceActive || !canUseTourBgm()) {
+      return;
+    }
+
+    const delay = NIGHT_CRY_MIN_INTERVAL_MS
+      + Math.random() * (NIGHT_CRY_MAX_INTERVAL_MS - NIGHT_CRY_MIN_INTERVAL_MS);
+
+    cryTimerId = window.setTimeout(() => {
+      playCryOnce();
+      scheduleNextCry();
+    }, delay);
+  }
+
+  function startNightCryAmbience() {
+    ensureCryAudio();
+    nightAmbienceActive = true;
+    scheduleNextCry();
+  }
+
+  function stopNightCryAmbience() {
+    nightAmbienceActive = false;
+    stopCryScheduler();
+
+    if (cryAudio) {
+      cryAudio.pause();
+      cryAudio.currentTime = 0;
+    }
+  }
+
+  function playNightTourBgm({ keepBgm = false } = {}) {
+    const url = getNightTourBgmUrl();
+
+    if (!url) {
+      return false;
+    }
+
+    const track = getTrack(url);
+
+    if (keepBgm && !track.paused && loadedUrl === url) {
+      cancelFade();
+
+      if (track.volume < TOUR_BGM_VOLUME - 0.01) {
+        beginFadeIn();
+      }
+
+      startNightCryAmbience();
+      return true;
+    }
+
+    cancelFade();
+
+    if (!keepBgm) {
+      track.currentTime = 0;
+    }
+
+    track.volume = 0;
+
+    try {
+      const playAttempt = track.play();
+
+      if (playAttempt && typeof playAttempt.then === "function") {
+        playAttempt
+          .then(() => {
+            beginFadeIn();
+            startNightCryAmbience();
+          })
+          .catch((error) => {
+            console.warn("Night tour BGM play failed:", error);
+          });
+      } else {
+        beginFadeIn();
+        startNightCryAmbience();
+      }
+
+      return true;
+    } catch (error) {
+      console.warn("Night tour BGM play failed:", error);
+      return false;
+    }
+  }
+
+  function shouldUseNightTourAudio(config) {
+    return isAngjiProjectConfig(config) && Boolean(options.getIsAngjiNightMode?.());
+  }
+
+  function preloadUrl(url) {
     if (!url) {
       return Promise.resolve();
     }
 
-    const track = getTrack(url);
+    const track = document.createElement("audio");
+    track.preload = "auto";
+    track.src = url;
+    track.load();
 
     if (track.readyState >= HTMLMediaElement.HAVE_ENOUGH_DATA) {
       return Promise.resolve();
@@ -1911,7 +2061,26 @@ function createTourBgmController() {
     });
   }
 
+  function preload(config) {
+    const urls = [
+      getTourBgmUrl(config),
+      isAngjiProjectConfig(config) ? getNightTourBgmUrl() : null
+    ].filter(Boolean);
+
+    if (!urls.length) {
+      return Promise.resolve();
+    }
+
+    return Promise.all(urls.map((url) => preloadUrl(url))).then(() => {
+      if (isAngjiProjectConfig(config) && canUseTourBgm()) {
+        ensureCryAudio();
+      }
+    });
+  }
+
   function stopTourBgm({ fadeOut = true } = {}) {
+    stopNightCryAmbience();
+
     if (!audio) {
       return;
     }
@@ -1934,14 +2103,35 @@ function createTourBgmController() {
   return {
     preload,
     onEnterWalkMode(config, walkEntryOptions = {}) {
+      if (shouldUseNightTourAudio(config)) {
+        playNightTourBgm(walkEntryOptions);
+        return;
+      }
+
+      stopNightCryAmbience();
       playTourBgm(config, walkEntryOptions);
     },
     onEnterOrbitMode(config) {
-      if (!getTourBgmUrl(config)) {
+      stopNightCryAmbience();
+
+      if (!getTourBgmUrl(config) && !getNightTourBgmUrl()) {
         return;
       }
 
       stopTourBgm({ fadeOut: true });
+    },
+    syncNightTourAudio(config, { keepBgm = false } = {}) {
+      if (!config) {
+        return;
+      }
+
+      if (shouldUseNightTourAudio(config)) {
+        playNightTourBgm({ keepBgm });
+        return;
+      }
+
+      stopNightCryAmbience();
+      playTourBgm(config, { keepBgm });
     }
   };
 }
@@ -1973,6 +2163,131 @@ function freezeSceneMaterials(materials) {
       material.freeze();
     }
   });
+}
+
+function isAngjiDownlightMaterialName(name) {
+  const normalized = normalizeMaterialName(name).replace(/[\s_-]+/g, "");
+  return /^lightdown0*1$/.test(normalized);
+}
+
+function isAngjiDownlight02MaterialName(name) {
+  const normalized = normalizeMaterialName(name).replace(/[\s_-]+/g, "");
+  // Angji GLB uses "Light_Down02" (also tolerate Light_Down2 / suffixes).
+  return /^lightdown0*2(?:\.\d+)?$/.test(normalized) || normalized.includes("lightdown02");
+}
+
+function collectAngjiDownlightMeshes(modelState) {
+  const meshes = modelState?.meshes || [];
+
+  return meshes.filter((mesh) => (
+    mesh?.isEnabled?.() !== false
+    && getMaterialNames(mesh).some((name) => isAngjiDownlightMaterialName(name))
+  ));
+}
+
+function collectAngjiDownlight02Meshes(modelState) {
+  const meshes = modelState?.meshes || [];
+
+  return meshes.filter((mesh) => {
+    if (mesh?.isEnabled?.() === false) {
+      return false;
+    }
+
+    if (typeof mesh.getTotalVertices === "function" && mesh.getTotalVertices() <= 0) {
+      return false;
+    }
+
+    if (getMaterialNames(mesh).some((name) => isAngjiDownlight02MaterialName(name))) {
+      return true;
+    }
+
+    const meshName = normalizeName(mesh.name || mesh.id || "");
+    return meshName.includes("lightdown02") || meshName.includes("lightdown2");
+  });
+}
+
+function collectUniqueMaterialsFromMeshes(meshes) {
+  const materials = new Set();
+
+  meshes.forEach((mesh) => {
+    if (!mesh?.material) {
+      return;
+    }
+
+    if (Array.isArray(mesh.material.subMaterials)) {
+      mesh.material.subMaterials.filter(Boolean).forEach((material) => materials.add(material));
+      return;
+    }
+
+    materials.add(mesh.material);
+  });
+
+  return [...materials];
+}
+
+function captureMaterialEmissiveState(material) {
+  return {
+    material,
+    emissiveColor: material.emissiveColor?.clone?.() || null,
+    emissiveIntensity: typeof material.emissiveIntensity === "number" ? material.emissiveIntensity : null,
+    disableLighting: typeof material.disableLighting === "boolean" ? material.disableLighting : null,
+    maxSimultaneousLights: typeof material.maxSimultaneousLights === "number" ? material.maxSimultaneousLights : null
+  };
+}
+
+function applyDownlightEmissive(BABYLON, material, options = {}) {
+  if (typeof material.unfreeze === "function") {
+    material.unfreeze();
+  }
+
+  const emissiveColor = options.emissiveColor || new BABYLON.Color3(0.85, 0.72, 0.35);
+  const emissiveIntensity = typeof options.emissiveIntensity === "number" ? options.emissiveIntensity : 3.4;
+
+  if ("emissiveColor" in material) {
+    material.emissiveColor = emissiveColor;
+  }
+
+  if ("emissiveIntensity" in material) {
+    material.emissiveIntensity = emissiveIntensity;
+  }
+
+  if ("disableLighting" in material) {
+    material.disableLighting = false;
+  }
+}
+
+function restoreMaterialEmissiveState(snapshot) {
+  const { material } = snapshot;
+
+  if (!material) {
+    return;
+  }
+
+  if (typeof material.unfreeze === "function") {
+    material.unfreeze();
+  }
+
+  if (snapshot.emissiveColor && material.emissiveColor?.copyFrom) {
+    material.emissiveColor.copyFrom(snapshot.emissiveColor);
+  } else if ("emissiveColor" in material && snapshot.emissiveColor === null) {
+    material.emissiveColor?.set?.(0, 0, 0);
+  }
+
+  if (snapshot.emissiveIntensity !== null && "emissiveIntensity" in material) {
+    material.emissiveIntensity = snapshot.emissiveIntensity;
+  }
+
+  if (snapshot.disableLighting !== null && "disableLighting" in material) {
+    material.disableLighting = snapshot.disableLighting;
+  }
+
+  if (snapshot.maxSimultaneousLights !== null && "maxSimultaneousLights" in material) {
+    material.maxSimultaneousLights = snapshot.maxSimultaneousLights;
+  }
+
+  if (typeof material.freeze === "function") {
+    material.freeze();
+  }
 }
 
 function isDtvTreeMesh(mesh) {
@@ -2730,9 +3045,24 @@ function getFireballMaterial(BABYLON, scene) {
 
   const material = new BABYLON.StandardMaterial("tour-fireball-material", scene);
   material.diffuseColor = new BABYLON.Color3(1, 0.35, 0.04);
-  material.emissiveColor = new BABYLON.Color3(1, 0.28, 0.02);
+  material.emissiveColor = new BABYLON.Color3(1, 0.45, 0.08);
   material.specularColor = new BABYLON.Color3(1, 0.65, 0.18);
+  material.disableLighting = true;
   return material;
+}
+
+function buildFireballHitMeshSet(modelState) {
+  // Prefer collision + people only — full-scene multiPick is a major fireball hitch.
+  const meshes = [
+    ...(modelState?.collisionMeshes || []),
+    ...(modelState?.peopleTargetMeshes || [])
+  ];
+
+  if (meshes.length) {
+    return new Set(meshes.filter((mesh) => mesh && mesh.isEnabled?.() !== false));
+  }
+
+  return new Set((modelState?.projectileHitMeshes || []).filter(Boolean));
 }
 
 function createFireballProjectile(BABYLON, scene, camera) {
@@ -2740,30 +3070,24 @@ function createFireballProjectile(BABYLON, scene, camera) {
   const position = camera.position.add(direction.scale(FIREBALL_SETTINGS.spawnDistance));
   const mesh = BABYLON.MeshBuilder.CreateSphere("tour-fireball", {
     diameter: FIREBALL_SETTINGS.radius * 2,
-    segments: 16
+    segments: 8
   }, scene);
 
   mesh.position.copyFrom(position);
   mesh.material = getFireballMaterial(BABYLON, scene);
   mesh.isPickable = false;
+  mesh.checkCollisions = false;
+  mesh.applyFog = false;
 
-  const light = new BABYLON.PointLight("tour-fireball-light", BABYLON.Vector3.Zero(), scene);
-  light.parent = mesh;
-  light.position.set(0, 0, 0);
-  light.intensity = 0.8;
-  light.range = 5;
-  light.diffuse = new BABYLON.Color3(1, 0.35, 0.05);
-
+  // No PointLight: dynamic lights force per-frame material light recomputation and hitch hard in night mode.
   return {
     mesh,
-    light,
     direction,
     distance: 0
   };
 }
 
 function disposeFireballProjectile(projectile) {
-  projectile.light?.dispose();
   projectile.mesh?.dispose();
 }
 
@@ -4393,7 +4717,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
   let collisionMeshSet = new Set(activeCollisionMeshes);
   let localGroundMeshSet = groundMeshSet;
   let localCollisionMeshSet = collisionMeshSet;
-  let projectileHitMeshSet = new Set(initialModelState.projectileHitMeshes);
+  let projectileHitMeshSet = buildFireballHitMeshSet(initialModelState);
   let activeTreeMeshes = initialModelState.treeMeshes || [];
   let lastLocalMeshPosition = null;
   let lastTreeViewerPosition = null;
@@ -4511,6 +4835,93 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     getFullBounds,
     softenModelMaterialReflections,
     targetHeight: 1.75,
+    getPlayerPosition: () => {
+      if (!walkMode) {
+        return null;
+      }
+
+      const visualPosition = tpsSystem?.getCharacter?.()?.getVisualPosition?.();
+
+      if (visualPosition) {
+        return visualPosition;
+      }
+
+      const root = tpsSystem?.getCharacter?.()?.getRoot?.();
+
+      if (root?.position) {
+        return root.position;
+      }
+
+      return walkCamera?.position || null;
+    },
+    getCollisionMeshes: () => localCollisionMeshSet.size > 0 ? localCollisionMeshSet : collisionMeshSet,
+    canGuestMoveHorizontal: (fromFeetPosition, dirX, dirZ, stepDistance) => {
+      if (!(stepDistance > 0.001)) {
+        return true;
+      }
+
+      const collisionSet = localCollisionMeshSet.size > 0 ? localCollisionMeshSet : collisionMeshSet;
+
+      if (!collisionSet.size) {
+        return true;
+      }
+
+      const movement = new BABYLON.Vector3(dirX, 0, dirZ).normalize().scale(stepDistance);
+      const probePosition = new BABYLON.Vector3(
+        fromFeetPosition.x,
+        fromFeetPosition.y + EYE_HEIGHT,
+        fromFeetPosition.z
+      );
+      const modelBounds = activeModelState?.model?.bounds;
+      const hit = findBodyCollision(
+        BABYLON,
+        scene,
+        probePosition,
+        movement,
+        collisionSet,
+        modelBounds
+      );
+
+      if (!hit) {
+        return true;
+      }
+
+      // Allow shallow ground/step contacts; block walls and furniture blockers.
+      if (isLowStepCollision(hit) || isStairCollisionHit(hit)) {
+        return true;
+      }
+
+      return false;
+    },
+    hasGuestLineOfSight: (fromFeetPosition, toFeetPosition) => {
+      const collisionSet = localCollisionMeshSet.size > 0 ? localCollisionMeshSet : collisionMeshSet;
+
+      if (!collisionSet.size) {
+        return true;
+      }
+
+      const origin = new BABYLON.Vector3(
+        fromFeetPosition.x,
+        fromFeetPosition.y + 1.35,
+        fromFeetPosition.z
+      );
+      const target = new BABYLON.Vector3(
+        toFeetPosition.x,
+        (toFeetPosition.y || fromFeetPosition.y) + 1.35,
+        toFeetPosition.z
+      );
+      const delta = target.subtract(origin);
+      const distance = delta.length();
+
+      if (distance <= 0.05) {
+        return true;
+      }
+
+      const ray = new BABYLON.Ray(origin, delta.normalize(), Math.max(0.05, distance - 0.2));
+      const hits = getRayHits(scene, ray, (mesh) => isRayPickableCollisionMesh(mesh, collisionSet));
+      const blockingHit = hits.map(getBlockingBodyHit).find(Boolean);
+      return !blockingHit;
+    },
     resolveSpawnPosition: (spawn) => {
       const guestModelState = getActiveGuestModelState();
 
@@ -4594,8 +5005,15 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     }
 
     const run = () => {
-      void guestCharacterSystem?.preload(getAngjiOutdoorGuestSpawns(), { parallel: true, showOnLoad: false });
-      void guestCharacterSystem?.preload(getAngjiSimultaneousGuestSpawns(), { parallel: true, showOnLoad: false });
+      const nightModeGuests = isAngjiNightGuestMode();
+      void guestCharacterSystem?.preload(
+        mapAngjiGuestSpawnsForMode(getAngjiOutdoorGuestSpawns(), nightModeGuests),
+        { parallel: true, showOnLoad: false }
+      );
+      void guestCharacterSystem?.preload(
+        mapAngjiGuestSpawnsForMode(getAngjiSimultaneousGuestSpawns(), nightModeGuests),
+        { parallel: true, showOnLoad: false }
+      );
     };
 
     if (typeof window.requestIdleCallback === "function") {
@@ -5108,6 +5526,66 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     return walkMode && isAngjiProjectConfig(activeModelState.config);
   }
 
+  function isAngjiNightGuestMode() {
+    return Boolean(options.getIsAngjiNightMode?.());
+  }
+
+  function getAngjiOutdoorSpawnsForCurrentLighting() {
+    const spawns = mapAngjiGuestSpawnsForMode(getAngjiOutdoorGuestSpawns(), isAngjiNightGuestMode());
+
+    if (!isAngjiNightGuestMode()) {
+      return spawns;
+    }
+
+    // Extra night-only overlook Marie (does not replace Mark-1 Devi).
+    return [...spawns, ...getAngjiNightExtraGuestSpawns()];
+  }
+
+  function getAngjiOutdoorBackgroundSpawnsForCurrentLighting() {
+    return mapAngjiGuestSpawnsForMode(getAngjiOutdoorBackgroundGuestSpawns(), isAngjiNightGuestMode());
+  }
+
+  function getAngjiIndoorSpawnsForCurrentLighting() {
+    return mapAngjiGuestSpawnsForMode(getAngjiIndoorGuestSpawns(), isAngjiNightGuestMode());
+  }
+
+  function getAngjiIndoorBackgroundSpawnsForCurrentLighting() {
+    return mapAngjiGuestSpawnsForMode(getAngjiIndoorBackgroundGuestSpawns(), isAngjiNightGuestMode());
+  }
+
+  async function refreshAngjiGuestsForNightMode() {
+    if (!isAngjiProjectConfig(activeModelState.config)) {
+      return;
+    }
+
+    await yieldFrames(1);
+    guestCharacterSystem?.disposeGuests?.({ onlyIds: getAngjiAllGuestIds() });
+    await yieldFrames(1);
+
+    // Warm night guest assets in parallel before spawn.
+    if (isAngjiNightGuestMode()) {
+      const marieTemplate = getAngjiNightExtraGuestSpawns()[0];
+      const nightTemplate = toAngjiNightGuestSpawn({
+        id: "Mark-Night-Template",
+        position: { x: 0, y: 0, z: 0 },
+        rotationY: 0
+      });
+
+      await Promise.all([
+        marieTemplate ? guestCharacterSystem?.preloadAsset?.(marieTemplate) : Promise.resolve(),
+        guestCharacterSystem?.preloadAsset?.(nightTemplate)
+      ]);
+    }
+
+    if (walkMode) {
+      await scheduleOutdoorGuestSpawn();
+      await scheduleIndoorGuestSpawn();
+      return;
+    }
+
+    await scheduleOutdoorGuestSpawn();
+  }
+
   function canUseJinjuOutdoorGuests() {
     return !walkMode && isJinjuProjectConfig(activeModelState.config);
   }
@@ -5196,30 +5674,46 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     const spawnToken = ++angjiOutdoorGuestSpawnToken;
     guestCharacterSystem?.hide({ onlyIds: getJinjuAllGuestIds() });
 
-    const allOutdoorSpawns = getAngjiOutdoorGuestSpawns();
-    const outdoorBackgroundSpawns = getAngjiOutdoorBackgroundGuestSpawns();
+    const allOutdoorSpawns = getAngjiOutdoorSpawnsForCurrentLighting();
+    const outdoorBackgroundSpawns = getAngjiOutdoorBackgroundSpawnsForCurrentLighting();
+    const nightModeGuests = isAngjiNightGuestMode();
 
     try {
-      await guestCharacterSystem.ensureSpawned(allOutdoorSpawns, { parallel: true, showOnLoad: false });
+      // Night: load Devis sequentially — parallel ImportMeshAsync of the same
+      // Devi.glb into one scene often fails and leaves enemies missing.
+      await guestCharacterSystem.ensureSpawned(allOutdoorSpawns, {
+        parallel: !nightModeGuests,
+        showOnLoad: false,
+        yieldBetweenLoads: nightModeGuests ? 1 : 0
+      });
 
       if (spawnToken !== angjiOutdoorGuestSpawnToken) {
         return;
       }
 
-      guestCharacterSystem.revealGuests(ANGJI_PRIORITY_GUEST_IDS);
+      guestCharacterSystem.revealGuests(
+        nightModeGuests
+          ? [...ANGJI_PRIORITY_GUEST_IDS, ANGJI_NIGHT_MARIE_GUEST_ID]
+          : ANGJI_PRIORITY_GUEST_IDS
+      );
 
       for (const spawn of outdoorBackgroundSpawns) {
         if (spawnToken !== angjiOutdoorGuestSpawnToken) {
           return;
         }
 
-        await yieldFrames(getBackgroundGuestLoadYieldFrames(spawn.id));
+        if (!nightModeGuests) {
+          await yieldFrames(getBackgroundGuestLoadYieldFrames(spawn.id));
+        }
+
         guestCharacterSystem.revealGuest(spawn.id);
 
-        const delayMs = getBackgroundGuestRevealDelayMs(spawn.id);
+        if (!nightModeGuests) {
+          const delayMs = getBackgroundGuestRevealDelayMs(spawn.id);
 
-        if (delayMs > 0) {
-          await wait(delayMs);
+          if (delayMs > 0) {
+            await wait(delayMs);
+          }
         }
       }
     } catch (error) {
@@ -5551,11 +6045,16 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     guestCharacterSystem.hide({ onlyIds: getAngjiIndoorGuestIds() });
     guestCharacterSystem?.hide({ onlyIds: getJinjuAllGuestIds() });
 
-    const allIndoorSpawns = getAngjiIndoorGuestSpawns();
-    const backgroundSpawns = getAngjiIndoorBackgroundGuestSpawns();
+    const allIndoorSpawns = getAngjiIndoorSpawnsForCurrentLighting();
+    const backgroundSpawns = getAngjiIndoorBackgroundSpawnsForCurrentLighting();
+    const nightModeGuests = isAngjiNightGuestMode();
 
     try {
-      await guestCharacterSystem.ensureSpawned(allIndoorSpawns, { parallel: true, showOnLoad: false });
+      await guestCharacterSystem.ensureSpawned(allIndoorSpawns, {
+        parallel: !nightModeGuests,
+        showOnLoad: false,
+        yieldBetweenLoads: nightModeGuests ? 1 : 0
+      });
 
       if (spawnToken !== angjiIndoorGuestSpawnToken) {
         return;
@@ -5567,7 +6066,9 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
       const loadedIds = new Set(simultaneousGuests.map((guest) => guest.spawn.id));
 
       if (ANGJI_SIMULTANEOUS_GUEST_IDS.every((guestId) => loadedIds.has(guestId))) {
-        guestCharacterSystem.revealGuests(ANGJI_SIMULTANEOUS_GUEST_IDS, { syncAnimations: true });
+        guestCharacterSystem.revealGuests(ANGJI_SIMULTANEOUS_GUEST_IDS, {
+          syncAnimations: !nightModeGuests
+        });
       }
 
       for (const spawn of backgroundSpawns) {
@@ -5575,13 +6076,18 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
           return;
         }
 
-        await yieldFrames(getBackgroundGuestLoadYieldFrames(spawn.id));
+        if (!nightModeGuests) {
+          await yieldFrames(getBackgroundGuestLoadYieldFrames(spawn.id));
+        }
+
         guestCharacterSystem.revealGuest(spawn.id);
 
-        const delayMs = getBackgroundGuestRevealDelayMs(spawn.id);
+        if (!nightModeGuests) {
+          const delayMs = getBackgroundGuestRevealDelayMs(spawn.id);
 
-        if (delayMs > 0) {
-          await wait(delayMs);
+          if (delayMs > 0) {
+            await wait(delayMs);
+          }
         }
       }
     } catch (error) {
@@ -5991,7 +6497,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     collisionMeshSet = new Set(activeCollisionMeshes);
     localGroundMeshSet = groundMeshSet;
     localCollisionMeshSet = collisionMeshSet;
-    projectileHitMeshSet = new Set(nextModelState.projectileHitMeshes);
+    projectileHitMeshSet = buildFireballHitMeshSet(nextModelState);
     restoreTreeMeshesInitialRotation(activeTreeMeshes);
     activeTreeMeshes = nextModelState.treeMeshes || [];
     lastLocalMeshPosition = null;
@@ -6154,7 +6660,9 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
       const fireball = fireballs[index];
       const stepDistance = FIREBALL_SETTINGS.speed * deltaScale;
       const ray = new BABYLON.Ray(fireball.mesh.position, fireball.direction, stepDistance + FIREBALL_SETTINGS.radius);
-      const hit = getRayHits(scene, ray, isFireballHitMesh)[0] || null;
+      // First hit only — multiPick against the building mesh set was a frame hitch.
+      const picked = scene.pickWithRay(ray, isFireballHitMesh);
+      const hit = picked?.hit && picked.pickedMesh && picked.pickedPoint ? picked : null;
       const enemyHitDistance = getEnemyHitDistance(fireball.mesh.position, fireball.direction, stepDistance + FIREBALL_SETTINGS.radius);
       const meshHitDistance = typeof hit?.distance === "number" ? hit.distance : Number.POSITIVE_INFINITY;
 
@@ -6721,6 +7229,9 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     options.tourBgm?.onEnterOrbitMode(leavingTourConfig);
     orbitCamera.attachControl(canvas, false);
     scene.activeCamera = orbitCamera;
+    // Restore the project's initial orbit framing after leaving tour.
+    applyOrbitCameraStart(BABYLON, orbitCamera, orbitModelState);
+    applyOrbitCameraConstraints(BABYLON, orbitCamera, orbitModelState);
     floorLabel.textContent = "Orbit View";
     currentLabel = "orbit view";
     setStatus("Orbit view ready. Middle mouse rotates, Shift+middle pans, wheel zooms to cursor. Use Tour Mode to enter walk mode.");
@@ -7059,8 +7570,912 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     enterWalkMode,
     enterOrbitMode,
     setModelState,
+    getActiveModelState: () => activeModelState,
     isWalkMode: () => walkMode,
+    refreshAngjiGuestsForNightMode,
     preloadCharacter: () => tpsSystem?.ensureLoaded?.()
+  };
+}
+
+function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = {}) {
+  const DAY_CLEAR_COLOR = scene.clearColor.clone();
+  const DAY_AMBIENT_INTENSITY = ambient.intensity;
+  const DAY_AMBIENT_GROUND = ambient.groundColor?.clone?.() || new BABYLON.Color3(0.35, 0.32, 0.28);
+  const DAY_AMBIENT_DIFFUSE = ambient.diffuse?.clone?.() || new BABYLON.Color3(1, 1, 1);
+  const DAY_SUN_INTENSITY = sun.intensity;
+  const DAY_SUN_DIFFUSE = sun.diffuse?.clone?.() || new BABYLON.Color3(1, 0.94, 0.82);
+  const DAY_SUN_SPECULAR = sun.specular?.clone?.() || BABYLON.Color3.Black();
+  const DAY_SUN_DIRECTION = sun.direction?.clone?.() || new BABYLON.Vector3(-0.45, -0.9, 0.25);
+  const DAY_SUN_POSITION = sun.position?.clone?.() || new BABYLON.Vector3(80, 120, -60);
+  const DAY_FOG_MODE = scene.fogMode;
+  const DAY_FOG_COLOR = scene.fogColor?.clone?.() || new BABYLON.Color3(0.62, 0.72, 0.86);
+  const DAY_FOG_DENSITY = typeof scene.fogDensity === "number" ? scene.fogDensity : 0.01;
+  const DAY_FOG_START = typeof scene.fogStart === "number" ? scene.fogStart : 0;
+  const DAY_FOG_END = typeof scene.fogEnd === "number" ? scene.fogEnd : 1000;
+
+  // Deep night sky + cool moonlight wash.
+  const NIGHT_CLEAR_COLOR = new BABYLON.Color4(0.018, 0.028, 0.06, 1);
+  const NIGHT_FOG_COLOR = new BABYLON.Color3(0.03, 0.045, 0.09);
+  const NIGHT_FOG_DENSITY = 0.008;
+  const NIGHT_AMBIENT_INTENSITY = 0.09;
+  const NIGHT_AMBIENT_DIFFUSE = new BABYLON.Color3(0.32, 0.4, 0.65);
+  const NIGHT_AMBIENT_GROUND = new BABYLON.Color3(0.03, 0.04, 0.08);
+  const NIGHT_MOON_INTENSITY = 1.44;
+  const NIGHT_MOON_DIFFUSE = new BABYLON.Color3(0.55, 0.68, 1);
+  const NIGHT_MOON_SPECULAR = new BABYLON.Color3(0.18, 0.22, 0.35);
+  const NIGHT_MOON_DIRECTION = new BABYLON.Vector3(-0.32, -0.88, 0.38).normalize();
+  const NIGHT_MOON_POSITION = new BABYLON.Vector3(170, 260, -130);
+  const MAX_CLUSTERED_LIGHTS = 8;
+  const CLUSTER_MERGE_DISTANCE = 6.5;
+  const DOWN02_TWINKLE_COUNT = 3;
+  const NIGHT_MATERIAL_CHUNK_SIZE = 64;
+
+  let nightMode = false;
+  let nightSetupToken = 0;
+  let downlightLights = [];
+  let downlight02Flares = [];
+  let downlight02TwinkleMaterials = [];
+  let downlight02MaterialOverrides = [];
+  let nightGlowLayer = null;
+  let nightFlareObserver = null;
+  let nightFlareTexture = null;
+  let materialSnapshots = [];
+  let sceneMaterialLightLimitSnapshots = [];
+  let peopleVisibilitySnapshots = [];
+  let litModelState = null;
+  let moonRoot = null;
+  let moonMeshes = [];
+
+  function cancelNightSetup() {
+    nightSetupToken += 1;
+  }
+
+  function yieldNightFrame() {
+    return new Promise((resolve) => {
+      window.requestAnimationFrame(() => resolve());
+    });
+  }
+
+  function isNightSetupActive(token) {
+    return nightMode && token === nightSetupToken;
+  }
+
+  function notifyNightModeChange(enabled) {
+    // One frame so sky paints first, then guest refresh can start.
+    window.requestAnimationFrame(() => {
+      if (nightMode !== enabled) {
+        return;
+      }
+
+      options.onNightModeChange?.(enabled);
+    });
+  }
+
+  function pickRandomItems(items, count) {
+    const pool = [...items];
+    const picked = [];
+
+    while (picked.length < count && pool.length) {
+      const index = Math.floor(Math.random() * pool.length);
+      picked.push(pool.splice(index, 1)[0]);
+    }
+
+    return picked;
+  }
+
+  function getActiveModelState() {
+    return options.getActiveModelState?.() || null;
+  }
+
+  function canToggleNightMode() {
+    return isAngjiProjectConfig(getActiveModelState()?.config)
+      && !options.isWalkMode?.();
+  }
+
+  function canKeepNightMode() {
+    // Tour keeps night lighting; only orbit view may toggle day/night.
+    return isAngjiProjectConfig(getActiveModelState()?.config);
+  }
+
+  function isPeopleMaterialMesh(mesh) {
+    return getMaterialNames(mesh).some((name) => {
+      const normalized = normalizeName(name);
+      return normalized.includes("people");
+    });
+  }
+
+  function collectNightModelStates() {
+    const active = getActiveModelState();
+
+    if (!active) {
+      return [];
+    }
+
+    const states = [active];
+
+    if (active.tourModelState) {
+      states.push(active.tourModelState);
+    }
+
+    if (active.orbitModelState) {
+      states.push(active.orbitModelState);
+    }
+
+    return states;
+  }
+
+  function restorePeopleMeshesVisibility() {
+    peopleVisibilitySnapshots.forEach((snapshot) => {
+      try {
+        snapshot.mesh.setEnabled(snapshot.isEnabled);
+        snapshot.mesh.visibility = snapshot.visibility;
+      } catch {
+        // ignore stale people meshes
+      }
+    });
+    peopleVisibilitySnapshots = [];
+  }
+
+  function hidePeopleMeshesForNight() {
+    restorePeopleMeshesVisibility();
+
+    const seen = new Set();
+
+    collectNightModelStates().forEach((modelState) => {
+      (modelState?.meshes || []).forEach((mesh) => {
+        if (!mesh || seen.has(mesh.uniqueId) || !isPeopleMaterialMesh(mesh)) {
+          return;
+        }
+
+        seen.add(mesh.uniqueId);
+        peopleVisibilitySnapshots.push({
+          mesh,
+          isEnabled: mesh.isEnabled(),
+          visibility: typeof mesh.visibility === "number" ? mesh.visibility : 1
+        });
+        mesh.setEnabled(false);
+        mesh.visibility = 0;
+      });
+    });
+  }
+
+  function disposeMoonVisual() {
+    moonMeshes.forEach((mesh) => {
+      try {
+        mesh.material?.dispose?.();
+        mesh.dispose();
+      } catch {
+        // ignore stale moon meshes
+      }
+    });
+    moonMeshes = [];
+
+    try {
+      moonRoot?.dispose();
+    } catch {
+      // ignore
+    }
+
+    moonRoot = null;
+  }
+
+  function ensureMoonVisual() {
+    if (moonRoot) {
+      moonRoot.setEnabled(true);
+      return;
+    }
+
+    moonRoot = new BABYLON.TransformNode("angji-moon-root", scene);
+
+    const moon = BABYLON.MeshBuilder.CreateSphere("angji-moon", {
+      diameter: 22,
+      segments: 24
+    }, scene);
+    moon.parent = moonRoot;
+    moon.position.copyFrom(NIGHT_MOON_POSITION);
+    moon.isPickable = false;
+    moon.checkCollisions = false;
+    moon.applyFog = false;
+    moon.infiniteDistance = true;
+
+    const moonMat = new BABYLON.StandardMaterial("angji-moon-mat", scene);
+    moonMat.disableLighting = true;
+    moonMat.emissiveColor = new BABYLON.Color3(0.92, 0.95, 1);
+    moonMat.diffuseColor = BABYLON.Color3.Black();
+    moonMat.specularColor = BABYLON.Color3.Black();
+    moon.material = moonMat;
+
+    const halo = BABYLON.MeshBuilder.CreateSphere("angji-moon-halo", {
+      diameter: 48,
+      segments: 16
+    }, scene);
+    halo.parent = moonRoot;
+    halo.position.copyFrom(NIGHT_MOON_POSITION);
+    halo.isPickable = false;
+    halo.checkCollisions = false;
+    halo.applyFog = false;
+    halo.infiniteDistance = true;
+    halo.visibility = 0.55;
+
+    const haloMat = new BABYLON.StandardMaterial("angji-moon-halo-mat", scene);
+    haloMat.disableLighting = true;
+    haloMat.emissiveColor = new BABYLON.Color3(0.35, 0.45, 0.85);
+    haloMat.diffuseColor = BABYLON.Color3.Black();
+    haloMat.specularColor = BABYLON.Color3.Black();
+    haloMat.alpha = 0.18;
+    haloMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+    halo.material = haloMat;
+
+    const glow = BABYLON.MeshBuilder.CreateSphere("angji-moon-glow", {
+      diameter: 78,
+      segments: 12
+    }, scene);
+    glow.parent = moonRoot;
+    glow.position.copyFrom(NIGHT_MOON_POSITION);
+    glow.isPickable = false;
+    glow.checkCollisions = false;
+    glow.applyFog = false;
+    glow.infiniteDistance = true;
+    glow.visibility = 0.35;
+
+    const glowMat = new BABYLON.StandardMaterial("angji-moon-glow-mat", scene);
+    glowMat.disableLighting = true;
+    glowMat.emissiveColor = new BABYLON.Color3(0.12, 0.18, 0.42);
+    glowMat.diffuseColor = BABYLON.Color3.Black();
+    glowMat.specularColor = BABYLON.Color3.Black();
+    glowMat.alpha = 0.08;
+    glowMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+    glow.material = glowMat;
+
+    moonMeshes = [moon, halo, glow];
+  }
+
+  function disposeNightFlareSystem() {
+    if (nightFlareObserver) {
+      scene.onBeforeRenderObservable.remove(nightFlareObserver);
+      nightFlareObserver = null;
+    }
+
+    downlight02Flares.forEach((flare) => {
+      try {
+        nightGlowLayer?.removeIncludedOnlyMesh?.(flare.mesh);
+        flare.mesh?.dispose();
+        flare.material?.dispose();
+      } catch {
+        // ignore stale flares
+      }
+    });
+    downlight02Flares = [];
+    downlight02TwinkleMaterials = [];
+
+    try {
+      nightGlowLayer?.dispose?.();
+    } catch {
+      // ignore
+    }
+    nightGlowLayer = null;
+
+    try {
+      nightFlareTexture?.dispose?.();
+    } catch {
+      // ignore
+    }
+    nightFlareTexture = null;
+  }
+
+  function ensureNightFlareTexture() {
+    if (nightFlareTexture) {
+      return nightFlareTexture;
+    }
+
+    const size = 128;
+    const texture = new BABYLON.DynamicTexture("angji-night-flare-tex", { width: size, height: size }, scene, false);
+    const context = texture.getContext();
+    const center = size / 2;
+    const gradient = context.createRadialGradient(center, center, 0, center, center, center);
+    // Match original building-twinkle flare softness.
+    gradient.addColorStop(0, "rgba(255, 245, 210, 1)");
+    gradient.addColorStop(0.18, "rgba(255, 220, 140, 0.95)");
+    gradient.addColorStop(0.45, "rgba(255, 180, 80, 0.35)");
+    gradient.addColorStop(1, "rgba(255, 160, 60, 0)");
+    context.clearRect(0, 0, size, size);
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, size, size);
+    texture.hasAlpha = true;
+    texture.update();
+    nightFlareTexture = texture;
+    return texture;
+  }
+
+  function ensureNightGlowLayer() {
+    if (nightGlowLayer || typeof BABYLON.GlowLayer !== "function") {
+      return nightGlowLayer;
+    }
+
+    nightGlowLayer = new BABYLON.GlowLayer("angji-night-glow", scene, {
+      mainTextureFixedSize: 256,
+      blurKernelSize: 64
+    });
+    nightGlowLayer.intensity = 1.15;
+    return nightGlowLayer;
+  }
+
+  function createDown02Flare(position, index) {
+    const texture = ensureNightFlareTexture();
+    const material = new BABYLON.StandardMaterial(`angji-down02-flare-mat-${index}`, scene);
+    material.diffuseTexture = texture;
+    material.opacityTexture = texture;
+    material.emissiveTexture = texture;
+    material.emissiveColor = new BABYLON.Color3(1, 0.85, 0.45);
+    material.disableLighting = true;
+    material.backFaceCulling = false;
+    material.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+    material.alpha = 0.75;
+    material.useAlphaFromDiffuseTexture = true;
+
+    const mesh = BABYLON.MeshBuilder.CreatePlane(`angji-down02-flare-${index}`, {
+      width: 1,
+      height: 1,
+      sideOrientation: BABYLON.Mesh.DOUBLESIDE
+    }, scene);
+    mesh.position.copyFrom(position);
+    mesh.material = material;
+    mesh.isPickable = false;
+    mesh.checkCollisions = false;
+    mesh.applyFog = false;
+    mesh.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
+    mesh.renderingGroupId = 1;
+
+    ensureNightGlowLayer()?.addIncludedOnlyMesh?.(mesh);
+
+    return {
+      mesh,
+      material,
+      baseScale: 0.7,
+      phase: Math.random() * Math.PI * 2,
+      speed: 1.4 + Math.random() * 1.8,
+      sparkChance: 0.012 + Math.random() * 0.02
+    };
+  }
+
+  function startDown02FlareTwinkle() {
+    if (nightFlareObserver) {
+      return;
+    }
+
+    if (!downlight02Flares.length && !downlight02TwinkleMaterials.length) {
+      return;
+    }
+
+    nightFlareObserver = scene.onBeforeRenderObservable.add(() => {
+      if (!nightMode) {
+        return;
+      }
+
+      const camera = scene.activeCamera;
+      const time = performance.now() * 0.001;
+
+      downlight02TwinkleMaterials.forEach((entry) => {
+        const pulse = 0.7
+          + 0.18 * Math.sin(time * entry.speed + entry.phase)
+          + 0.1 * Math.sin(time * entry.speed * 2.35 + entry.phase * 1.4);
+        const spark = Math.random() < entry.sparkChance ? 0.2 + Math.random() * 0.25 : 0;
+        const intensity = Math.min(1.15, Math.max(0.55, pulse + spark));
+        entry.material.emissiveIntensity = entry.baseIntensity * intensity;
+        entry.material.emissiveColor?.set?.(
+          entry.baseColor.r * (0.85 + intensity * 0.2),
+          entry.baseColor.g * (0.85 + intensity * 0.2),
+          entry.baseColor.b * (0.85 + intensity * 0.2)
+        );
+      });
+
+      // Same twinkle curve as the earlier building downlight flares.
+      downlight02Flares.forEach((flare) => {
+        const twinkle = 0.55
+          + 0.28 * Math.sin(time * flare.speed + flare.phase)
+          + 0.17 * Math.sin(time * flare.speed * 2.35 + flare.phase * 1.7);
+        const spark = Math.random() < flare.sparkChance ? 0.35 + Math.random() * 0.45 : 0;
+        const intensity = Math.min(1.35, Math.max(0.25, twinkle + spark));
+
+        flare.material.emissiveColor.set(1 * intensity, 0.82 * intensity, 0.42 * intensity);
+        flare.material.alpha = 0.35 + intensity * 0.55;
+
+        let distanceScale = 1;
+
+        if (camera?.position) {
+          const distance = BABYLON.Vector3.Distance(camera.position, flare.mesh.position);
+          distanceScale = 1 + Math.min(22, distance) * 0.05;
+        }
+
+        const scale = flare.baseScale * distanceScale * (0.85 + intensity * 0.45);
+        flare.mesh.scaling.set(scale, scale, scale);
+      });
+    });
+  }
+
+  function disposeDownlightLights() {
+    downlightLights.forEach((light) => {
+      try {
+        light.dispose();
+      } catch {
+        // ignore stale lights
+      }
+    });
+    downlightLights = [];
+    disposeNightFlareSystem();
+  }
+
+  function restoreDownlight02MaterialOverrides() {
+    downlight02MaterialOverrides.forEach(({ mesh, originalMaterial, clonedMaterial }) => {
+      try {
+        if (mesh && !mesh.isDisposed?.()) {
+          mesh.material = originalMaterial;
+        }
+      } catch {
+        // ignore stale mesh material restore
+      }
+
+      try {
+        clonedMaterial?.dispose?.();
+      } catch {
+        // ignore stale clone dispose
+      }
+    });
+    downlight02MaterialOverrides = [];
+  }
+
+  function restoreDownlightMaterials() {
+    materialSnapshots.forEach(restoreMaterialEmissiveState);
+    materialSnapshots = [];
+    restoreDownlight02MaterialOverrides();
+  }
+
+  function restoreSceneMaterialLightLimits() {
+    sceneMaterialLightLimitSnapshots.forEach((snapshot) => {
+      const { material } = snapshot;
+
+      if (!material || !("maxSimultaneousLights" in material)) {
+        return;
+      }
+
+      if (typeof material.unfreeze === "function") {
+        material.unfreeze();
+      }
+
+      material.maxSimultaneousLights = snapshot.maxSimultaneousLights;
+
+      if (typeof material.freeze === "function") {
+        material.freeze();
+      }
+    });
+    sceneMaterialLightLimitSnapshots = [];
+  }
+
+  function prepareModelMaterialLightLimit(material) {
+    if (!material || !("maxSimultaneousLights" in material)) {
+      return;
+    }
+
+    if ((material.maxSimultaneousLights || 4) >= 8) {
+      return;
+    }
+
+    sceneMaterialLightLimitSnapshots.push({
+      material,
+      maxSimultaneousLights: material.maxSimultaneousLights
+    });
+
+    if (typeof material.unfreeze === "function") {
+      material.unfreeze();
+    }
+
+    // Ambient + moonlight + Down01/Down02 clustered spots.
+    material.maxSimultaneousLights = 8;
+  }
+
+  async function prepareModelMaterialsForNightLightsChunked(meshes, token) {
+    restoreSceneMaterialLightLimits();
+
+    const materials = collectUniqueMaterialsFromMeshes(meshes || []);
+
+    for (let index = 0; index < materials.length; index += NIGHT_MATERIAL_CHUNK_SIZE) {
+      if (!isNightSetupActive(token)) {
+        return false;
+      }
+
+      const chunk = materials.slice(index, index + NIGHT_MATERIAL_CHUNK_SIZE);
+      chunk.forEach(prepareModelMaterialLightLimit);
+
+      // Yield only between chunks — keep night setup to a few frames total.
+      if (index + NIGHT_MATERIAL_CHUNK_SIZE < materials.length) {
+        await yieldNightFrame();
+      }
+    }
+
+    return isNightSetupActive(token);
+  }
+
+  function collectNightLitMeshes(modelState) {
+    return (modelState.meshes || []).filter((mesh) => (
+      mesh
+      && mesh.isEnabled()
+      && (typeof mesh.visibility !== "number" || mesh.visibility > 0.02)
+      && !mesh.metadata?.tourGuest
+      && !mesh.metadata?.angjiCollisionInvisible
+    ));
+  }
+
+  function collectDownlightWorldPositions(downlightMeshes, yOffset = -0.35) {
+    const positions = [];
+
+    downlightMeshes.forEach((mesh) => {
+      mesh.computeWorldMatrix(true);
+      const center = mesh.getBoundingInfo?.()?.boundingBox?.centerWorld;
+
+      if (!center) {
+        return;
+      }
+
+      positions.push(center.clone().addInPlace(new BABYLON.Vector3(0, yOffset, 0)));
+    });
+
+    return positions;
+  }
+
+  function clusterDownlightPositions(BABYLON, positions, options = {}) {
+    const mergeDistance = options.mergeDistance ?? CLUSTER_MERGE_DISTANCE;
+    const maxClusters = options.maxClusters ?? MAX_CLUSTERED_LIGHTS;
+    const clusters = [];
+
+    positions.forEach((position) => {
+      let nearest = null;
+      let nearestDistance = Number.POSITIVE_INFINITY;
+
+      clusters.forEach((cluster) => {
+        const distance = BABYLON.Vector3.Distance(position, cluster.center);
+
+        if (distance < nearestDistance) {
+          nearest = cluster;
+          nearestDistance = distance;
+        }
+      });
+
+      const canMerge = nearest && nearestDistance <= mergeDistance;
+
+      if (canMerge || clusters.length >= maxClusters) {
+        const target = canMerge
+          ? nearest
+          : clusters.reduce((best, cluster) => {
+            const distance = BABYLON.Vector3.Distance(position, cluster.center);
+            if (!best || distance < best.distance) {
+              return { cluster, distance };
+            }
+            return best;
+          }, null)?.cluster;
+
+        if (target) {
+          target.points.push(position);
+          target.center = target.points
+            .reduce((sum, point) => sum.add(point), BABYLON.Vector3.Zero())
+            .scale(1 / target.points.length);
+          return;
+        }
+      }
+
+      clusters.push({
+        center: position.clone(),
+        points: [position]
+      });
+    });
+
+    return clusters;
+  }
+
+  function applyNightEnvironment() {
+    scene.clearColor.copyFrom(NIGHT_CLEAR_COLOR);
+    scene.fogMode = BABYLON.Scene.FOGMODE_EXP2;
+    scene.fogColor.copyFrom(NIGHT_FOG_COLOR);
+    scene.fogDensity = NIGHT_FOG_DENSITY;
+
+    ambient.intensity = NIGHT_AMBIENT_INTENSITY;
+    ambient.diffuse?.copyFrom?.(NIGHT_AMBIENT_DIFFUSE);
+    ambient.groundColor.copyFrom(NIGHT_AMBIENT_GROUND);
+
+    // Reuse the day sun as cool moonlight so outdoor surfaces get a silver wash.
+    sun.intensity = NIGHT_MOON_INTENSITY;
+    sun.diffuse.copyFrom(NIGHT_MOON_DIFFUSE);
+    sun.specular?.copyFrom?.(NIGHT_MOON_SPECULAR);
+    sun.direction.copyFrom(NIGHT_MOON_DIRECTION);
+    sun.position.copyFrom(NIGHT_MOON_POSITION);
+
+    ensureMoonVisual();
+  }
+
+  function applyNightPeopleVisibility() {
+    hidePeopleMeshesForNight();
+  }
+
+  function applyDayEnvironment() {
+    scene.clearColor.copyFrom(DAY_CLEAR_COLOR);
+    scene.fogMode = DAY_FOG_MODE;
+    scene.fogColor.copyFrom(DAY_FOG_COLOR);
+    scene.fogDensity = DAY_FOG_DENSITY;
+    scene.fogStart = DAY_FOG_START;
+    scene.fogEnd = DAY_FOG_END;
+
+    ambient.intensity = DAY_AMBIENT_INTENSITY;
+    ambient.diffuse?.copyFrom?.(DAY_AMBIENT_DIFFUSE);
+    ambient.groundColor.copyFrom(DAY_AMBIENT_GROUND);
+
+    sun.intensity = DAY_SUN_INTENSITY;
+    sun.diffuse.copyFrom(DAY_SUN_DIFFUSE);
+    sun.specular?.copyFrom?.(DAY_SUN_SPECULAR);
+    sun.direction.copyFrom(DAY_SUN_DIRECTION);
+    sun.position.copyFrom(DAY_SUN_POSITION);
+
+    if (moonRoot) {
+      moonRoot.setEnabled(false);
+    }
+
+    restorePeopleMeshesVisibility();
+  }
+
+  function hasReadyNightDownlights(modelState) {
+    return litModelState === modelState
+      && downlightLights.length > 0
+      && (downlight02Flares.length > 0 || downlight02TwinkleMaterials.length > 0);
+  }
+
+  async function runNightDownlightSetup(modelState, token) {
+    if (!modelState || !isNightSetupActive(token)) {
+      return;
+    }
+
+    if (hasReadyNightDownlights(modelState)) {
+      applyNightEnvironment();
+      applyNightPeopleVisibility();
+      return;
+    }
+
+    applyNightPeopleVisibility();
+    disposeDownlightLights();
+    restoreDownlightMaterials();
+    await yieldNightFrame();
+
+    if (!isNightSetupActive(token)) {
+      return;
+    }
+
+    const downlightMeshes = collectAngjiDownlightMeshes(modelState);
+    const downlight02Meshes = collectAngjiDownlight02Meshes(modelState);
+    const selectedDown02Meshes = pickRandomItems(downlight02Meshes, DOWN02_TWINKLE_COUNT);
+    const materials01 = collectUniqueMaterialsFromMeshes(downlightMeshes);
+    const positions01 = collectDownlightWorldPositions(downlightMeshes);
+    const clusters01 = clusterDownlightPositions(BABYLON, positions01);
+    const litMeshes = collectNightLitMeshes(modelState);
+
+    // Only touch materials that receive night spots — much cheaper than whole model.
+    const materialsReady = await prepareModelMaterialsForNightLightsChunked(litMeshes, token);
+
+    if (!materialsReady) {
+      return;
+    }
+
+    materialSnapshots = materials01.map(captureMaterialEmissiveState);
+    materials01.forEach((material) => applyDownlightEmissive(BABYLON, material));
+
+    downlight02MaterialOverrides = [];
+    downlight02TwinkleMaterials = [];
+
+    selectedDown02Meshes.forEach((mesh, index) => {
+      const original = mesh.material;
+
+      if (original && !original.subMaterials) {
+        const cloned = original.clone(`angji-down02-twinkle-mat-${index}`);
+        mesh.material = cloned;
+        downlight02MaterialOverrides.push({
+          mesh,
+          originalMaterial: original,
+          clonedMaterial: cloned
+        });
+        applyDownlightEmissive(BABYLON, cloned, {
+          emissiveColor: new BABYLON.Color3(1, 0.86, 0.48),
+          emissiveIntensity: 3.4
+        });
+        downlight02TwinkleMaterials.push({
+          material: cloned,
+          baseIntensity: typeof cloned.emissiveIntensity === "number" ? cloned.emissiveIntensity : 3.4,
+          baseColor: cloned.emissiveColor?.clone?.() || new BABYLON.Color3(1, 0.86, 0.48),
+          phase: index * 0.73 + Math.random(),
+          speed: 1.4 + (index % 5) * 0.25 + Math.random() * 0.6,
+          sparkChance: 0.012 + Math.random() * 0.02
+        });
+      }
+
+      mesh.computeWorldMatrix(true);
+      const center = mesh.getBoundingInfo?.()?.boundingBox?.centerWorld?.clone?.();
+
+      if (!center) {
+        return;
+      }
+
+      const light = new BABYLON.SpotLight(
+        `angji-down02-spot-${index}`,
+        center.clone(),
+        new BABYLON.Vector3(0, -1, 0),
+        Math.PI * 0.78,
+        1.9,
+        scene
+      );
+      light.diffuse = new BABYLON.Color3(1, 0.9, 0.62);
+      light.specular = new BABYLON.Color3(0.2, 0.15, 0.08);
+      light.intensity = 7.4;
+      light.range = 20;
+      light.falloffType = BABYLON.Light.FALLOFF_GLTF;
+
+      if (litMeshes.length) {
+        light.includedOnlyMeshes = litMeshes;
+      }
+
+      downlightLights.push(light);
+
+      const flarePos = center.clone();
+      flarePos.y -= 0.85;
+      downlight02Flares.push(createDown02Flare(flarePos, index));
+    });
+
+    clusters01.forEach((cluster, index) => {
+      const light = new BABYLON.SpotLight(
+        `angji-downlight-spot-${index}`,
+        cluster.center.clone(),
+        new BABYLON.Vector3(0, -1, 0),
+        Math.PI * 0.72,
+        2.2,
+        scene
+      );
+      light.diffuse = new BABYLON.Color3(1, 0.88, 0.55);
+      light.specular = new BABYLON.Color3(0.15, 0.12, 0.06);
+      light.intensity = 6.8 + Math.min(cluster.points.length, 6) * 0.5;
+      light.range = 18;
+      light.falloffType = BABYLON.Light.FALLOFF_GLTF;
+
+      if (litMeshes.length) {
+        light.includedOnlyMeshes = litMeshes;
+      }
+
+      downlightLights.push(light);
+    });
+
+    if (!isNightSetupActive(token)) {
+      return;
+    }
+
+    startDown02FlareTwinkle();
+    litModelState = modelState;
+    console.info(
+      `[angji-night] Down01 meshes=${downlightMeshes.length} spots=${clusters01.length}`
+      + ` / Down02 total=${downlight02Meshes.length} selected=${selectedDown02Meshes.length}`
+      + ` flares=${downlight02Flares.length} twinkleMats=${downlight02TwinkleMaterials.length}`
+    );
+  }
+
+  function enableDownlights(modelState) {
+    if (!modelState) {
+      return;
+    }
+
+    if (hasReadyNightDownlights(modelState)) {
+      applyNightEnvironment();
+      applyNightPeopleVisibility();
+      return;
+    }
+
+    const token = ++nightSetupToken;
+    void runNightDownlightSetup(modelState, token);
+  }
+
+  function clearNightLighting() {
+    cancelNightSetup();
+    disposeDownlightLights();
+    restoreDownlightMaterials();
+    restoreSceneMaterialLightLimits();
+    disposeMoonVisual();
+    restorePeopleMeshesVisibility();
+    litModelState = null;
+  }
+
+  function updateButton() {
+    if (!nightModeButton) {
+      return;
+    }
+
+    const available = canToggleNightMode();
+    nightModeButton.hidden = !available;
+    nightModeButton.disabled = !available;
+    nightModeButton.textContent = nightMode ? "Day Mode" : "Night Mode";
+    nightModeButton.classList.toggle("is-night", nightMode);
+    nightModeButton.setAttribute("aria-pressed", nightMode ? "true" : "false");
+  }
+
+  function setNightMode(enabled) {
+    if (enabled === nightMode) {
+      updateButton();
+      return nightMode;
+    }
+
+    if (enabled) {
+      const modelState = getActiveModelState();
+
+      if (!isAngjiProjectConfig(modelState?.config)) {
+        updateButton();
+        return nightMode;
+      }
+
+      nightMode = true;
+      // Paint sky/fog/moon immediately; stagger heavy light/material work.
+      applyNightEnvironment();
+      enableDownlights(modelState);
+    } else {
+      nightMode = false;
+      clearNightLighting();
+      applyDayEnvironment();
+
+      const modelState = getActiveModelState();
+
+      if (modelState) {
+        applyOrbitEnvironmentSettings(BABYLON, sun, modelState.orbitModelState || modelState);
+      }
+    }
+
+    updateButton();
+    notifyNightModeChange(nightMode);
+    return nightMode;
+  }
+
+  function toggle() {
+    if (!canToggleNightMode()) {
+      updateButton();
+      return nightMode;
+    }
+
+    return setNightMode(!nightMode);
+  }
+
+  function sync() {
+    if (!canKeepNightMode()) {
+      if (nightMode) {
+        setNightMode(false);
+      } else {
+        updateButton();
+      }
+      return;
+    }
+
+    if (nightMode) {
+      applyNightEnvironment();
+      applyNightPeopleVisibility();
+      enableDownlights(getActiveModelState());
+    }
+
+    updateButton();
+  }
+
+  nightModeButton?.addEventListener("click", () => {
+    if (!canToggleNightMode()) {
+      return;
+    }
+
+    toggle();
+    options.onToggle?.(nightMode);
+  });
+
+  updateButton();
+
+  return {
+    isNightMode: () => nightMode,
+    setNightMode,
+    sync,
+    updateButton
   };
 }
 
@@ -7506,8 +8921,45 @@ async function loadTourModelState(BABYLON, scene, config) {
   };
 }
 
+function registerBabylonFbxLoader(BABYLON) {
+  if (!BABYLON?.SceneLoader || typeof BABYLON.SceneLoader.RegisterPlugin !== "function") {
+    return;
+  }
+
+  const existing = typeof BABYLON.SceneLoader.GetPluginForExtension === "function"
+    ? BABYLON.SceneLoader.GetPluginForExtension(".fbx")
+    : null;
+
+  if (existing) {
+    return;
+  }
+
+  const loaderExports = window.FBXLoader;
+  const LoaderFactory = loaderExports?.FBXLoader || loaderExports?.default || null;
+
+  if (!LoaderFactory) {
+    console.warn("[loader] FBX loader script missing; Devi.fbx guests may fail to load");
+    return;
+  }
+
+  try {
+    const plugin = typeof LoaderFactory.prototype?.createPlugin === "function"
+      || typeof LoaderFactory.createPlugin === "function"
+      ? (typeof LoaderFactory.createPlugin === "function"
+        ? LoaderFactory.createPlugin()
+        : new LoaderFactory().createPlugin())
+      : new LoaderFactory();
+
+    BABYLON.SceneLoader.RegisterPlugin(plugin);
+    console.info("[loader] FBX loader registered for Angji night guests");
+  } catch (error) {
+    console.warn("[loader] FBX loader registration failed", error);
+  }
+}
+
 async function start() {
   const BABYLON = window.BABYLON;
+  registerBabylonFbxLoader(BABYLON);
   const engine = new BABYLON.Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true });
   const scene = new BABYLON.Scene(engine);
   scene.clearColor = new BABYLON.Color4(0.62, 0.72, 0.86, 1);
@@ -7523,12 +8975,15 @@ async function start() {
   sun.diffuse = new BABYLON.Color3(1, 0.94, 0.82);
   sun.specular = BABYLON.Color3.Black();
   setupSunControls(BABYLON, sun);
+  let angjiNightMode = null;
   setLoadingTargetProgress(LOADING_PROGRESS.engineReady);
   await loadDefaultProjectOverviews();
   loadLocalOverviewOverrides();
   setLoadingTargetProgress(LOADING_PROGRESS.dataReady);
 
-  const tourBgm = createTourBgmController();
+  const tourBgm = createTourBgmController({
+    getIsAngjiNightMode: () => angjiNightMode?.isNightMode?.() || false
+  });
   const bgmReady = Promise.all(MODEL_CONFIGS.map((config) => tourBgm.preload(config)));
 
   const modelLoadSteps = countModelLoadSteps();
@@ -7622,6 +9077,7 @@ async function start() {
     applyOrbitEnvironmentSettings(BABYLON, sun, orbitModelState);
     renderModelDebug(nextModelState);
     updateProjectOverviewVisibility();
+    angjiNightMode?.sync();
   }
 
   function easeOutCubic(value) {
@@ -7714,17 +9170,41 @@ async function start() {
     isTransitioning = false;
     updateModelSwitcherVisibility();
     updateProjectOverviewVisibility();
+    angjiNightMode?.sync();
   }
 
   controls = createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, modelStates[activeModelIndex], {
     tourBgm,
+    getIsAngjiNightMode: () => angjiNightMode?.isNightMode?.() || false,
     onModeChange: () => {
       updateModelSwitcherVisibility();
       updateProjectOverviewVisibility();
+      angjiNightMode?.sync();
     },
     onActiveModelStateChange: showActiveModelState
   });
+  angjiNightMode = createAngjiNightModeController(BABYLON, scene, ambient, sun, {
+    getActiveModelState: () => controls?.getActiveModelState?.() || displayedModelState,
+    isWalkMode: () => controls?.isWalkMode?.() || false,
+    onNightModeChange: (isNight) => {
+      void controls?.refreshAngjiGuestsForNightMode?.().catch((error) => {
+        console.error("[angji-night] guest refresh failed", error);
+      });
+
+      if (controls?.isWalkMode?.()) {
+        const activeConfig = controls.getActiveModelState?.()?.config
+          || displayedModelState?.config;
+        tourBgm.syncNightTourAudio?.(activeConfig, { keepBgm: false });
+      }
+    },
+    onToggle: (isNight) => {
+      setStatus(isNight
+        ? "Night Mode active. Guests become Devi. Toggle Day/Night only in Orbit View."
+        : "Day Mode restored. Original guests return.");
+    }
+  });
   controls.setModelState(modelStates[activeModelIndex]);
+  angjiNightMode.sync();
   void controls.preloadCharacter?.().catch((error) => {
     console.warn("Character preload failed", error);
   });

@@ -1,7 +1,7 @@
 import {
   isAngjiDanceAnimationClip,
   shouldAngjiGuestAllowDanceRootMotion
-} from "./angji-guest-config.js?v=angji-guest-mark21-22-offset-20260713";
+} from "./angji-guest-config.js?v=angji-guest-night-marie-extra-20260719";
 import {
   createGuestDevLabel,
   disposeGuestDevLabel,
@@ -20,6 +20,13 @@ const PATROL_DEFAULT_DECEL_DISTANCE = 2.8;
 const PATROL_MIN_SPEED_FACTOR = 0.15;
 const PATROL_ACCEL_RATE = 0.024;
 const PATROL_DEPART_TURN_SPEED = 0.14;
+const NIGHT_DEVI_CHASE_TYPE = "nightDeviChase";
+const NIGHT_DEVI_ENERGY_MAX = 5;
+const NIGHT_DEVI_ENERGY_BAR_WIDTH = 1.2 * 0.2;
+const NIGHT_DEVI_ENERGY_BAR_HEIGHT = 0.22 * 0.2;
+const NIGHT_DEVI_ENERGY_BAR_GAP = 0.12;
+const NIGHT_DEVI_BODY_RADIUS = 0.35;
+const NIGHT_DEVI_PROBE_HEIGHT = 1.45;
 
 function applyGuestMeshCollisionFlags(mesh, guestId) {
   mesh.isPickable = false;
@@ -177,6 +184,25 @@ function getGuestRootMotionClipNames(spawn) {
 function stripGuestLocomotionRootMotion(BABYLON, animationGroups, spawn) {
   if (spawn?.movement?.type === "rootMotion") {
     // rootMotion guests intentionally keep translation keys; we apply them to the root transform at runtime.
+    return;
+  }
+
+  if (spawn?.behavior?.type === NIGHT_DEVI_CHASE_TYPE) {
+    const attackNames = (animationGroups || [])
+      .map((group) => group.name)
+      .filter((name) => normalizeClipName(name).startsWith("attack"));
+
+    stripLocomotionRootMotion(BABYLON, animationGroups, [
+      "Idle",
+      "IDLE",
+      "Walking",
+      "WALKING",
+      "Run_Fast",
+      "Run",
+      "Running",
+      "Jump_Run",
+      ...attackNames
+    ], { forceStripAllPosition: true });
     return;
   }
 
@@ -868,6 +894,772 @@ function updateGuestPatrol(guest, deltaScale, resolveFloorY) {
   syncGuestRootMotionSample(guest);
 }
 
+function isNightDeviChaseGuest(guest) {
+  return guest?.spawn?.behavior?.type === NIGHT_DEVI_CHASE_TYPE;
+}
+
+function ensureNightDeviChaseState(guest) {
+  if (!isNightDeviChaseGuest(guest)) {
+    return null;
+  }
+
+  if (!guest.nightChase) {
+    const position = guest.root?.position;
+    guest.nightChase = {
+      phase: "idle",
+      engaged: false,
+      path: [],
+      returnPath: [],
+      returnIndex: 0,
+      leashAwaySince: null,
+      chaseStartedAt: null,
+      chaseDurationMs: 0,
+      returnStartedAt: null,
+      returnDeadlineMs: 0,
+      home: position
+        ? {
+          x: position.x,
+          y: position.y,
+          z: position.z,
+          rotationY: guest.root.rotation?.y ?? guest.spawn.rotationY ?? 0
+        }
+        : {
+          x: guest.spawn.position.x,
+          y: guest.spawn.position.y,
+          z: guest.spawn.position.z,
+          rotationY: guest.spawn.rotationY ?? 0
+        }
+    };
+  }
+
+  return guest.nightChase;
+}
+
+function captureNightDeviHome(guest) {
+  const chase = ensureNightDeviChaseState(guest);
+
+  if (!chase || !guest.root) {
+    return;
+  }
+
+  chase.home = {
+    x: guest.root.position.x,
+    y: guest.root.position.y,
+    z: guest.root.position.z,
+    rotationY: guest.root.rotation.y
+  };
+}
+
+function horizontalDistanceXZ(ax, az, bx, bz) {
+  const dx = bx - ax;
+  const dz = bz - az;
+  return Math.hypot(dx, dz);
+}
+
+function recordNightDeviPathPoint(guest, chase, behavior) {
+  const position = guest.root.position;
+  const path = chase.path;
+  const last = path[path.length - 1];
+  const minDistance = behavior.pathRecordDistance ?? 0.45;
+
+  if (!last) {
+    path.push({ x: position.x, y: position.y, z: position.z });
+    return;
+  }
+
+  if (horizontalDistanceXZ(last.x, last.z, position.x, position.z) >= minDistance) {
+    path.push({ x: position.x, y: position.y, z: position.z });
+  }
+}
+
+function listNightDeviAttackClipNames(guest) {
+  const prefix = normalizeClipName(guest.spawn.behavior?.attackClipPrefix || "Attack");
+
+  return (guest.animationGroups || [])
+    .map((group) => group.name)
+    .filter((name) => normalizeClipName(name).startsWith(prefix));
+}
+
+function pickRandomNightDeviAttackClip(guest) {
+  const clips = listNightDeviAttackClipNames(guest);
+
+  if (!clips.length) {
+    return null;
+  }
+
+  return clips[Math.floor(Math.random() * clips.length)];
+}
+
+function resolveNightDeviRunClip(guest) {
+  const behavior = guest.spawn.behavior;
+  const aliases = behavior.runClipAliases?.length
+    ? behavior.runClipAliases
+    : [behavior.runClip || "Run_Fast"];
+
+  for (const clipName of aliases) {
+    if (resolveClip(guest.animationGroups, clipName)) {
+      return clipName;
+    }
+  }
+
+  return aliases[0];
+}
+
+function playNightDeviLoop(guest, clipName) {
+  if (guest.activeAnimationGroup && normalizeClipName(guest.activeAnimationGroup.name) === normalizeClipName(clipName)) {
+    return;
+  }
+
+  playGuestLoopClip(guest, clipName);
+}
+
+function resolveNightDeviWalkClip(guest) {
+  const behavior = guest.spawn.behavior;
+  return behavior.chaseClip || behavior.walkClip || "Walking";
+}
+
+function getNightDeviChaseSpeed(behavior) {
+  return (behavior.runSpeed ?? 0.2) * 0.5;
+}
+
+function beginNightDeviReturn(guest, chase) {
+  const home = chase.home;
+  const position = guest.root.position;
+  const now = performance.now();
+  const path = chase.path || [];
+
+  chase.chaseDurationMs = chase.chaseStartedAt != null
+    ? Math.max(0, now - chase.chaseStartedAt)
+    : 0;
+  chase.returnStartedAt = now;
+  // If still not home after 75% of chase time, snap home (stuck fallback).
+  chase.returnDeadlineMs = chase.chaseDurationMs * 0.75;
+
+  const last = path[path.length - 1];
+  if (!last || horizontalDistanceXZ(last.x, last.z, position.x, position.z) > 0.05) {
+    path.push({ x: position.x, y: position.y, z: position.z });
+  }
+
+  const returnPath = [...path].reverse();
+
+  if (!returnPath.length || horizontalDistanceXZ(
+    returnPath[returnPath.length - 1].x,
+    returnPath[returnPath.length - 1].z,
+    home.x,
+    home.z
+  ) > 0.2) {
+    returnPath.push({ x: home.x, y: home.y, z: home.z });
+  }
+
+  chase.phase = "returning";
+  chase.returnPath = returnPath;
+  chase.returnIndex = 0;
+  chase.leashAwaySince = null;
+  chase.engaged = false;
+  playNightDeviLoop(guest, resolveNightDeviWalkClip(guest));
+  syncGuestEnergyBar(guest);
+}
+
+function finishNightDeviReturn(guest, chase) {
+  const home = chase.home;
+  guest.root.position.set(home.x, home.y, home.z);
+  guest.root.rotation.y = home.rotationY;
+  chase.phase = "idle";
+  chase.engaged = false;
+  chase.path = [];
+  chase.returnPath = [];
+  chase.returnIndex = 0;
+  chase.leashAwaySince = null;
+  chase.chaseStartedAt = null;
+  chase.chaseDurationMs = 0;
+  chase.returnStartedAt = null;
+  chase.returnDeadlineMs = 0;
+  playNightDeviLoop(guest, guest.spawn.behavior.idleClip || "Idle");
+  syncGuestRootMotionSample(guest);
+  syncGuestEnergyBar(guest);
+}
+
+function createGuestEnergyBar(BABYLON, scene, guestId) {
+  const root = new BABYLON.TransformNode(`guest-energy-root-${guestId}`, scene);
+  const texture = new BABYLON.DynamicTexture(`guest-energy-texture-${guestId}`, {
+    width: 256,
+    height: 48
+  }, scene);
+  const material = new BABYLON.StandardMaterial(`guest-energy-material-${guestId}`, scene);
+  const plane = BABYLON.MeshBuilder.CreatePlane(`guest-energy-plane-${guestId}`, {
+    width: NIGHT_DEVI_ENERGY_BAR_WIDTH,
+    height: NIGHT_DEVI_ENERGY_BAR_HEIGHT
+  }, scene);
+
+  texture.hasAlpha = true;
+  material.diffuseTexture = texture;
+  material.emissiveTexture = texture;
+  material.emissiveColor = BABYLON.Color3.White();
+  material.diffuseColor = BABYLON.Color3.White();
+  material.specularColor = BABYLON.Color3.Black();
+  material.disableLighting = true;
+  material.backFaceCulling = false;
+  material.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+  material.useAlphaFromDiffuseTexture = true;
+
+  plane.parent = root;
+  plane.material = material;
+  plane.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
+  plane.isPickable = false;
+  plane.checkCollisions = false;
+  plane.applyFog = false;
+  plane.renderingGroupId = 1;
+  plane.alwaysSelectAsActiveMesh = true;
+
+  return {
+    root,
+    plane,
+    texture,
+    material,
+    energy: NIGHT_DEVI_ENERGY_MAX,
+    maxEnergy: NIGHT_DEVI_ENERGY_MAX,
+    offsetY: 1.95
+  };
+}
+
+function updateGuestEnergyBar(energyBar) {
+  if (!energyBar?.texture) {
+    return;
+  }
+
+  const context = energyBar.texture.getContext();
+  const width = energyBar.texture.getSize().width;
+  const height = energyBar.texture.getSize().height;
+  const padding = 4;
+  const gap = 3;
+  const segmentCount = energyBar.maxEnergy || NIGHT_DEVI_ENERGY_MAX;
+  const segmentWidth = (width - padding * 2 - gap * (segmentCount - 1)) / segmentCount;
+  const segmentHeight = height - padding * 2;
+  const filled = Math.max(0, Math.min(segmentCount, energyBar.energy ?? segmentCount));
+
+  context.clearRect(0, 0, width, height);
+  context.fillStyle = "rgba(0, 0, 0, 0.78)";
+  context.fillRect(0, 0, width, height);
+
+  for (let index = 0; index < segmentCount; index += 1) {
+    const x = padding + index * (segmentWidth + gap);
+    context.fillStyle = index < filled ? "rgb(20, 230, 60)" : "rgba(20, 45, 25, 0.85)";
+    context.fillRect(x, padding, segmentWidth, segmentHeight);
+  }
+
+  energyBar.texture.update();
+}
+
+function shouldShowGuestEnergyBar(guest) {
+  if (!guest?.root?.isEnabled?.()) {
+    return false;
+  }
+
+  const chase = guest.nightChase;
+  if (!chase?.engaged) {
+    return false;
+  }
+
+  // Visible only while actively recognizing/chasing the rabbit.
+  return chase.phase === "chasing" || chase.phase === "attacking";
+}
+
+function attachGuestEnergyBar(BABYLON, scene, guest) {
+  if (!isNightDeviChaseGuest(guest) || guest.energyBar) {
+    return;
+  }
+
+  const energyBar = createGuestEnergyBar(BABYLON, scene, guest.spawn.id);
+  energyBar.root.parent = guest.root;
+  energyBar.root.position.set(0, energyBar.offsetY, 0);
+  updateGuestEnergyBar(energyBar);
+  energyBar.root.setEnabled(false);
+  guest.energyBar = energyBar;
+  syncGuestEnergyBar(guest);
+}
+
+function disposeGuestEnergyBar(guest) {
+  if (!guest?.energyBar) {
+    return;
+  }
+
+  try {
+    guest.energyBar.plane?.dispose();
+    guest.energyBar.material?.dispose();
+    guest.energyBar.texture?.dispose();
+    guest.energyBar.root?.dispose();
+  } catch {
+    // ignore stale energy bars
+  }
+
+  guest.energyBar = null;
+}
+
+function syncGuestEnergyBar(guest) {
+  if (!guest?.energyBar?.root || !guest.root) {
+    return;
+  }
+
+  // guest.root already has fitScale. Use local-space height and inverse scale
+  // so the bar stays above the head at a readable world size.
+  const fitScale = Math.max(guest.fitScale || 1, 1e-6);
+  const invScale = 1 / fitScale;
+  const localHeight = Math.max(guest.rawHeight || 0, 1.6 * invScale);
+  const visible = shouldShowGuestEnergyBar(guest);
+
+  guest.energyBar.offsetY = localHeight + NIGHT_DEVI_ENERGY_BAR_GAP * invScale;
+  guest.energyBar.root.position.set(0, guest.energyBar.offsetY, 0);
+  guest.energyBar.root.scaling.set(invScale, invScale, invScale);
+  guest.energyBar.root.setEnabled(visible);
+  guest.energyBar.plane?.setEnabled?.(visible);
+}
+
+function getCollisionMeshCollectionSize(meshes) {
+  if (!meshes) {
+    return 0;
+  }
+
+  if (typeof meshes.size === "number") {
+    return meshes.size;
+  }
+
+  if (typeof meshes.length === "number") {
+    return meshes.length;
+  }
+
+  return 0;
+}
+
+function toCollisionMeshSet(meshes) {
+  if (!meshes) {
+    return new Set();
+  }
+
+  return meshes instanceof Set ? meshes : new Set(meshes);
+}
+
+function hasNightDeviLineOfSight(BABYLON, scene, fromPosition, toPosition, helpers = {}) {
+  const { getCollisionMeshes, hasGuestLineOfSight } = helpers;
+
+  if (typeof hasGuestLineOfSight === "function") {
+    return hasGuestLineOfSight(fromPosition, toPosition);
+  }
+
+  if (getCollisionMeshCollectionSize(typeof getCollisionMeshes === "function" ? getCollisionMeshes() : null) <= 0) {
+    return true;
+  }
+
+  const collisionSet = toCollisionMeshSet(getCollisionMeshes());
+  const origin = new BABYLON.Vector3(
+    fromPosition.x,
+    fromPosition.y + NIGHT_DEVI_PROBE_HEIGHT,
+    fromPosition.z
+  );
+  const target = new BABYLON.Vector3(
+    toPosition.x,
+    (toPosition.y || fromPosition.y) + NIGHT_DEVI_PROBE_HEIGHT,
+    toPosition.z
+  );
+  const delta = target.subtract(origin);
+  const distance = delta.length();
+
+  if (distance <= 0.05) {
+    return true;
+  }
+
+  const direction = delta.normalize();
+  const ray = new BABYLON.Ray(origin, direction, Math.max(0.05, distance - 0.2));
+  const hits = typeof scene.multiPickWithRay === "function"
+    ? (scene.multiPickWithRay(ray, (mesh) => (
+      collisionSet.has(mesh)
+      && mesh.isEnabled()
+      && mesh.isPickable
+      && !mesh.metadata?.passThrough
+      && !mesh.metadata?.tourGuest
+    )) || []).filter((hit) => hit?.hit).sort((a, b) => a.distance - b.distance)
+    : (() => {
+      const hit = scene.pickWithRay(ray, (mesh) => (
+        collisionSet.has(mesh)
+        && mesh.isEnabled()
+        && mesh.isPickable
+        && !mesh.metadata?.passThrough
+        && !mesh.metadata?.tourGuest
+      ));
+      return hit?.hit ? [hit] : [];
+    })();
+
+  return hits.length === 0;
+}
+
+function canNightDeviStep(BABYLON, scene, fromPosition, dirX, dirZ, stepDistance, helpers = {}) {
+  const { getCollisionMeshes, canGuestMoveHorizontal } = helpers;
+
+  if (stepDistance <= 0.001) {
+    return true;
+  }
+
+  const horizontal = Math.hypot(dirX, dirZ);
+
+  if (horizontal < 1e-6) {
+    return true;
+  }
+
+  if (typeof canGuestMoveHorizontal === "function") {
+    return canGuestMoveHorizontal(fromPosition, dirX / horizontal, dirZ / horizontal, stepDistance);
+  }
+
+  if (getCollisionMeshCollectionSize(typeof getCollisionMeshes === "function" ? getCollisionMeshes() : null) <= 0) {
+    return true;
+  }
+
+  const collisionSet = toCollisionMeshSet(getCollisionMeshes());
+  const direction = new BABYLON.Vector3(dirX / horizontal, 0, dirZ / horizontal);
+  const rayDistance = stepDistance + NIGHT_DEVI_BODY_RADIUS + 0.25;
+  const heightOffsets = [1.45, 0.95, 0.45];
+  const lateralOffsets = [-NIGHT_DEVI_BODY_RADIUS * 0.75, 0, NIGHT_DEVI_BODY_RADIUS * 0.75];
+  const lateralAxis = new BABYLON.Vector3(direction.z, 0, -direction.x);
+
+  for (const heightOffset of heightOffsets) {
+    for (const lateralOffset of lateralOffsets) {
+      const lateral = lateralAxis.scale(lateralOffset);
+      const rayOrigin = new BABYLON.Vector3(
+        fromPosition.x + lateral.x,
+        fromPosition.y + heightOffset,
+        fromPosition.z + lateral.z
+      );
+      const ray = new BABYLON.Ray(rayOrigin, direction, rayDistance);
+      const hit = scene.pickWithRay(ray, (mesh) => (
+        collisionSet.has(mesh)
+        && mesh.isEnabled()
+        && mesh.isPickable
+        && !mesh.metadata?.passThrough
+        && !mesh.metadata?.tourGuest
+      ));
+
+      if (hit?.hit && hit.distance <= rayDistance) {
+        const normal = hit.getNormal?.(true);
+        const isWallMeta = hit.pickedMesh?.metadata?.angjiWallSurface
+          || hit.pickedMesh?.metadata?.angjiFurnitureSurface;
+
+        if (isWallMeta || !normal || normal.y < 0.55) {
+          return false;
+        }
+      }
+    }
+  }
+
+  return true;
+}
+
+function moveNightDeviToward(guest, targetX, targetZ, targetY, speed, deltaScale, resolveFloorY, helpers = {}) {
+  const { BABYLON, scene } = helpers;
+  const position = guest.root.position;
+  const toX = targetX - position.x;
+  const toZ = targetZ - position.z;
+  const distance = Math.hypot(toX, toZ);
+  const step = speed * deltaScale;
+
+  const tryMove = (moveX, moveZ, moveStep) => {
+    if (!BABYLON || !scene) {
+      return true;
+    }
+
+    return canNightDeviStep(BABYLON, scene, position, moveX, moveZ, moveStep, helpers);
+  };
+
+  const applyMove = (nextX, nextZ) => {
+    position.x = nextX;
+    position.z = nextZ;
+    position.y = resolveFloorY?.(nextX, nextZ, targetY ?? position.y) ?? (targetY ?? position.y);
+    guest.root.rotation.y = Math.atan2(toX, toZ);
+    syncGuestRootMotionSample(guest);
+  };
+
+  if (distance <= Math.max(step, 0.04)) {
+    if (!tryMove(toX, toZ, distance)) {
+      guest.root.rotation.y = Math.atan2(toX, toZ);
+      syncGuestRootMotionSample(guest);
+      return distance;
+    }
+
+    applyMove(targetX, targetZ);
+    return 0;
+  }
+
+  const inv = 1 / distance;
+  const stepX = toX * inv * step;
+  const stepZ = toZ * inv * step;
+
+  if (tryMove(toX, toZ, step)) {
+    applyMove(position.x + stepX, position.z + stepZ);
+    return distance - step;
+  }
+
+  // Axis slide so Devi can follow corridors instead of freezing against a wall.
+  if (Math.abs(stepX) > 0.001 && tryMove(stepX, 0, Math.abs(stepX))) {
+    applyMove(position.x + stepX, position.z);
+    return Math.hypot(targetX - position.x, targetZ - position.z);
+  }
+
+  if (Math.abs(stepZ) > 0.001 && tryMove(0, stepZ, Math.abs(stepZ))) {
+    applyMove(position.x, position.z + stepZ);
+    return Math.hypot(targetX - position.x, targetZ - position.z);
+  }
+
+  guest.root.rotation.y = Math.atan2(toX, toZ);
+  syncGuestRootMotionSample(guest);
+  return distance;
+}
+
+function startNightDeviAttack(guest, chase, getPlayerPosition) {
+  const behavior = guest.spawn.behavior;
+  const clipName = pickRandomNightDeviAttackClip(guest);
+
+  if (!clipName) {
+    chase.phase = "chasing";
+    playNightDeviLoop(guest, resolveNightDeviWalkClip(guest));
+    return;
+  }
+
+  chase.phase = "attacking";
+  playGuestClipOnce(guest, clipName, () => {
+    if (!guest.root?.isEnabled?.() || !guest.nightChase || guest.nightChase !== chase) {
+      return;
+    }
+
+    const playerPosition = typeof getPlayerPosition === "function" ? getPlayerPosition() : null;
+
+    if (playerPosition) {
+      const distance = horizontalDistanceXZ(
+        guest.root.position.x,
+        guest.root.position.z,
+        playerPosition.x,
+        playerPosition.z
+      );
+
+      if (distance <= (behavior.attackRange ?? 1)) {
+        startNightDeviAttack(guest, chase, getPlayerPosition);
+        return;
+      }
+    }
+
+    chase.phase = "chasing";
+  });
+}
+
+function updateNightDeviChase(guest, deltaScale, resolveFloorY, getPlayerPosition, helpers = {}) {
+  const behavior = guest.spawn.behavior;
+  const chase = ensureNightDeviChaseState(guest);
+  const chaseSpeed = getNightDeviChaseSpeed(behavior);
+  const chaseRange = behavior.chaseRange ?? 10;
+  const chaseClip = resolveNightDeviWalkClip(guest);
+  const { BABYLON, scene, getCollisionMeshes, canGuestMoveHorizontal, hasGuestLineOfSight } = helpers;
+  const moveHelpers = {
+    BABYLON,
+    scene,
+    getCollisionMeshes,
+    canGuestMoveHorizontal,
+    hasGuestLineOfSight
+  };
+
+  if (!chase || !guest.root?.isEnabled?.()) {
+    return;
+  }
+
+  syncGuestEnergyBar(guest);
+
+  const playerPosition = typeof getPlayerPosition === "function" ? getPlayerPosition() : null;
+
+  if (!playerPosition) {
+    if (chase.phase !== "idle" && chase.phase !== "returning" && chase.phase !== "attacking") {
+      chase.phase = "idle";
+      playNightDeviLoop(guest, behavior.idleClip || "Idle");
+    }
+
+    if (chase.phase === "returning") {
+      updateNightDeviReturn(guest, chase, behavior, deltaScale, resolveFloorY, moveHelpers);
+    }
+
+    return;
+  }
+
+  const distance = horizontalDistanceXZ(
+    guest.root.position.x,
+    guest.root.position.z,
+    playerPosition.x,
+    playerPosition.z
+  );
+  const hasLineOfSight = !BABYLON || !scene
+    ? true
+    : hasNightDeviLineOfSight(BABYLON, scene, guest.root.position, playerPosition, helpers);
+  const sensedDistance = hasLineOfSight ? distance : Number.POSITIVE_INFINITY;
+
+  if (chase.phase === "returning") {
+    if (sensedDistance <= behavior.aggroRange) {
+      chase.engaged = true;
+      chase.phase = "chasing";
+      chase.returnPath = [];
+      chase.returnIndex = 0;
+      chase.leashAwaySince = null;
+      chase.chaseStartedAt = performance.now();
+      chase.returnStartedAt = null;
+      chase.returnDeadlineMs = 0;
+      if (!chase.path.length) {
+        chase.path.push({ ...chase.home });
+      }
+      recordNightDeviPathPoint(guest, chase, behavior);
+      playNightDeviLoop(guest, chaseClip);
+    } else {
+      updateNightDeviReturn(guest, chase, behavior, deltaScale, resolveFloorY, moveHelpers);
+      return;
+    }
+  }
+
+  if (chase.phase === "attacking") {
+    guest.root.rotation.y = Math.atan2(
+      playerPosition.x - guest.root.position.x,
+      playerPosition.z - guest.root.position.z
+    );
+
+    if (chase.engaged && (distance >= behavior.leashRange || !hasLineOfSight)) {
+      if (chase.leashAwaySince == null) {
+        chase.leashAwaySince = performance.now();
+      } else if (performance.now() - chase.leashAwaySince >= behavior.leashTimeoutMs) {
+        beginNightDeviReturn(guest, chase);
+      }
+    } else {
+      chase.leashAwaySince = null;
+    }
+
+    return;
+  }
+
+  if (!chase.engaged) {
+    if (sensedDistance > behavior.aggroRange) {
+      if (chase.phase !== "idle") {
+        chase.phase = "idle";
+        playNightDeviLoop(guest, behavior.idleClip || "Idle");
+      }
+
+      return;
+    }
+
+    chase.engaged = true;
+    chase.phase = "chasing";
+    chase.path = [{ ...chase.home }];
+    chase.leashAwaySince = null;
+    chase.chaseStartedAt = performance.now();
+    chase.returnStartedAt = null;
+    chase.returnDeadlineMs = 0;
+    recordNightDeviPathPoint(guest, chase, behavior);
+    playNightDeviLoop(guest, chaseClip);
+  }
+
+  if (distance >= behavior.leashRange || !hasLineOfSight) {
+    if (chase.leashAwaySince == null) {
+      chase.leashAwaySince = performance.now();
+    } else if (performance.now() - chase.leashAwaySince >= behavior.leashTimeoutMs) {
+      beginNightDeviReturn(guest, chase);
+      updateNightDeviReturn(guest, chase, behavior, deltaScale, resolveFloorY, moveHelpers);
+      return;
+    }
+  } else {
+    chase.leashAwaySince = null;
+  }
+
+  if (!hasLineOfSight) {
+    playNightDeviLoop(guest, behavior.idleClip || "Idle");
+    return;
+  }
+
+  if (distance <= behavior.attackRange) {
+    startNightDeviAttack(guest, chase, getPlayerPosition);
+    return;
+  }
+
+  // Past attack range through chaseRange: follow at half run speed.
+  if (distance <= chaseRange) {
+    chase.phase = "chasing";
+    playNightDeviLoop(guest, chaseClip);
+    moveNightDeviToward(
+      guest,
+      playerPosition.x,
+      playerPosition.z,
+      playerPosition.y,
+      chaseSpeed,
+      deltaScale,
+      resolveFloorY,
+      moveHelpers
+    );
+    recordNightDeviPathPoint(guest, chase, behavior);
+    return;
+  }
+
+  // Engaged but beyond chase range: hold and face until leash return triggers.
+  guest.root.rotation.y = Math.atan2(
+    playerPosition.x - guest.root.position.x,
+    playerPosition.z - guest.root.position.z
+  );
+  playNightDeviLoop(guest, behavior.idleClip || "Idle");
+}
+
+function updateNightDeviReturn(guest, chase, behavior, deltaScale, resolveFloorY, moveHelpers = {}) {
+  const returnPath = chase.returnPath || [];
+  const home = chase.home;
+  const now = performance.now();
+  const returnElapsed = chase.returnStartedAt != null ? now - chase.returnStartedAt : 0;
+
+  if (!returnPath.length) {
+    finishNightDeviReturn(guest, chase);
+    return;
+  }
+
+  // If return takes longer than 75% of chase time and still not home, teleport.
+  if (
+    chase.returnDeadlineMs > 0
+    && returnElapsed >= chase.returnDeadlineMs
+    && horizontalDistanceXZ(
+      guest.root.position.x,
+      guest.root.position.z,
+      home.x,
+      home.z
+    ) > 0.25
+  ) {
+    finishNightDeviReturn(guest, chase);
+    return;
+  }
+
+  playNightDeviLoop(guest, resolveNightDeviWalkClip(guest));
+
+  if (chase.returnIndex >= returnPath.length) {
+    finishNightDeviReturn(guest, chase);
+    return;
+  }
+
+  const target = returnPath[chase.returnIndex];
+  const remaining = moveNightDeviToward(
+    guest,
+    target.x,
+    target.z,
+    target.y,
+    behavior.walkSpeed ?? 0.075,
+    deltaScale,
+    resolveFloorY,
+    moveHelpers
+  );
+
+  if (remaining > 0.05) {
+    // Stay on this waypoint while walking (or blocked). Timeout handles stuck cases.
+    return;
+  }
+
+  chase.returnIndex += 1;
+
+  if (chase.returnIndex >= returnPath.length) {
+    finishNightDeviReturn(guest, chase);
+  }
+}
+
 function collectMeshMaterials(meshes) {
   const materials = new Set();
 
@@ -912,9 +1704,8 @@ async function loadGuestCharacter(BABYLON, scene, spawn, helpers) {
 
   const assetRoot = spawn.assetRoot || GUEST_ASSET_ROOT;
   const encodedFile = encodeGuestAssetPath(spawn.file);
-  const loadTask = BABYLON.SceneLoader.ImportMeshAsync("", assetRoot, encodedFile, scene);
   const result = await Promise.race([
-    loadTask,
+    BABYLON.SceneLoader.ImportMeshAsync("", assetRoot, encodedFile, scene),
     new Promise((_, reject) => {
       window.setTimeout(() => {
         reject(new Error(`guest load timeout: ${spawn.id}`));
@@ -994,6 +1785,7 @@ function applyGuestScale(guest, spawn) {
   guest.scaleMultiplier = scaleMultiplier;
   guest.fitScale = baseFitScale * scaleMultiplier;
   guest.root.scaling.set(guest.fitScale, guest.fitScale, guest.fitScale);
+  syncGuestEnergyBar(guest);
 }
 
 function serializeGuestAnimation(animation) {
@@ -1062,11 +1854,13 @@ function disposeGuestRuntimeResources(guest) {
     }
   });
 
+  disposeGuestEnergyBar(guest);
   guest.contentRoot?.dispose();
   guest.root?.dispose();
   guest.contentRoot = null;
   guest.root = null;
   guest.resolvedSpawn = null;
+  guest.nightChase = null;
 }
 
 export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
@@ -1077,7 +1871,7 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
   let revealAnimStartedCount = 0;
   let revealAnimSkippedCount = 0;
   let sequenceNeutralizeFrame = 0;
-  const { resolveSpawnPosition, resolveGuestFloorY, showDevLabels = false } = helpers;
+  const { resolveSpawnPosition, resolveGuestFloorY, showDevLabels = false, getPlayerPosition = null, getCollisionMeshes = null, canGuestMoveHorizontal = null, hasGuestLineOfSight = null } = helpers;
 
   function resetRevealDiagnostics() {
     revealAnimStartedCount = 0;
@@ -1094,8 +1888,29 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
   }
 
   function resolveGuestSpawn(spawn, guest = null) {
+    const incomingIdentity = `${spawn.file || ""}::${spawn.assetRoot || ""}`;
+
     if (guest?.resolvedSpawn) {
-      return guest.resolvedSpawn;
+      const cachedIdentity = `${guest.resolvedSpawn.file || ""}::${guest.resolvedSpawn.assetRoot || ""}`;
+
+      if (cachedIdentity === incomingIdentity) {
+        // Keep floor-snapped pose, but refresh animation / behavior from the latest spawn config.
+        const refreshed = {
+          ...guest.resolvedSpawn,
+          ...spawn,
+          position: guest.resolvedSpawn.position,
+          movement: spawn.movement
+            ? {
+              ...spawn.movement,
+              patrolTargets: guest.resolvedSpawn.movement?.patrolTargets || spawn.movement.patrolTargets
+            }
+            : spawn.movement
+        };
+        guest.resolvedSpawn = refreshed;
+        return refreshed;
+      }
+
+      guest.resolvedSpawn = null;
     }
 
     const resolvedSpawn = resolveSpawnPosition?.(spawn);
@@ -1140,6 +1955,13 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
     guest.root.rotation.set(0, resolvedSpawn.rotationY, 0);
     guest.root.setEnabled(true);
     setGuestDevLabelVisible(guest, true);
+
+    if (isNightDeviChaseGuest(guest) && !guest.nightChase?.engaged) {
+      ensureNightDeviChaseState(guest);
+      captureNightDeviHome(guest);
+      attachGuestEnergyBar(BABYLON, scene, guest);
+      syncGuestEnergyBar(guest);
+    }
 
     if (!wasVisible || force) {
       guest.isVisibleShown = true;
@@ -1189,6 +2011,13 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
       guest.root.setEnabled(true);
       guest.isVisibleShown = true;
       setGuestDevLabelVisible(guest, true);
+
+      if (isNightDeviChaseGuest(guest) && !guest.nightChase?.engaged) {
+        ensureNightDeviChaseState(guest);
+        captureNightDeviHome(guest);
+        attachGuestEnergyBar(BABYLON, scene, guest);
+        syncGuestEnergyBar(guest);
+      }
 
       if (!wasVisible) {
         guestsToAnimate.push(guest);
@@ -1327,51 +2156,65 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
 
   async function loadSpawn(spawn, { showOnLoad = true } = {}) {
     const existingGuest = guestsById.get(spawn.id);
-    const resolvedSpawn = resolveGuestSpawn(spawn, existingGuest);
+
+    // Compare against the incoming spawn BEFORE resolveGuestSpawn, so a stale
+    // resolvedSpawn cache (e.g. day Monkey preload for Mark-4/5/6) cannot block
+    // a night Devi reload.
+    if (existingGuest) {
+      if (
+        existingGuest.spawn?.file !== spawn.file
+        || (existingGuest.spawn?.assetRoot || "") !== (spawn.assetRoot || "")
+      ) {
+        await disposeGuestInstance(existingGuest);
+        guestsById.delete(spawn.id);
+        loadPromises.delete(spawn.id);
+      }
+    }
+
+    const resolvedSpawn = resolveGuestSpawn(spawn, guestsById.get(spawn.id));
 
     if (guestsById.has(resolvedSpawn.id)) {
       const existing = guestsById.get(resolvedSpawn.id);
+      const previousMovementKey = serializeGuestMovement(existing.spawn?.movement);
+      const nextMovementKey = serializeGuestMovement(resolvedSpawn.movement);
+      const previousAnimationKey = serializeGuestAnimation(existing.spawn?.animation);
+      const nextAnimationKey = serializeGuestAnimation(resolvedSpawn.animation);
+      existing.spawn = resolvedSpawn;
+      existing.root.position.set(
+        resolvedSpawn.position.x,
+        resolvedSpawn.position.y,
+        resolvedSpawn.position.z
+      );
+      applyGuestScale(existing, resolvedSpawn);
+      attachGuestDevLabel(existing);
 
-      if (existing.spawn?.file !== resolvedSpawn.file) {
-        await disposeGuestInstance(existing);
-        guestsById.delete(resolvedSpawn.id);
-        loadPromises.delete(resolvedSpawn.id);
-      } else {
-        const previousMovementKey = serializeGuestMovement(existing.spawn?.movement);
-        const nextMovementKey = serializeGuestMovement(resolvedSpawn.movement);
-        const previousAnimationKey = serializeGuestAnimation(existing.spawn?.animation);
-        const nextAnimationKey = serializeGuestAnimation(resolvedSpawn.animation);
-        existing.spawn = resolvedSpawn;
-        existing.root.position.set(
-          resolvedSpawn.position.x,
-          resolvedSpawn.position.y,
-          resolvedSpawn.position.z
-        );
-        applyGuestScale(existing, resolvedSpawn);
-        attachGuestDevLabel(existing);
+      if (isNightDeviChaseGuest(existing) && !existing.nightChase?.engaged) {
+        captureNightDeviHome(existing);
+        attachGuestEnergyBar(BABYLON, scene, existing);
+        syncGuestEnergyBar(existing);
+      }
 
-        if (previousMovementKey !== nextMovementKey && resolvedSpawn.movement?.type === "patrol") {
-          resetGuestPatrolState(existing);
+      if (previousMovementKey !== nextMovementKey && resolvedSpawn.movement?.type === "patrol") {
+        resetGuestPatrolState(existing);
 
-          if (existing.isVisibleShown && existing.root.isEnabled()) {
-            stopGuestAnimation(existing);
-            playGuestAnimation(existing);
-          }
-        } else if (
-          previousAnimationKey !== nextAnimationKey
-          && existing.isVisibleShown
-          && existing.root.isEnabled()
-        ) {
+        if (existing.isVisibleShown && existing.root.isEnabled()) {
           stopGuestAnimation(existing);
           playGuestAnimation(existing);
         }
-
-        if (visible && showOnLoad) {
-          showGuest(existing);
-        }
-
-        return existing;
+      } else if (
+        previousAnimationKey !== nextAnimationKey
+        && existing.isVisibleShown
+        && existing.root.isEnabled()
+      ) {
+        stopGuestAnimation(existing);
+        playGuestAnimation(existing);
       }
+
+      if (visible && showOnLoad) {
+        showGuest(existing);
+      }
+
+      return existing;
     }
 
     if (loadPromises.has(resolvedSpawn.id)) {
@@ -1395,6 +2238,13 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
         loadPromises.delete(resolvedSpawn.id);
         attachGuestDevLabel(guest);
 
+        if (isNightDeviChaseGuest(guest)) {
+          ensureNightDeviChaseState(guest);
+          captureNightDeviHome(guest);
+          attachGuestEnergyBar(BABYLON, scene, guest);
+          syncGuestEnergyBar(guest);
+        }
+
         if (visible && showOnLoad) {
           showGuest(guest);
         }
@@ -1411,8 +2261,8 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
     return loadPromise;
   }
 
-  async function ensureSpawned(spawns, { parallel = false, showOnLoad = true } = {}) {
-    if (parallel) {
+  async function ensureSpawned(spawns, { parallel = false, showOnLoad = true, yieldBetweenLoads = 0 } = {}) {
+    if (parallel && !yieldBetweenLoads) {
       const results = await Promise.all(
         spawns.map((spawn) => loadSpawn(spawn, { showOnLoad: false }))
       );
@@ -1427,15 +2277,47 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
 
     const results = [];
 
-    for (const spawn of spawns) {
-      const guest = await loadSpawn(spawn, { showOnLoad });
+    for (let index = 0; index < spawns.length; index += 1) {
+      const guest = await loadSpawn(spawns[index], { showOnLoad: parallel ? false : showOnLoad });
 
       if (guest) {
         results.push(guest);
       }
+
+      if (yieldBetweenLoads > 0 && index < spawns.length - 1) {
+        await new Promise((resolve) => {
+          let remaining = yieldBetweenLoads;
+          const step = () => {
+            remaining -= 1;
+            if (remaining <= 0) {
+              resolve();
+              return;
+            }
+            requestAnimationFrame(step);
+          };
+          requestAnimationFrame(step);
+        });
+      }
+    }
+
+    if (visible && showOnLoad && parallel) {
+      results.forEach(showGuest);
     }
 
     return results;
+  }
+
+  async function preloadAsset(spawn) {
+    // Warm the browser HTTP cache for repeated night Devi loads.
+    try {
+      const assetRoot = spawn.assetRoot || GUEST_ASSET_ROOT;
+      const encodedFile = encodeGuestAssetPath(spawn.file);
+      await fetch(`${assetRoot}${encodedFile}`, { cache: "force-cache" });
+      return true;
+    } catch (error) {
+      console.warn(`[guest-spawn] preloadAsset failed for ${spawn.file}`, error);
+      return false;
+    }
   }
 
   async function preload(spawns, options = {}) {
@@ -1456,6 +2338,17 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
 
     getGuests().forEach((guest) => {
       if (!guest.root?.isEnabled()) {
+        return;
+      }
+
+      if (isNightDeviChaseGuest(guest)) {
+        updateNightDeviChase(guest, deltaScale, resolveGuestFloorY, getPlayerPosition, {
+          BABYLON,
+          scene,
+          getCollisionMeshes,
+          canGuestMoveHorizontal,
+          hasGuestLineOfSight
+        });
         return;
       }
 
@@ -1488,6 +2381,7 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
   return {
     ensureSpawned,
     preload,
+    preloadAsset,
     show,
     revealGuest,
     revealGuests,
