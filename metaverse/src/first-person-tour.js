@@ -82,7 +82,7 @@ function getModelLoadFileName(config) {
   return `${config.file}?v=${version}`;
 }
 const ENEMY_ROOT = "./assets/guest/";
-const AUDIO_BGM_ROOT = "./assets/audio/bgm/";
+const AUDIO_BGM_ROOT = new URL("../assets/audio/bgm/", import.meta.url).href;
 const TOUR_BGM_FADE_MS = 3000;
 const TOUR_BGM_VOLUME = 1;
 const TOUR_BGM_ENABLED = true;
@@ -93,7 +93,16 @@ const NIGHT_CRY_MAX_INTERVAL_MS = 30000;
 const NIGHT_CRY_VOLUME = 0.85;
 
 function canUseTourBgm() {
-  return TOUR_BGM_ENABLED && isLocalDevEnvironment();
+  // Night/day tour audio should play on production (homepage → metaverse), not only localhost.
+  return TOUR_BGM_ENABLED;
+}
+
+function resolveTourBgmUrl(fileName) {
+  if (!fileName) {
+    return null;
+  }
+
+  return new URL(String(fileName).replace(/^\//, ""), AUDIO_BGM_ROOT).href;
 }
 const DEFAULT_MODEL_FILE = "Angji.glb";
 const MODEL_CONFIGS = [
@@ -1765,13 +1774,7 @@ function getTourBgmUrl(config) {
     return null;
   }
 
-  const fileName = config?.tourBgm;
-
-  if (!fileName) {
-    return null;
-  }
-
-  return `${AUDIO_BGM_ROOT}${fileName}`;
+  return resolveTourBgmUrl(config?.tourBgm);
 }
 
 function createTourBgmController(options = {}) {
@@ -1894,7 +1897,7 @@ function createTourBgmController(options = {}) {
       return null;
     }
 
-    return `${AUDIO_BGM_ROOT}${NIGHT_TOUR_BGM_FILE}`;
+    return resolveTourBgmUrl(NIGHT_TOUR_BGM_FILE);
   }
 
   function stopCryScheduler() {
@@ -1908,7 +1911,7 @@ function createTourBgmController(options = {}) {
     if (!cryAudio) {
       cryAudio = document.createElement("audio");
       cryAudio.preload = "auto";
-      cryAudio.src = `${AUDIO_BGM_ROOT}${NIGHT_CRY_SFX_FILE}`;
+      cryAudio.src = resolveTourBgmUrl(NIGHT_CRY_SFX_FILE);
       cryAudio.load();
     }
 
