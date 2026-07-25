@@ -29,6 +29,108 @@ body {
   touch-action: none;
 }
 
+/* Babylon HtmlMesh CSS3D layer — keep wrappers clear; iframe shows history page. */
+#css-container,
+#css-container .camera-element,
+#css-container .overlay-element,
+#css-container_overlay,
+#css-container_overlay .camera-element,
+#css-container_in_scene,
+#css-container_in_scene .camera-element {
+  background-color: transparent;
+}
+
+#css-container,
+#css-container_in_scene {
+  pointer-events: none;
+}
+
+#css-container iframe,
+#css-container_in_scene iframe {
+  pointer-events: auto;
+  background-color: #f7f3ef;
+}
+
+/* HtmlMesh wrappers must stay transparent so the WebGL backing shows if iframe is loading. */
+#css-container .html-mesh-element,
+#css-container [id^="history-embed"],
+#css-container_in_scene .html-mesh-element,
+#css-container_in_scene [id^="history-embed"] {
+  background-color: transparent !important;
+}
+
+.history-display-embed-host,
+.history-display-embed-root {
+  pointer-events: auto !important;
+}
+
+/* Do NOT force iframe to 100% — that shrinks window.innerHeight into phone mode (white). */
+.history-display-embed-root iframe {
+  pointer-events: auto !important;
+  border: 0;
+  max-width: none !important;
+  max-height: none !important;
+}
+
+.history-display-embed-stage {
+  pointer-events: auto !important;
+}
+
+.history-display-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+}
+
+.history-display-modal[hidden] {
+  display: none !important;
+}
+
+.history-display-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(6, 8, 13, 0.72);
+}
+
+.history-display-modal__panel {
+  position: relative;
+  z-index: 1;
+  width: min(96vw, 1280px);
+  height: min(90vh, 820px);
+  background: #f7f3ef;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+
+.history-display-modal__close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  z-index: 2;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 0;
+  background: rgba(102, 86, 71, 0.92);
+  color: #f7f3ef;
+  font-size: 28px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.history-display-modal__frame {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #f7f3ef;
+}
+
+body.history-display-modal-open {
+  overflow: hidden;
+}
+
 body.walk-mode-active #gameCanvas {
   cursor: crosshair;
 }

@@ -4,7 +4,7 @@ function round(value, digits = 2) {
 }
 
 function formatMarker(marker) {
-  return {
+  const formatted = {
     label: marker.label,
     file: marker.file || "",
     position: {
@@ -21,6 +21,16 @@ function formatMarker(marker) {
     },
     source: marker.source
   };
+
+  if (marker.cameraPosition) {
+    formatted.cameraPosition = {
+      x: round(marker.cameraPosition.x),
+      y: round(marker.cameraPosition.y),
+      z: round(marker.cameraPosition.z)
+    };
+  }
+
+  return formatted;
 }
 
 export function createGuestPlacementTool(BABYLON, scene, options = {}) {
@@ -106,7 +116,8 @@ export function createGuestPlacementTool(BABYLON, scene, options = {}) {
     groundY = null,
     referenceY,
     rotationY,
-    source
+    source,
+    cameraPosition = null
   }) {
     let resolvedGroundY = groundY;
 
@@ -129,7 +140,10 @@ export function createGuestPlacementTool(BABYLON, scene, options = {}) {
       position,
       rotationY,
       lookTarget,
-      source
+      source,
+      cameraPosition: cameraPosition
+        ? new BABYLON.Vector3(cameraPosition.x, cameraPosition.y, cameraPosition.z)
+        : null
     };
 
     markers.push(marker);
@@ -157,6 +171,8 @@ export function createGuestPlacementTool(BABYLON, scene, options = {}) {
       ? Math.atan2(dx, dz)
       : 0;
 
+    // Keep ground marker on the orbit look-at point (guest aim), and also store
+    // the actual orbit camera pose for camera-config capture.
     return buildMarker({
       label,
       file,
@@ -164,7 +180,8 @@ export function createGuestPlacementTool(BABYLON, scene, options = {}) {
       z: target.z,
       referenceY: cameraPosition.y,
       rotationY,
-      source: "orbit"
+      source: "orbit",
+      cameraPosition
     });
   }
 

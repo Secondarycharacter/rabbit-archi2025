@@ -200,10 +200,19 @@
       var VISUAL_H  = 1160;
       // 핸드폰 판별: landscape 기준 짧은 쪽(높이)이 500px 이하
       var PHONE_H_LIMIT = 500;
+      // Metaverse HtmlMesh iframe is often <500px tall — treat as forced tablet fit.
+      var isEmbed = false;
+      try {
+        isEmbed = new URLSearchParams(window.location.search).get("embed") === "1";
+      } catch (e) {}
 
       var overlay = document.getElementById('rotate-overlay');
 
       function isPhone() {
+        if (isEmbed) {
+          return false;
+        }
+
         var short = Math.min(window.innerWidth, window.innerHeight);
         return short <= PHONE_H_LIMIT;
       }
@@ -215,6 +224,29 @@
         var vw = window.innerWidth;
         var vh = window.innerHeight;
         var isLandscape = vw > vh;
+
+        if (isEmbed) {
+          // Fit the full history layout into the 3D display iframe.
+          if (overlay) {
+            overlay.style.display = 'none';
+          }
+
+          wrapper.style.setProperty('visibility', 'visible', 'important');
+          document.body.style.setProperty('overflow', 'hidden', 'important');
+          document.body.style.setProperty('background', '#f7f3ef', 'important');
+
+          var scaleW = (vw * 0.98) / DESIGN_W;
+          var scaleH = (vh * 0.98) / VISUAL_H;
+          var scale = Math.min(scaleW, scaleH);
+
+          wrapper.style.setProperty('position', 'fixed', 'important');
+          wrapper.style.setProperty('top', '50%', 'important');
+          wrapper.style.setProperty('left', '50%', 'important');
+          wrapper.style.setProperty('transform-origin', 'center center', 'important');
+          wrapper.style.setProperty('transform', 'translate(-50%, -50%) scale(' + scale + ')', 'important');
+          wrapper.style.setProperty('overflow', 'visible', 'important');
+          return;
+        }
 
         // ── 핸드폰 ──────────────────────────────────────────────
         if (isPhone()) {

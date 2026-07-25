@@ -13,10 +13,14 @@ import { CLIP_NAMES } from "./AnimationController.js?v=tps-jump-nocol-20260629";
 import { createRootMotionNeutralizer, stripLocomotionRootMotion } from "./RootMotionNeutralizer.js?v=tps-jump-nocol-20260629";
 
 function shouldIgnoreCollisionDuringJump(stateOutput, isGrounded) {
+  // Cover the WHOLE jump action, including the grounded wind-up before takeoff.
+  // Collision-checked wind-up frames were clamped/blocked more often at low FPS
+  // (larger per-frame steps), making night-mode run jumps land shorter than day.
+  void isGrounded;
   return Boolean(
     stateOutput.walkJumpHorizontalMoveActive
     || stateOutput.walkJumpAnimInAirborne
-    || (!isGrounded && stateOutput.isJumpAction)
+    || stateOutput.isJumpAction
   );
 }
 

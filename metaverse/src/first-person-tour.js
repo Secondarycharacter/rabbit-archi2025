@@ -1,5 +1,5 @@
 import { FIREBASE_CONFIG, OVERVIEW_ADMIN_PASSCODE } from "./firebase-config.js?v=tps-jump-nocol-20260629";
-import { createTpsSystem } from "./controllers/createTpsSystem.js?v=floor2-ceiling-camera-20260629";
+import { createTpsSystem } from "./controllers/createTpsSystem.js?v=jump-nocol-windup-20260725";
 import {
   CONTROLLER_SETTINGS,
   EYE_HEIGHT,
@@ -11,7 +11,12 @@ import {
 import {
   applyCharacterTpsKeyDown
 } from "./character-tps-bindings.js?v=tps-jump-nocol-20260629";
-import { createGuestPlacementTool } from "./guest-placement-tool.js?v=tps-jump-nocol-20260629";
+import { createGuestPlacementTool } from "./guest-placement-tool.js?v=orbit-cam-capture-20260725";
+import {
+  attachHistoryDisplayBoards,
+  disposeHistoryDisplayBoards,
+  setHistoryDisplayBoardsEnabled
+} from "./history-display-board.js?v=night-light-occlusion-20260726bk";
 import {
   getAngjiIndoorBackgroundGuestSpawns,
   getAngjiOutdoorBackgroundGuestSpawns,
@@ -93,7 +98,7 @@ const NIGHT_CRY_MAX_INTERVAL_MS = 30000;
 const NIGHT_CRY_VOLUME = 0.85;
 
 function canUseTourBgm() {
-  // Night/day tour audio should play on production (homepage → metaverse), not only localhost.
+  // Night/day tour audio should play on production (homepage -> metaverse), not only localhost.
   return TOUR_BGM_ENABLED;
 }
 
@@ -113,6 +118,7 @@ const MODEL_CONFIGS = [
     overviewId: "jinju",
     moveSpeedMultiplier: 3,
     collision: {
+      colLayer: true,
       stairMode: "discrete"
     },
     orbitCamera: {
@@ -134,12 +140,44 @@ const MODEL_CONFIGS = [
     overviewId: "angji",
     tourBgm: "angji/angji_tour_bgm.mp3",
     moveSpeedMultiplier: 3,
+    collision: {
+      colLayer: true
+    },
     performance: {
       localCollisionRadius: 18,
       localGroundRadius: 24,
       localMeshUpdateDistance: 4,
       treeFacingMinMoveDistance: 0.35,
       treeFacingIntervalFrames: 3
+    },
+    displayBoards: [
+      {
+        materialName: "Display_04_01",
+        aspectWidth: 9,
+        aspectHeight: 6,
+        url: "https://rabbit-archi2025.com/history/history.html",
+        // Interact on the board itself (HtmlMesh), not a separate modal.
+        interactionMode: "embed",
+        // Exterior wall board: face outdoors, fill Display material, keep landscape axes.
+        contentRotateDegrees: 180,
+        contentFlipHorizontal: false,
+        preferWorldLandscape: true,
+        fillDisplayFace: true,
+        faceOutward: true,
+        surfaceOffset: 0.08
+      }
+    ],
+    nightLighting: {
+      // Without this block night ran on defaults: ALL SpotLights enabled at
+      // once (no distance budget) and flare occlusion raycasts every frame —
+      // the main reasons night mode lagged far behind day mode.
+      maxSimultaneousLights: 8,
+      maxActiveSpotLights: 8,
+      spotLightCullIntervalFrames: 3,
+      spotLightCullRadius: 55,
+      lightIncludeRadius: 18,
+      // Flares are few and cheap — keep them visible at any distance.
+      flareOcclusionIntervalFrames: 6
     },
     orbitCamera: {
       position: { x: -143.86, y: 53.30, z: 6.29 },
@@ -200,15 +238,71 @@ const MODEL_CONFIGS = [
   },
   {
     file: "Geochang.glb",
+    modelCacheVersion: "20260725-blend-load-fix",
     label: "거창",
     overviewId: "geochang",
+    moveSpeedMultiplier: 3,
+    // Reset: same Angji collision contract (0_COL_* only, no Jinju discrete stairs).
+    collision: {
+      colLayer: true
+    },
+    performance: {
+      localCollisionRadius: 18,
+      localGroundRadius: 24,
+      localMeshUpdateDistance: 4,
+      treeFacingMinMoveDistance: 0.35,
+      treeFacingIntervalFrames: 3,
+      optimizeDtvBlendToAlphaTest: true,
+      optimizeNonEssentialBlendToAlphaTest: true,
+      treatPeopleMaterialAsCutoutProp: true
+    },
+    displayBoards: [
+      {
+        materialName: "Display_03_01",
+        url: "https://rabbit-archi2025.com/history/history.html",
+        aspectWidth: 9,
+        aspectHeight: 6,
+        interactionMode: "modal"
+      }
+    ],
+    nightLighting: {
+      // Many fixtures can look "on" (emissive + flares). Real SpotLights are expensive:
+      // cost ~ activeSpots × maxSimultaneousLights × lit pixels. Keep shader budget at 8
+      // and only enable the nearest SpotLights each few frames (see maxActiveSpotLights).
+      down01PerFixture: false,
+      down01MaxSpots: 16,
+      down01InitialSpots: 8,
+      down01MergeDistance: 5.5,
+      down01Intensity: 28,
+      down01LocalRange: 18,
+      lightIncludeRadius: 18,
+      down02SelectRatio: 1,
+      down03SelectRatio: 1,
+      // Exterior Down02: 5% but at least 3 lit at once, re-rolled randomly every 10s.
+      down02RotationMaxRatio: 0.05,
+      down02RotationMinCount: 3,
+      down02RotationIntervalMs: 10000,
+      // Exterior Down03 (7 fixtures): 2 lit at a time, sequential rotation every 10s.
+      down03RotationActiveCount: 2,
+      down03RotationIntervalMs: 10000,
+      maxSimultaneousLights: 8,
+      maxActiveSpotLights: 8,
+      spotLightCullIntervalFrames: 3,
+      spotLightCullRadius: 55,
+      // Flares are few and cheap — keep them visible at any distance.
+      flareOcclusionIntervalFrames: 6
+    },
     orbitCamera: {
-      position: { x: 10.80, y: 58.49, z: 98.94 },
-      target: { x: 10.31, y: 12.44, z: 28.26 }
+      position: { x: -41.07, y: 84.64, z: 107.3 },
+      target: { x: -42.83, y: 28.5, z: -29.03 },
+      rotationY: -3.1287,
+      upperBetaDegrees: 82,
+      zoomOutMultiplier: 3
     },
     tourCamera: {
-      position: { x: 2.04, y: 27.77, z: 20.58 },
-      target: { x: 1.89, y: 26.83, z: 18.54 }
+      position: { x: -30.82, y: 19.68, z: -6.68 },
+      rotationY: -2.9985,
+      lookDistance: 10
     }
   }
 ];
@@ -232,7 +326,11 @@ const DEFAULT_PERFORMANCE_SETTINGS = {
   localGroundRadius: LOCAL_GROUND_RADIUS,
   localMeshUpdateDistance: LOCAL_MESH_UPDATE_DISTANCE,
   treeFacingMinMoveDistance: 0.2,
-  treeFacingIntervalFrames: 2
+  treeFacingIntervalFrames: 2,
+  treeFacingInOrbit: true,
+  optimizeDtvBlendToAlphaTest: false,
+  optimizeNonEssentialBlendToAlphaTest: false,
+  treatPeopleMaterialAsCutoutProp: false
 };
 const FURNITURE_MATERIAL_PREFIXES = ["chair", "sofa", "table"];
 const TOUR_RESET_HORIZONTAL_MARGIN_RATIO = 0.08;
@@ -265,7 +363,7 @@ const STAIR_NODE_KEYWORDS = ["3dgeom126", "3dgeom292", "3dgeom599", "3dgeom600",
 const ANGJI_BUILDING_WALL_PREFIXES = ["0_col_b_wall"];
 const ANGJI_BUILDING_FLOOR1_PREFIXES = ["0_col_b_floor1"];
 const ANGJI_BUILDING_FLOOR2_PREFIXES = ["0_col_b_floor2"];
-/** Rooftop / 3F floor — add to GLB as 0_COL_B_Floor3 when the slab exists. */
+/** Rooftop / 3F floor -> add to GLB as 0_COL_B_Floor3 when the slab exists. */
 const ANGJI_BUILDING_FLOOR3_PREFIXES = ["0_col_b_floor3"];
 const ANGJI_BUILDING_FLOOR_PREFIXES = [
   ...ANGJI_BUILDING_FLOOR1_PREFIXES,
@@ -414,6 +512,8 @@ const MATERIAL_REFLECTION_SETTINGS = {
   roughness: 1,
   metallic: 0
 };
+/** Angji default: fixed count of Light_Down02 twinkle/spot lights. */
+const DOWN02_TWINKLE_COUNT = 3;
 const ENEMY_SETTINGS = {
   file: "enemy01.glb",
   modelFile: "Angji.glb",
@@ -623,13 +723,21 @@ function renderGuestPlacementList(markers) {
 
   guestPlacementList.innerHTML = markers.length === 0
     ? "<li>아직 마커가 없습니다.</li>"
-    : markers.map((marker) => (
-      `<li><strong>${marker.label}</strong>`
-      + `${marker.file ? ` / ${marker.file}` : ""}`
-      + `<br>pos x ${marker.position.x}, y ${marker.position.y}, z ${marker.position.z}`
-      + `<br>rotY ${marker.rotationY} (${marker.rotationYDeg}°)`
-      + `</li>`
-    )).join("");
+    : markers.map((marker) => {
+      const cameraLine = marker.cameraPosition
+        ? `<br>cam x ${marker.cameraPosition.x}, y ${marker.cameraPosition.y}, z ${marker.cameraPosition.z}`
+        : "";
+
+      return (
+        `<li><strong>${marker.label}</strong>`
+        + `${marker.file ? ` / ${marker.file}` : ""}`
+        + `${marker.source ? ` <em>(${marker.source})</em>` : ""}`
+        + cameraLine
+        + `<br>pos x ${marker.position.x}, y ${marker.position.y}, z ${marker.position.z}`
+        + `<br>rotY ${marker.rotationY} (${marker.rotationYDeg}°)`
+        + `</li>`
+      );
+    }).join("");
 }
 
 function getGuestPlacementInputs() {
@@ -1534,13 +1642,36 @@ function hasAngjiWallMaterial(mesh) {
 }
 
 function applyAngjiCollisionInvisibility(mesh, BABYLON) {
-  mesh.visibility = 1;
+  // Collision helpers must stay pickable for walks/occlusion rays, but never draw.
+  // (A prior depth-only pass left wall COL visible when disableColorWrite failed on PBR.)
+  mesh.isPickable = true;
+  mesh.isVisible = false;
+  mesh.visibility = 0;
+  mesh.metadata = {
+    ...(mesh.metadata || {}),
+    angjiCollisionInvisible: true,
+    angjiDepthOccluder: false
+  };
 
+  // Keep materials opaque/pickable-friendly without forcing a visible depth pass.
   collectMeshMaterials(mesh).forEach((material) => {
-    material.alpha = 0;
-    material.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+    if (!material) {
+      return;
+    }
+
+    if (typeof material.unfreeze === "function") {
+      material.unfreeze();
+    }
+
     material.disableDepthWrite = true;
-    material.backFaceCulling = false;
+
+    if ("disableColorWrite" in material) {
+      material.disableColorWrite = true;
+    }
+
+    if (typeof material.freeze === "function") {
+      material.freeze();
+    }
   });
 }
 
@@ -1738,6 +1869,15 @@ function isJinjuProjectConfig(config) {
   return config?.overviewId === "jinju";
 }
 
+function isGeochangProjectConfig(config) {
+  return config?.overviewId === "geochang";
+}
+
+/** Orbit Night Mode button + night lighting/BGM (Angji-style). */
+function supportsNightModeConfig(config) {
+  return isAngjiProjectConfig(config) || isGeochangProjectConfig(config);
+}
+
 function isColLayerDiscreteStairConfig(config) {
   return config?.collision?.stairMode === "discrete";
 }
@@ -1766,7 +1906,15 @@ function isSteppableSlopeSurface(mesh) {
 }
 
 function hasColLayerConfig(config) {
-  return isAngjiProjectConfig(config) || isJinjuProjectConfig(config);
+  // Explicit Angji-style 0_COL_* collision contract.
+  if (config?.collision && Object.prototype.hasOwnProperty.call(config.collision, "colLayer")) {
+    return config.collision.colLayer === true;
+  }
+
+  // Legacy fallback for older configs without the flag.
+  return isAngjiProjectConfig(config)
+    || isJinjuProjectConfig(config)
+    || isGeochangProjectConfig(config);
 }
 
 function getTourBgmUrl(config) {
@@ -2025,7 +2173,7 @@ function createTourBgmController(options = {}) {
   }
 
   function shouldUseNightTourAudio(config) {
-    return isAngjiProjectConfig(config) && Boolean(options.getIsAngjiNightMode?.());
+    return supportsNightModeConfig(config) && Boolean(options.getIsAngjiNightMode?.());
   }
 
   function preloadUrl(url) {
@@ -2067,7 +2215,7 @@ function createTourBgmController(options = {}) {
   function preload(config) {
     const urls = [
       getTourBgmUrl(config),
-      isAngjiProjectConfig(config) ? getNightTourBgmUrl() : null
+      supportsNightModeConfig(config) ? getNightTourBgmUrl() : null
     ].filter(Boolean);
 
     if (!urls.length) {
@@ -2075,7 +2223,7 @@ function createTourBgmController(options = {}) {
     }
 
     return Promise.all(urls.map((url) => preloadUrl(url))).then(() => {
-      if (isAngjiProjectConfig(config) && canUseTourBgm()) {
+      if (supportsNightModeConfig(config) && canUseTourBgm()) {
         ensureCryAudio();
       }
     });
@@ -2179,6 +2327,11 @@ function isAngjiDownlight02MaterialName(name) {
   return /^lightdown0*2(?:\.\d+)?$/.test(normalized) || normalized.includes("lightdown02");
 }
 
+function isAngjiDownlight03MaterialName(name) {
+  const normalized = normalizeMaterialName(name).replace(/[\s_-]+/g, "");
+  return /^lightdown0*3(?:\.\d+)?$/.test(normalized) || normalized.includes("lightdown03");
+}
+
 function collectAngjiDownlightMeshes(modelState) {
   const meshes = modelState?.meshes || [];
 
@@ -2207,6 +2360,74 @@ function collectAngjiDownlight02Meshes(modelState) {
     const meshName = normalizeName(mesh.name || mesh.id || "");
     return meshName.includes("lightdown02") || meshName.includes("lightdown2");
   });
+}
+
+function collectAngjiDownlight03Meshes(modelState) {
+  const meshes = modelState?.meshes || [];
+
+  return meshes.filter((mesh) => {
+    if (mesh?.isEnabled?.() === false) {
+      return false;
+    }
+
+    if (typeof mesh.getTotalVertices === "function" && mesh.getTotalVertices() <= 0) {
+      return false;
+    }
+
+    if (getMaterialNames(mesh).some((name) => isAngjiDownlight03MaterialName(name))) {
+      return true;
+    }
+
+    const meshName = normalizeName(mesh.name || mesh.id || "");
+    return meshName.includes("lightdown03") || meshName.includes("lightdown3");
+  });
+}
+
+function getNightDown02SelectCount(config, totalCount) {
+  if (config?.nightLighting?.down02SelectAll === true) {
+    return totalCount;
+  }
+
+  const ratio = config?.nightLighting?.down02SelectRatio;
+
+  if (typeof ratio === "number" && ratio >= 0) {
+    return Math.max(0, Math.min(totalCount, Math.round(totalCount * ratio)));
+  }
+
+  if (typeof config?.nightLighting?.down02SelectCount === "number") {
+    return Math.max(0, Math.min(totalCount, Math.floor(config.nightLighting.down02SelectCount)));
+  }
+
+  return Math.min(totalCount, DOWN02_TWINKLE_COUNT);
+}
+
+function getNightDown03SelectCount(config, totalCount) {
+  if (config?.nightLighting?.down03SelectAll === true) {
+    return totalCount;
+  }
+
+  const ratio = config?.nightLighting?.down03SelectRatio;
+
+  if (typeof ratio === "number" && ratio >= 0) {
+    return Math.max(0, Math.min(totalCount, Math.round(totalCount * ratio)));
+  }
+
+  if (typeof config?.nightLighting?.down03SelectCount === "number") {
+    return Math.max(0, Math.min(totalCount, Math.floor(config.nightLighting.down03SelectCount)));
+  }
+
+  // Default: keep previous behavior (treat all Down03 as Down02).
+  return totalCount;
+}
+
+function getNightMaxSimultaneousLights(config) {
+  const configured = config?.nightLighting?.maxSimultaneousLights;
+
+  if (typeof configured === "number" && configured > 0) {
+    return Math.max(4, Math.floor(configured));
+  }
+
+  return 8;
 }
 
 function collectUniqueMaterialsFromMeshes(meshes) {
@@ -2297,6 +2518,665 @@ function isDtvTreeMesh(mesh) {
   return getMaterialNames(mesh).some((name) => normalizeName(name).startsWith("dtv"));
 }
 
+function findConnectedVertexIslands(indices, vertexCount) {
+  const parent = new Int32Array(vertexCount);
+
+  for (let index = 0; index < vertexCount; index += 1) {
+    parent[index] = index;
+  }
+
+  function find(index) {
+    let root = index;
+
+    while (parent[root] !== root) {
+      root = parent[root];
+    }
+
+    let cursor = index;
+
+    while (cursor !== root) {
+      const next = parent[cursor];
+      parent[cursor] = root;
+      cursor = next;
+    }
+
+    return root;
+  }
+
+  function union(left, right) {
+    const leftRoot = find(left);
+    const rightRoot = find(right);
+
+    if (leftRoot !== rightRoot) {
+      parent[rightRoot] = leftRoot;
+    }
+  }
+
+  for (let index = 0; index + 2 < indices.length; index += 3) {
+    const a = indices[index];
+    const b = indices[index + 1];
+    const c = indices[index + 2];
+    union(a, b);
+    union(b, c);
+  }
+
+  const islands = new Map();
+
+  for (let vertex = 0; vertex < vertexCount; vertex += 1) {
+    const root = find(vertex);
+    let list = islands.get(root);
+
+    if (!list) {
+      list = [];
+      islands.set(root, list);
+    }
+
+    list.push(vertex);
+  }
+
+  return Array.from(islands.values());
+}
+
+function createDtvTreeIslandMesh(BABYLON, scene, sourceMesh, islandVertices, islandIndex) {
+  const positions = sourceMesh.getVerticesData(BABYLON.VertexBuffer.PositionKind);
+  const indices = sourceMesh.getIndices();
+
+  if (!positions || !indices || islandVertices.length < 3) {
+    return null;
+  }
+
+  const islandSet = new Set(islandVertices);
+  const oldToNew = new Map();
+  const newPositions = [];
+
+  islandVertices.forEach((oldIndex) => {
+    oldToNew.set(oldIndex, newPositions.length / 3);
+    const offset = oldIndex * 3;
+    newPositions.push(positions[offset], positions[offset + 1], positions[offset + 2]);
+  });
+
+  const newIndices = [];
+
+  for (let index = 0; index + 2 < indices.length; index += 3) {
+    const a = indices[index];
+    const b = indices[index + 1];
+    const c = indices[index + 2];
+
+    if (!islandSet.has(a) || !islandSet.has(b) || !islandSet.has(c)) {
+      continue;
+    }
+
+    newIndices.push(oldToNew.get(a), oldToNew.get(b), oldToNew.get(c));
+  }
+
+  if (newIndices.length < 3) {
+    return null;
+  }
+
+  // Rebase so local origin = canopy foot -> same pivot model as Angji/Jinju cards.
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let minZ = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxZ = Number.NEGATIVE_INFINITY;
+
+  for (let index = 0; index < newPositions.length; index += 3) {
+    minX = Math.min(minX, newPositions[index]);
+    minY = Math.min(minY, newPositions[index + 1]);
+    minZ = Math.min(minZ, newPositions[index + 2]);
+    maxX = Math.max(maxX, newPositions[index]);
+    maxZ = Math.max(maxZ, newPositions[index + 2]);
+  }
+
+  const footX = (minX + maxX) * 0.5;
+  const footY = minY;
+  const footZ = (minZ + maxZ) * 0.5;
+
+  for (let index = 0; index < newPositions.length; index += 3) {
+    newPositions[index] -= footX;
+    newPositions[index + 1] -= footY;
+    newPositions[index + 2] -= footZ;
+  }
+
+  const vertexKinds = [
+    BABYLON.VertexBuffer.NormalKind,
+    BABYLON.VertexBuffer.UVKind,
+    BABYLON.VertexBuffer.UV2Kind,
+    BABYLON.VertexBuffer.ColorKind,
+    BABYLON.VertexBuffer.TangentKind
+  ];
+  const vertexData = new BABYLON.VertexData();
+  vertexData.positions = newPositions;
+  vertexData.indices = newIndices;
+
+  vertexKinds.forEach((kind) => {
+    const source = sourceMesh.getVerticesData(kind);
+
+    if (!source) {
+      return;
+    }
+
+    const stride = kind === BABYLON.VertexBuffer.UVKind || kind === BABYLON.VertexBuffer.UV2Kind
+      ? 2
+      : kind === BABYLON.VertexBuffer.ColorKind || kind === BABYLON.VertexBuffer.TangentKind
+        ? 4
+        : 3;
+    const extracted = [];
+
+    islandVertices.forEach((oldIndex) => {
+      const offset = oldIndex * stride;
+
+      for (let component = 0; component < stride; component += 1) {
+        extracted.push(source[offset + component]);
+      }
+    });
+
+    if (kind === BABYLON.VertexBuffer.NormalKind) {
+      vertexData.normals = extracted;
+    } else if (kind === BABYLON.VertexBuffer.UVKind) {
+      vertexData.uvs = extracted;
+    } else if (kind === BABYLON.VertexBuffer.UV2Kind) {
+      vertexData.uvs2 = extracted;
+    } else if (kind === BABYLON.VertexBuffer.ColorKind) {
+      vertexData.colors = extracted;
+    } else if (kind === BABYLON.VertexBuffer.TangentKind) {
+      vertexData.tangents = extracted;
+    }
+  });
+
+  const islandMesh = new BABYLON.Mesh(
+    `${sourceMesh.name || "dtv"}-island-${islandIndex}-${sourceMesh.uniqueId}`,
+    scene
+  );
+  vertexData.applyToMesh(islandMesh, true);
+  islandMesh.material = sourceMesh.material;
+
+  // Place foot at the baked island location, then lift into the source parent space.
+  sourceMesh.computeWorldMatrix(true);
+  const footWorld = BABYLON.Vector3.TransformCoordinates(
+    new BABYLON.Vector3(footX, footY, footZ),
+    sourceMesh.getWorldMatrix()
+  );
+  const worldScale = new BABYLON.Vector3();
+  const worldRot = new BABYLON.Quaternion();
+  const worldPos = new BABYLON.Vector3();
+  sourceMesh.getWorldMatrix().decompose(worldScale, worldRot, worldPos);
+
+  islandMesh.parent = null;
+  islandMesh.rotationQuaternion = worldRot;
+  islandMesh.scaling.copyFrom(worldScale);
+  islandMesh.position.copyFrom(footWorld);
+
+  if (sourceMesh.parent) {
+    islandMesh.setParent(sourceMesh.parent, true);
+  }
+
+  islandMesh.isPickable = false;
+  islandMesh.checkCollisions = false;
+  islandMesh.receiveShadows = sourceMesh.receiveShadows;
+  islandMesh.metadata = {
+    ...(sourceMesh.metadata || {}),
+    treeMesh: true,
+    passThrough: true,
+    splitFromMergedDtv: true,
+    sourceTreeMeshId: sourceMesh.uniqueId
+  };
+
+  return islandMesh;
+}
+
+/**
+ * Geochang (and similar) exports many individual DTV cards welded into one mesh.
+ * One mesh -> one yaw. Split connected islands so each tree can face the camera
+ * from its own pivot -> same behavior as Angji/Jinju/Chungju per-tree meshes.
+ */
+function expandMergedDtvTreeMeshes(BABYLON, scene, treeMeshes, allMeshes) {
+  const expanded = [];
+  let splitMeshCount = 0;
+  let islandCount = 0;
+
+  treeMeshes.forEach((mesh) => {
+    const positions = mesh.getVerticesData(BABYLON.VertexBuffer.PositionKind);
+    const indices = mesh.getIndices();
+
+    if (!positions || !indices || positions.length < 9) {
+      expanded.push(mesh);
+      return;
+    }
+
+    const vertexCount = positions.length / 3;
+    const islands = findConnectedVertexIslands(indices, vertexCount);
+
+    // Single island: already one tree (or inseparable volume). Keep as-is.
+    if (islands.length <= 1) {
+      expanded.push(mesh);
+      return;
+    }
+
+    const created = [];
+
+    islands.forEach((islandVertices, islandIndex) => {
+      // Ignore degenerate scraps; DTV cards are typically ~167 verts.
+      if (islandVertices.length < 12) {
+        return;
+      }
+
+      const islandMesh = createDtvTreeIslandMesh(
+        BABYLON,
+        scene,
+        mesh,
+        islandVertices,
+        islandIndex
+      );
+
+      if (islandMesh) {
+        created.push(islandMesh);
+      }
+    });
+
+    if (created.length <= 1) {
+      created.forEach((entry) => entry.dispose?.());
+      expanded.push(mesh);
+      return;
+    }
+
+    created.forEach((islandMesh) => {
+      expanded.push(islandMesh);
+      allMeshes.push(islandMesh);
+    });
+
+    mesh.setEnabled(false);
+    mesh.isVisible = false;
+    mesh.isPickable = false;
+    mesh.metadata = {
+      ...(mesh.metadata || {}),
+      treeMesh: true,
+      passThrough: true,
+      mergedDtvSplitAway: true
+    };
+
+    splitMeshCount += 1;
+    islandCount += created.length;
+  });
+
+  if (splitMeshCount > 0) {
+    console.info(
+      `[trees] Split ${splitMeshCount} merged DTV mesh(es) into ${islandCount} individual trees`
+    );
+  }
+
+  return expanded;
+}
+
+/**
+ * Same pivot rule as Angji/Jinju/Chungju: yaw around mesh origin.
+ * Merged Geochang cards are split + rebased first so their origin is already the tree foot.
+ */
+function getTreeYawPivotWorldPosition(BABYLON, mesh) {
+  mesh.computeWorldMatrix(true);
+  return mesh.getAbsolutePosition().clone();
+}
+
+function attachTreeYawPivot(BABYLON, scene, mesh, modelRoot) {
+  mesh.billboardMode = 0;
+  modelRoot.computeWorldMatrix(true);
+  mesh.computeWorldMatrix(true);
+  mesh.refreshBoundingInfo?.(true, true);
+
+  const worldPos = getTreeYawPivotWorldPosition(BABYLON, mesh);
+  const rootWorldInverse = modelRoot.getWorldMatrix().clone();
+  rootWorldInverse.invert();
+  const localPos = BABYLON.Vector3.TransformCoordinates(worldPos, rootWorldInverse);
+
+  const pivot = new BABYLON.TransformNode(`tree-yaw-pivot-${mesh.uniqueId}`, scene);
+  pivot.parent = modelRoot;
+  pivot.position.copyFrom(localPos);
+  pivot.rotation.set(0, 0, 0);
+  pivot.rotationQuaternion = null;
+  mesh.setParent(pivot, true);
+  mesh.computeWorldMatrix(true);
+
+  mesh.metadata = {
+    ...(mesh.metadata || {}),
+    treeYawPivot: pivot,
+    treeFaceYawOffset: getTreeMeshFaceYawOffset(BABYLON, mesh)
+  };
+}
+
+function getMaterialDebugName(material) {
+  return normalizeName(material?.name || material?.id || "");
+}
+
+function shouldPreserveRealtimeBlendMaterial(material, performanceSettings = DEFAULT_PERFORMANCE_SETTINGS) {
+  const name = getMaterialDebugName(material);
+
+  if (
+    name.includes("glass")
+    || name.includes("water")
+    || name.includes("pool")
+    || name.includes("translucent")
+    || name.includes("displayboard")
+  ) {
+    return true;
+  }
+
+  if (!name.includes("people")) {
+    return false;
+  }
+
+  // Geochang: exact "People" is the old DefaultMaterial8 sheet -> allow AlphaTest.
+  if (
+    performanceSettings?.treatPeopleMaterialAsCutoutProp === true
+    && isGeochangPeopleCutoutPropMaterialName(name)
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+function isGeochangPeopleCutoutPropMaterialName(name) {
+  const normalized = normalizeName(name);
+  return normalized === "people" || normalized.includes("defaultmaterial8");
+}
+
+/** Cutouts that encode transparency as black RGB (alpha channel unused / opaque). */
+function isRgbLumaCutoutMaterial(material) {
+  const name = getMaterialDebugName(material);
+  return name.includes("istockphoto")
+    || name.includes("istock")
+    || name.includes("shutterstock")
+    || name.includes("gettyimages")
+    || name === "ivy"
+    || name.startsWith("ivy")
+    || name.includes("ivy");
+}
+
+function isKnownCutoutBlendMaterial(material, performanceSettings = DEFAULT_PERFORMANCE_SETTINGS) {
+  const name = getMaterialDebugName(material);
+
+  return name.startsWith("dtv")
+    || name.includes("defaultmaterial")
+    || name.startsWith("mmkgfgfd")
+    || name.includes("arbre")
+    || isRgbLumaCutoutMaterial(material)
+    || (
+      performanceSettings?.treatPeopleMaterialAsCutoutProp === true
+      && isGeochangPeopleCutoutPropMaterialName(name)
+    );
+}
+
+function collectMaterialColorTextures(material) {
+  if (!material) {
+    return [];
+  }
+
+  const listed = [
+    material.diffuseTexture,
+    material.albedoTexture,
+    material.baseTexture,
+    material.opacityTexture,
+    material.emissiveTexture,
+    material.ambientTexture
+  ];
+
+  if (typeof material.getActiveTextures === "function") {
+    // Prefer color maps only -> skip bump/normal/metal so RGB-as-alpha does not punch holes in them.
+    material.getActiveTextures().forEach((texture) => {
+      if (
+        texture === material.bumpTexture
+        || texture === material.normalTexture
+        || texture === material.metallicTexture
+        || texture === material.reflectivityTexture
+        || texture === material.microSurfaceTexture
+      ) {
+        return;
+      }
+
+      listed.push(texture);
+    });
+  }
+
+  return [...new Set(listed.filter(Boolean))];
+}
+
+function applyTextureAlphaFlags(texture, useRgbAsAlpha) {
+  if (!texture) {
+    return;
+  }
+
+  const apply = () => {
+    texture.hasAlpha = true;
+
+    if ("getAlphaFromRGB" in texture) {
+      texture.getAlphaFromRGB = useRgbAsAlpha === true;
+    }
+
+    if (typeof texture.updateSamplingMode === "function" && texture.samplingMode != null) {
+      // Nudge sampler so alpha-flag changes are picked up after async decode.
+      texture.updateSamplingMode(texture.samplingMode);
+    }
+
+    if (typeof texture.markAsDirty === "function") {
+      texture.markAsDirty();
+    }
+  };
+
+  apply();
+
+  if (typeof texture.isReady === "function" && !texture.isReady() && texture.onLoadObservable?.addOnce) {
+    texture.onLoadObservable.addOnce(apply);
+  }
+}
+
+function convertMaterialToAlphaTest(BABYLON, material, performanceSettings = DEFAULT_PERFORMANCE_SETTINGS) {
+  if (!material || shouldPreserveRealtimeBlendMaterial(material, performanceSettings)) {
+    return false;
+  }
+
+  const alphaTestMode = BABYLON.Material.MATERIAL_ALPHATEST;
+  const alphaBlendMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+  const currentMode = material.transparencyMode;
+  const namedCutout = isKnownCutoutBlendMaterial(material, performanceSettings);
+  const useRgbAsAlpha = isRgbLumaCutoutMaterial(material);
+  const isBlend = currentMode === alphaBlendMode;
+
+  if (!isBlend && !namedCutout) {
+    return false;
+  }
+
+  if (currentMode === alphaTestMode) {
+    enableMaterialTextureAlpha(material, { useRgbAsAlpha });
+    return false;
+  }
+
+  if (typeof material.unfreeze === "function") {
+    material.unfreeze();
+  }
+
+  material.transparencyMode = alphaTestMode;
+
+  if ("alphaCutOff" in material) {
+    const currentCutOff = typeof material.alphaCutOff === "number" ? material.alphaCutOff : 0;
+    material.alphaCutOff = Math.max(currentCutOff, useRgbAsAlpha ? 0.05 : 0.15);
+  }
+
+  enableMaterialTextureAlpha(material, { useRgbAsAlpha });
+
+  if ("needDepthPrePass" in material) {
+    material.needDepthPrePass = false;
+  }
+
+  if ("forceDepthWrite" in material) {
+    material.forceDepthWrite = true;
+  }
+
+  if (typeof material.markAsDirty === "function" && BABYLON.Material?.MaterialDirtyFlag) {
+    material.markAsDirty(BABYLON.Material.MaterialDirtyFlag);
+  } else if (typeof material.markAsDirty === "function") {
+    material.markAsDirty(63);
+  }
+
+  return true;
+}
+
+/** Transparent texels render black when alphaMode is cutout but textures lack hasAlpha. */
+function enableMaterialTextureAlpha(material, options = {}) {
+  if (!material) {
+    return;
+  }
+
+  // DTV foliage: real alpha channel. IVY / istockphoto cards: black RGB, opaque A.
+  const useRgbAsAlpha = options.useRgbAsAlpha === true;
+  const textures = collectMaterialColorTextures(material);
+
+  textures.forEach((texture) => {
+    applyTextureAlphaFlags(texture, useRgbAsAlpha);
+  });
+
+  if (useRgbAsAlpha) {
+    const baseTexture = material.diffuseTexture
+      || material.albedoTexture
+      || material.baseTexture
+      || textures[0]
+      || null;
+
+    // Ensure the opacity path samples the same map (SpecularGlossiness / PBR).
+    if (baseTexture) {
+      if (!material.opacityTexture) {
+        material.opacityTexture = baseTexture;
+      }
+
+      applyTextureAlphaFlags(material.opacityTexture, true);
+    }
+  }
+
+  if ("useAlphaFromDiffuseTexture" in material) {
+    material.useAlphaFromDiffuseTexture = true;
+  }
+
+  if ("useAlphaFromAlbedoTexture" in material) {
+    material.useAlphaFromAlbedoTexture = true;
+  }
+
+  if ("useAlphaFromOpacityTexture" in material && material.opacityTexture) {
+    material.useAlphaFromOpacityTexture = true;
+  }
+
+  if ("alpha" in material && typeof material.alpha === "number" && material.alpha <= 0) {
+    material.alpha = 1;
+  }
+}
+
+function fixCutoutTextureAlphaOnMeshes(meshes, performanceSettings = DEFAULT_PERFORMANCE_SETTINGS) {
+  const materials = collectUniqueMaterialsFromMeshes(meshes);
+  let fixed = 0;
+
+  materials.forEach((material) => {
+    const mode = material?.transparencyMode;
+    const namedCutout = isKnownCutoutBlendMaterial(material, performanceSettings);
+    const useRgbAsAlpha = isRgbLumaCutoutMaterial(material);
+    const needsAlpha = mode === 1 // ALPHATEST
+      || mode === 2 // ALPHABLEND
+      || mode === 3 // ALPHATESTANDBLEND
+      || namedCutout
+      || useRgbAsAlpha;
+
+    if (!needsAlpha) {
+      return;
+    }
+
+    if (typeof material.unfreeze === "function") {
+      material.unfreeze();
+    }
+
+    enableMaterialTextureAlpha(material, { useRgbAsAlpha });
+
+    // MASK/cutout authored materials that still draw black: force alpha-test path.
+    if (
+      (namedCutout || useRgbAsAlpha)
+      && material.transparencyMode !== 2
+      && "transparencyMode" in material
+    ) {
+      material.transparencyMode = 1;
+      if ("alphaCutOff" in material) {
+        const minCut = useRgbAsAlpha ? 0.05 : 0.15;
+        material.alphaCutOff = Math.min(
+          0.5,
+          Math.max(typeof material.alphaCutOff === "number" ? material.alphaCutOff : 0, minCut)
+        );
+      }
+    }
+
+    fixed += 1;
+
+    if (typeof material.freeze === "function") {
+      material.freeze();
+    }
+  });
+
+  // Textures often finish decoding after the first pass -> re-apply IVY/RGB cutout flags.
+  const scene = meshes.find((mesh) => mesh?.getScene?.())?.getScene?.();
+
+  if (scene?.onReadyObservable?.addOnce) {
+    scene.onReadyObservable.addOnce(() => {
+      materials.forEach((material) => {
+        if (!isRgbLumaCutoutMaterial(material) && !isKnownCutoutBlendMaterial(material, performanceSettings)) {
+          return;
+        }
+
+        if (typeof material.unfreeze === "function") {
+          material.unfreeze();
+        }
+
+        enableMaterialTextureAlpha(material, {
+          useRgbAsAlpha: isRgbLumaCutoutMaterial(material)
+        });
+
+        if (typeof material.freeze === "function") {
+          material.freeze();
+        }
+      });
+    });
+  }
+
+  return fixed;
+}
+
+function optimizeModelBlendMaterials(BABYLON, meshes, options = {}) {
+  const {
+    optimizeDtv = false,
+    optimizeNonEssential = false,
+    performanceSettings = DEFAULT_PERFORMANCE_SETTINGS
+  } = options;
+
+  if (!optimizeDtv && !optimizeNonEssential) {
+    return 0;
+  }
+
+  const materials = collectUniqueMaterialsFromMeshes(meshes);
+  let converted = 0;
+
+  materials.forEach((material) => {
+    if (shouldPreserveRealtimeBlendMaterial(material, performanceSettings)) {
+      return;
+    }
+
+    const namedCutout = isKnownCutoutBlendMaterial(material, performanceSettings);
+    const allow = optimizeNonEssential || (optimizeDtv && namedCutout);
+
+    if (!allow) {
+      return;
+    }
+
+    if (convertMaterialToAlphaTest(BABYLON, material, performanceSettings)) {
+      converted += 1;
+    }
+  });
+
+  return converted;
+}
+
 function getLocalVertexBounds(BABYLON, mesh) {
   const positions = mesh.getVerticesData(BABYLON.VertexBuffer.PositionKind);
 
@@ -2350,31 +3230,6 @@ function getTreeMeshFaceYawOffset(BABYLON, mesh) {
   });
 
   return bestLength > 1e-6 ? bestYaw : 0;
-}
-
-function attachTreeYawPivot(BABYLON, scene, mesh, modelRoot) {
-  mesh.billboardMode = 0;
-  modelRoot.computeWorldMatrix(true);
-  mesh.computeWorldMatrix(true);
-
-  const worldPos = mesh.getAbsolutePosition().clone();
-  const rootWorldInverse = modelRoot.getWorldMatrix().clone();
-  rootWorldInverse.invert();
-  const localPos = BABYLON.Vector3.TransformCoordinates(worldPos, rootWorldInverse);
-
-  const pivot = new BABYLON.TransformNode(`tree-yaw-pivot-${mesh.uniqueId}`, scene);
-  pivot.parent = modelRoot;
-  pivot.position.copyFrom(localPos);
-  pivot.rotation.set(0, 0, 0);
-  pivot.rotationQuaternion = null;
-  mesh.setParent(pivot, true);
-  mesh.computeWorldMatrix(true);
-
-  mesh.metadata = {
-    ...(mesh.metadata || {}),
-    treeYawPivot: pivot,
-    treeFaceYawOffset: getTreeMeshFaceYawOffset(BABYLON, mesh)
-  };
 }
 
 function restoreTreeMeshInitialRotation(mesh) {
@@ -2472,8 +3327,20 @@ function isFloorSurface(mesh) {
   return hasMaterialKeyword(mesh, FLOOR_MATERIAL_KEYWORDS);
 }
 
-function isPeopleFireballTarget(mesh) {
-  return hasMaterialKeyword(mesh, PASS_THROUGH_MATERIAL_KEYWORDS);
+function isPeopleFireballTarget(mesh, performanceSettings = DEFAULT_PERFORMANCE_SETTINGS) {
+  // Geochang renamed DefaultMaterial8 -> People. That sheet is a large translucent
+  // prop (~74 meshes); treating it as people made them pickable + fireball-split.
+  const treatPeopleAsProp = performanceSettings?.treatPeopleMaterialAsCutoutProp === true;
+
+  return getMaterialNames(mesh).some((name) => {
+    const normalized = normalizeName(name);
+
+    if (treatPeopleAsProp && isGeochangPeopleCutoutPropMaterialName(normalized)) {
+      return false;
+    }
+
+    return normalized.includes("people");
+  });
 }
 
 function isLikelyWalkableSurface(mesh) {
@@ -3055,7 +3922,7 @@ function getFireballMaterial(BABYLON, scene) {
 }
 
 function buildFireballHitMeshSet(modelState) {
-  // Prefer collision + people only — full-scene multiPick is a major fireball hitch.
+  // Prefer collision + people only -> full-scene multiPick is a major fireball hitch.
   const meshes = [
     ...(modelState?.collisionMeshes || []),
     ...(modelState?.peopleTargetMeshes || [])
@@ -3494,11 +4361,11 @@ function createPeopleComponentMeshes(BABYLON, scene, mesh) {
   });
 }
 
-function splitPeopleTargetMeshes(BABYLON, scene, meshes) {
+function splitPeopleTargetMeshes(BABYLON, scene, meshes, performanceSettings = DEFAULT_PERFORMANCE_SETTINGS) {
   const generatedMeshes = [];
 
   meshes.slice().forEach((mesh) => {
-    if (!isPeopleFireballTarget(mesh) || mesh.metadata?.fireballSplitComponent) {
+    if (!isPeopleFireballTarget(mesh, performanceSettings) || mesh.metadata?.fireballSplitComponent) {
       return;
     }
 
@@ -3528,6 +4395,12 @@ function softenModelMaterialReflections(BABYLON, materials) {
       return;
     }
 
+    if (typeof material.unfreeze === "function") {
+      material.unfreeze();
+    }
+
+    // Keep double-sided foliage/glass readable; opaque building faces still cull via
+    // engine defaults when materials are authored single-sided.
     material.backFaceCulling = false;
 
     if ("specularColor" in material) {
@@ -3594,7 +4467,7 @@ function findGroundHit(BABYLON, scene, position, groundMeshSet, options = {}) {
   return belowReference[0]?.hit || null;
 }
 
-/** Spawn / reset snap — accepts large vertical offset from Tour_Start markers. */
+/** Spawn / reset snap -> accepts large vertical offset from Tour_Start markers. */
 function findSpawnGroundHit(BABYLON, scene, position, groundMeshSet) {
   const groundHits = getGroundHitsAtPosition(BABYLON, scene, position, groundMeshSet);
 
@@ -5337,14 +6210,14 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     jinjuIndoorGuestActivationStarted = false;
     jinjuIndoorGuestSpawnComplete = false;
     guestCharacterSystem?.disposeGuests?.({ onlyIds: getJinjuIndoorGuestIds() });
-    console.info(`[jinju-indoor-guest] cancelled — ${reason}`);
+    console.info(`[jinju-indoor-guest] cancelled -> ${reason}`);
   }
 
   function cancelJinjuRooftopGuestSpawn(reason) {
     jinjuRooftopGuestSpawnToken += 1;
     jinjuRooftopGuestActivationStarted = false;
     guestCharacterSystem?.disposeGuests?.({ onlyIds: getJinjuRooftopGuestIds() });
-    console.info(`[jinju-rooftop-guest] cancelled — ${reason}`);
+    console.info(`[jinju-rooftop-guest] cancelled -> ${reason}`);
   }
 
   function disposeJinjuIndoorGuestsForRooftop() {
@@ -5434,12 +6307,12 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
         jinjuIndoorGuestSpawnComplete
         && (hasAnyJinjuRooftopGuests() || jinjuRooftopGuestActivationStarted)
       ) {
-        cancelJinjuRooftopGuestSpawn("ramp 1F descent — indoor spawn complete, clearing rooftop");
+        cancelJinjuRooftopGuestSpawn("ramp 1F descent -> indoor spawn complete, clearing rooftop");
         restoreJinjuIndoorGuestsAfterRooftop("ramp 1F descent");
       } else if (!jinjuIndoorGuestActivationStarted) {
         jinjuRamp1FHasBeenContacted = true;
         jinjuIndoorGuestActivationStarted = true;
-        console.info("[jinju-indoor-guest] ramp 1F contact — starting indoor guest spawn");
+        console.info("[jinju-indoor-guest] ramp 1F contact -> starting indoor guest spawn");
         void scheduleJinjuIndoorGuestSpawn();
       }
     }
@@ -5449,17 +6322,17 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
         && (jinjuRooftopGuestActivationStarted || hasAnyJinjuRooftopGuests());
 
       if (returningFromRooftop) {
-        cancelJinjuRooftopGuestSpawn("ramp 2F descent — restoring indoor guests");
+        cancelJinjuRooftopGuestSpawn("ramp 2F descent -> restoring indoor guests");
         restoreJinjuIndoorGuestsAfterRooftop("ramp 2F descent");
       } else {
         const rooftopStuck = jinjuRooftopGuestActivationStarted && !hasAnyJinjuRooftopGuests();
         if (!jinjuRooftopGuestActivationStarted || rooftopStuck) {
           if (rooftopStuck) {
-            console.warn("[jinju-rooftop-guest] ramp 2F contact — retrying stuck rooftop activation");
+            console.warn("[jinju-rooftop-guest] ramp 2F contact -> retrying stuck rooftop activation");
             jinjuRooftopGuestActivationStarted = false;
           }
           jinjuRooftopGuestActivationStarted = true;
-          console.info(`[jinju-rooftop-guest] ramp 2F contact — starting rooftop guest spawn (${JINJU_ROOFTOP_GUEST_CONFIG_VERSION})`);
+          console.info(`[jinju-rooftop-guest] ramp 2F contact -> starting rooftop guest spawn (${JINJU_ROOFTOP_GUEST_CONFIG_VERSION})`);
           void scheduleJinjuRooftopGuestSpawn();
         }
       }
@@ -5496,7 +6369,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
       return;
     }
 
-    // Orbit outdoor only — indoor guests load on ramp contact to avoid OOM (building + TPS + N GLBs).
+    // Orbit outdoor only -> indoor guests load on ramp contact to avoid OOM (building + TPS + N GLBs).
     const run = () => {
       void guestCharacterSystem?.preload(getJinjuFixedGuestSpawns(), { parallel: false, showOnLoad: false });
     };
@@ -5682,7 +6555,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     const nightModeGuests = isAngjiNightGuestMode();
 
     try {
-      // Night: load Devis sequentially — parallel ImportMeshAsync of the same
+      // Night: load Devis sequentially -> parallel ImportMeshAsync of the same
       // Devi.glb into one scene often fails and leaves enemies missing.
       await guestCharacterSystem.ensureSpawned(allOutdoorSpawns, {
         parallel: !nightModeGuests,
@@ -5908,7 +6781,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
       }
 
       if (revealedAny) {
-        console.info(`[jinju-rooftop-guest] schedule run #${scheduleRunId} complete — spawn-once latch held`);
+        console.info(`[jinju-rooftop-guest] schedule run #${scheduleRunId} complete -> spawn-once latch held`);
         return;
       }
 
@@ -6002,7 +6875,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
         jinjuIndoorGuestSpawnComplete = true;
         disposeJinjuOutdoorGuestsForIndoor();
         console.info(
-          `[jinju-indoor-guest] schedule run #${scheduleRunId} complete — spawn-once latch held (audit: auditJinjuGuestState())`
+          `[jinju-indoor-guest] schedule run #${scheduleRunId} complete -> spawn-once latch held (audit: auditJinjuGuestState())`
         );
         return;
       }
@@ -6129,7 +7002,33 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
       });
 
     clearGuestPlacementInputs();
-    setStatus(`Guest placement saved: ${marker.label}`);
+
+    if (marker.source === "orbit" && marker.cameraPosition) {
+      const cam = marker.cameraPosition;
+      setStatus(
+        `Orbit camera saved: ${marker.label}`
+        + ` | cam (${cam.x.toFixed(2)}, ${cam.y.toFixed(2)}, ${cam.z.toFixed(2)})`
+        + ` | rotY ${marker.rotationY.toFixed(4)} (${((marker.rotationY * 180) / Math.PI).toFixed(1)}°)`
+      );
+      console.info("[orbit-placement]", {
+        label: marker.label,
+        cameraPosition: {
+          x: Number(cam.x.toFixed(2)),
+          y: Number(cam.y.toFixed(2)),
+          z: Number(cam.z.toFixed(2))
+        },
+        rotationY: Number(marker.rotationY.toFixed(4)),
+        rotationYDeg: Number(((marker.rotationY * 180) / Math.PI).toFixed(1)),
+        lookTarget: {
+          x: Number(marker.lookTarget.x.toFixed(2)),
+          y: Number(marker.lookTarget.y.toFixed(2)),
+          z: Number(marker.lookTarget.z.toFixed(2))
+        }
+      });
+    } else {
+      setStatus(`Guest placement saved: ${marker.label}`);
+    }
+
     return marker;
   }
 
@@ -6216,7 +7115,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
   window.jinjuIndoorGuestTestInfo = () => {
     const audit = window.auditJinjuGuestState();
     console.info(
-      "[jinju-indoor-guest] manual test — ramp 1F climb after guests appear; "
+      "[jinju-indoor-guest] manual test -> ramp 1F climb after guests appear; "
       + "scheduleRunCount must stay 1; revealSkipped should rise if re-reveal blocked"
     );
     return audit;
@@ -6464,6 +7363,11 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     }
 
     const performanceSettings = getPerformanceSettings(activeModelState.config);
+
+    if (!walkMode && performanceSettings.treeFacingInOrbit === false) {
+      return;
+    }
+
     const viewerPosition = walkMode ? walkCamera.position : orbitCamera.position;
     treeFacingFrameCounter += 1;
 
@@ -6663,7 +7567,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
       const fireball = fireballs[index];
       const stepDistance = FIREBALL_SETTINGS.speed * deltaScale;
       const ray = new BABYLON.Ray(fireball.mesh.position, fireball.direction, stepDistance + FIREBALL_SETTINGS.radius);
-      // First hit only — multiPick against the building mesh set was a frame hitch.
+      // First hit only -> multiPick against the building mesh set was a frame hitch.
       const picked = scene.pickWithRay(ray, isFireballHitMesh);
       const hit = picked?.hit && picked.pickedMesh && picked.pickedPoint ? picked : null;
       const enemyHitDistance = getEnemyHitDistance(fireball.mesh.position, fireball.direction, stepDistance + FIREBALL_SETTINGS.radius);
@@ -6681,7 +7585,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
       if (hit) {
         const targetName = hit.pickedMesh.name || hit.pickedMesh.id || "mesh";
 
-        if (isPeopleFireballTarget(hit.pickedMesh)) {
+        if (isPeopleFireballTarget(hit.pickedMesh, getPerformanceSettings(getActiveModelState()?.config))) {
           animatePeopleFireballHit(BABYLON, scene, hit.pickedMesh);
           inputDiagnostics.lastFireball = `people hit:${targetName}`;
           setStatus("People target hit. The target is fading out.");
@@ -6738,11 +7642,25 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
   }
 
   function getActiveTourCameraConfig() {
-    return activeModelState.config?.tourCamera || DEFAULT_TOUR_CAMERA;
+    return resolveCameraViewConfig(
+      activeModelState.config?.tourCamera || DEFAULT_TOUR_CAMERA,
+      { lookDistance: 10 }
+    );
   }
 
   function getWalkSpawnCameraConfig() {
     const tourCamera = getActiveTourCameraConfig();
+    const configuredTour = activeModelState.config?.tourCamera;
+    const hasExplicitSpawn = Boolean(
+      configuredTour?.position
+      && (configuredTour.target || typeof configuredTour.rotationY === "number")
+    );
+
+    // Prefer project-configured tour spawn (e.g. Geochang rotationY pose) over Tour_Start.
+    if (hasExplicitSpawn) {
+      return tourCamera;
+    }
+
     const tourStartNode = activeModelState.model?.tourStartNode;
 
     if (!tourStartNode) {
@@ -7360,7 +8278,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     updateTreeMeshesFacingViewer();
 
     if (!walkMode) {
-      const deltaScale = Math.min(engine.getDeltaTime() / 16.6667, 2);
+      const deltaScale = Math.min(engine.getDeltaTime() / 16.6667, 4);
       guestCharacterSystem?.update(deltaScale);
       inputDiagnostics.lastCollision = "-";
       inputDiagnostics.movementBlocked = false;
@@ -7375,7 +8293,11 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
       return;
     }
 
-    const deltaScale = Math.min(engine.getDeltaTime() / 16.6667, 2);
+    // Cap at 4 (15 FPS) instead of 2 (30 FPS): jump phases / animations run on
+    // real seconds, so a tighter movement cap made night-mode (low FPS) jumps
+    // land shorter than day jumps. Do NOT derive deltaSeconds from the capped
+    // clock — that desyncs animation-driven jump states and retriggers jumps.
+    const deltaScale = Math.min(engine.getDeltaTime() / 16.6667, 4);
     const deltaSeconds = engine.getDeltaTime() / 1000;
     refreshLocalMeshSets();
     walkFrameLocomotion = null;
@@ -7610,8 +8532,10 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
   const NIGHT_MOON_POSITION = new BABYLON.Vector3(170, 260, -130);
   const MAX_CLUSTERED_LIGHTS = 8;
   const CLUSTER_MERGE_DISTANCE = 6.5;
-  const DOWN02_TWINKLE_COUNT = 3;
-  const NIGHT_MATERIAL_CHUNK_SIZE = 64;
+  const NIGHT_MATERIAL_CHUNK_SIZE = 32;
+  const NIGHT_CREATE_CHUNK = 4;
+  const LIGHT_INCLUDE_RADIUS = 18;
+  const DOWN01_INITIAL_SPOTS = 8;
 
   let nightMode = false;
   let nightSetupToken = 0;
@@ -7621,7 +8545,15 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
   let downlight02MaterialOverrides = [];
   let nightGlowLayer = null;
   let nightFlareObserver = null;
+  let nightSpotCullObserver = null;
+  let nightRotationObserver = null;
+  let downlight02Fixtures = [];
   let nightFlareTexture = null;
+  let nightSharedFlareMaterial = null;
+  let nightIncludeMeshes = [];
+  let nightIncludeRadius = LIGHT_INCLUDE_RADIUS;
+  let nightWallOccluders = [];
+  let nightAssetsSuspended = false;
   let materialSnapshots = [];
   let sceneMaterialLightLimitSnapshots = [];
   let peopleVisibilitySnapshots = [];
@@ -7671,19 +8603,20 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
   }
 
   function canToggleNightMode() {
-    return isAngjiProjectConfig(getActiveModelState()?.config)
+    return supportsNightModeConfig(getActiveModelState()?.config)
       && !options.isWalkMode?.();
   }
 
   function canKeepNightMode() {
     // Tour keeps night lighting; only orbit view may toggle day/night.
-    return isAngjiProjectConfig(getActiveModelState()?.config);
+    return supportsNightModeConfig(getActiveModelState()?.config);
   }
 
   function isPeopleMaterialMesh(mesh) {
     return getMaterialNames(mesh).some((name) => {
       const normalized = normalizeName(name);
-      return normalized.includes("people");
+      // Geochang renamed DefaultMaterial8 -> People; keep both for safety.
+      return normalized.includes("people") || normalized.includes("defaultmaterial8");
     });
   }
 
@@ -7839,11 +8772,24 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
       nightFlareObserver = null;
     }
 
+    if (nightRotationObserver) {
+      scene.onBeforeRenderObservable.remove(nightRotationObserver);
+      nightRotationObserver = null;
+    }
+
+    downlight02Fixtures.forEach((fixture) => {
+      releaseDown02Fixture(fixture, { keepDescriptor: false });
+    });
+    downlight02Fixtures = [];
+
     downlight02Flares.forEach((flare) => {
       try {
         nightGlowLayer?.removeIncludedOnlyMesh?.(flare.mesh);
         flare.mesh?.dispose();
-        flare.material?.dispose();
+
+        if (!flare.sharedMaterial) {
+          flare.material?.dispose();
+        }
       } catch {
         // ignore stale flares
       }
@@ -7857,6 +8803,13 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
       // ignore
     }
     nightGlowLayer = null;
+
+    try {
+      nightSharedFlareMaterial?.dispose?.();
+    } catch {
+      // ignore
+    }
+    nightSharedFlareMaterial = null;
 
     try {
       nightFlareTexture?.dispose?.();
@@ -7890,6 +8843,27 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
     return texture;
   }
 
+  function ensureSharedFlareMaterial() {
+    if (nightSharedFlareMaterial) {
+      return nightSharedFlareMaterial;
+    }
+
+    const texture = ensureNightFlareTexture();
+    const material = new BABYLON.StandardMaterial("angji-down02-flare-shared-mat", scene);
+    material.diffuseTexture = texture;
+    material.opacityTexture = texture;
+    material.emissiveTexture = texture;
+    material.emissiveColor = new BABYLON.Color3(1, 0.85, 0.45);
+    material.disableLighting = true;
+    material.backFaceCulling = false;
+    material.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+    material.alpha = 0.75;
+    material.useAlphaFromDiffuseTexture = true;
+    material.disableDepthWrite = false;
+    nightSharedFlareMaterial = material;
+    return material;
+  }
+
   function ensureNightGlowLayer() {
     if (nightGlowLayer || typeof BABYLON.GlowLayer !== "function") {
       return nightGlowLayer;
@@ -7904,41 +8878,666 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
   }
 
   function createDown02Flare(position, index) {
-    const texture = ensureNightFlareTexture();
-    const material = new BABYLON.StandardMaterial(`angji-down02-flare-mat-${index}`, scene);
-    material.diffuseTexture = texture;
-    material.opacityTexture = texture;
-    material.emissiveTexture = texture;
-    material.emissiveColor = new BABYLON.Color3(1, 0.85, 0.45);
-    material.disableLighting = true;
-    material.backFaceCulling = false;
-    material.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
-    material.alpha = 0.75;
-    material.useAlphaFromDiffuseTexture = true;
-
+    const material = ensureSharedFlareMaterial();
     const mesh = BABYLON.MeshBuilder.CreatePlane(`angji-down02-flare-${index}`, {
       width: 1,
       height: 1,
       sideOrientation: BABYLON.Mesh.DOUBLESIDE
     }, scene);
     mesh.position.copyFrom(position);
+    // Sit the glow below the fixture / spot origin so it reads better from afar.
+    mesh.position.y -= 0.1;
     mesh.material = material;
     mesh.isPickable = false;
     mesh.checkCollisions = false;
     mesh.applyFog = false;
     mesh.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
-    mesh.renderingGroupId = 1;
-
-    ensureNightGlowLayer()?.addIncludedOnlyMesh?.(mesh);
+    mesh.renderingGroupId = 0;
 
     return {
       mesh,
       material,
+      sharedMaterial: true,
       baseScale: 0.7,
       phase: Math.random() * Math.PI * 2,
       speed: 1.4 + Math.random() * 1.8,
       sparkChance: 0.012 + Math.random() * 0.02
     };
+  }
+
+  function collectMeshesNearPosition(meshes, position, radius) {
+    if (!position || !meshes?.length) {
+      return [];
+    }
+
+    const radiusSq = radius * radius;
+
+    return meshes.filter((mesh) => {
+      try {
+        const center = mesh.getBoundingInfo?.()?.boundingBox?.centerWorld;
+
+        if (!center) {
+          return false;
+        }
+
+        return BABYLON.Vector3.DistanceSquared(center, position) <= radiusSq;
+      } catch {
+        return false;
+      }
+    });
+  }
+
+  function collectMeshesNearPositions(meshes, positions, radius) {
+    if (!positions?.length) {
+      return meshes || [];
+    }
+
+    const seen = new Set();
+    const result = [];
+
+    positions.forEach((position) => {
+      collectMeshesNearPosition(meshes, position, radius).forEach((mesh) => {
+        if (seen.has(mesh.uniqueId)) {
+          return;
+        }
+
+        seen.add(mesh.uniqueId);
+        result.push(mesh);
+      });
+    });
+
+    return result.length ? result : (meshes || []);
+  }
+
+  /**
+   * SpotLights have no depth occlusion — anything in includedOnlyMeshes within
+   * range is lit even through walls. Drop wall receivers and reject meshes whose
+   * center is blocked from the fixture by a COL wall slab.
+   */
+  function isMeshOccludedFromLight(lightPosition, mesh, wallOccluders) {
+    if (!lightPosition || !mesh || !wallOccluders?.length) {
+      return false;
+    }
+
+    let center;
+
+    try {
+      center = mesh.getBoundingInfo?.()?.boundingBox?.centerWorld;
+    } catch {
+      return true;
+    }
+
+    if (!center) {
+      return true;
+    }
+
+    const toMesh = center.subtract(lightPosition);
+    const distance = toMesh.length();
+
+    if (distance < 0.25) {
+      return false;
+    }
+
+    const direction = toMesh.scale(1 / distance);
+    const ray = new BABYLON.Ray(lightPosition, direction, Math.max(0.05, distance - 0.08));
+
+    for (let index = 0; index < wallOccluders.length; index += 1) {
+      const wall = wallOccluders[index];
+
+      if (!wall || wall.isDisposed?.() || wall === mesh) {
+        continue;
+      }
+
+      // Skip walls that contain / own this mesh (same partition).
+      if (wall.uniqueId === mesh.uniqueId) {
+        continue;
+      }
+
+      let hit;
+
+      try {
+        hit = ray.intersectsMesh(wall, true);
+      } catch {
+        continue;
+      }
+
+      if (hit?.hit && typeof hit.distance === "number" && hit.distance < distance - 0.12) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  function filterNightLightReceivers(meshes, lightPosition) {
+    const candidates = (meshes || []).filter((mesh) => {
+      if (!mesh || mesh.isDisposed?.()) {
+        return false;
+      }
+
+      // Walls lit from the fixture side also brighten the far face and look like bleed.
+      if (mesh.metadata?.angjiWallSurface) {
+        return false;
+      }
+
+      return true;
+    });
+
+    if (!lightPosition || !nightWallOccluders.length) {
+      return candidates;
+    }
+
+    return candidates.filter((mesh) => !isMeshOccludedFromLight(lightPosition, mesh, nightWallOccluders));
+  }
+
+  function resolveLightIncludeMeshes(position) {
+    if (!nightIncludeMeshes.length) {
+      return [];
+    }
+
+    if (!position) {
+      return filterNightLightReceivers(nightIncludeMeshes, null);
+    }
+
+    const near = collectMeshesNearPosition(nightIncludeMeshes, position, nightIncludeRadius);
+    const pool = near.length ? near : nightIncludeMeshes;
+    const filtered = filterNightLightReceivers(pool, position);
+
+    if (filtered.length) {
+      return filtered;
+    }
+
+    // Occlusion can over-reject (coplanar COL). Keep near non-wall receivers.
+    return pool.filter((mesh) => !mesh.metadata?.angjiWallSurface);
+  }
+
+  function refreshNightWallOccluders(modelState) {
+    nightWallOccluders = (modelState?.collisionMeshes || []).filter((mesh) => (
+      mesh
+      && !mesh.isDisposed?.()
+      && mesh.isEnabled?.() !== false
+      && (
+        mesh.metadata?.angjiWallSurface
+        || mesh.metadata?.angjiCollisionRole === "wall"
+      )
+    ));
+  }
+
+  function getNightColOccluderMeshes(modelState) {
+    return (modelState?.collisionMeshes || []).filter((mesh) => (
+      mesh
+      && !mesh.isDisposed?.()
+      && mesh.isEnabled?.() !== false
+      && (
+        mesh.metadata?.angjiWallSurface
+        || mesh.metadata?.angjiFurnitureSurface
+        || mesh.metadata?.angjiCollisionLayer
+      )
+    ));
+  }
+
+  function isDown02FlareOccluded(flarePosition, occluders) {
+    const camera = scene.activeCamera;
+
+    if (!camera || !occluders.length) {
+      return false;
+    }
+
+    const origin = camera.globalPosition || camera.position;
+    const toFlare = flarePosition.subtract(origin);
+    const distance = toFlare.length();
+
+    if (distance < 0.08) {
+      return false;
+    }
+
+    const direction = toFlare.scale(1 / distance);
+    const ray = new BABYLON.Ray(origin, direction, Math.max(0.05, distance - 0.08));
+
+    // Prefer direct mesh tests so invisible COL walls still block (isVisible=false).
+    for (let index = 0; index < occluders.length; index += 1) {
+      const mesh = occluders[index];
+
+      if (!mesh || mesh.isDisposed?.()) {
+        continue;
+      }
+
+      const hit = ray.intersectsMesh(mesh, true);
+
+      if (hit?.hit && hit.distance < distance - 0.05) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  function getMeshLightDirection(BABYLON, mesh) {
+    mesh.computeWorldMatrix(true);
+    // Architectural downlights are authored facing local -Y.
+    const localDown = new BABYLON.Vector3(0, -1, 0);
+    const worldMatrix = mesh.getWorldMatrix();
+    const direction = BABYLON.Vector3.TransformNormal(localDown, worldMatrix);
+
+    if (direction.lengthSquared() < 1e-6) {
+      return new BABYLON.Vector3(0, -1, 0);
+    }
+
+    return direction.normalize();
+  }
+
+  function createFixtureDescriptor(mesh, group, index) {
+    mesh.computeWorldMatrix(true);
+    const center = mesh.getBoundingInfo?.()?.boundingBox?.centerWorld?.clone?.() || null;
+
+    return {
+      mesh,
+      group,
+      index,
+      center,
+      light: null,
+      flare: null,
+      twinkle: null,
+      materialOverride: null,
+      active: false,
+      instantiated: false
+    };
+  }
+
+  function instantiateDown02Fixture(fixture) {
+    if (fixture.instantiated || !fixture.center || fixture.mesh?.isDisposed?.()) {
+      return;
+    }
+
+    const { mesh, index } = fixture;
+    const original = mesh.material;
+
+    if (original && !original.subMaterials) {
+      const cloned = original.clone(`angji-down02-twinkle-mat-${index}`);
+      mesh.material = cloned;
+      const override = {
+        mesh,
+        originalMaterial: original,
+        clonedMaterial: cloned
+      };
+      downlight02MaterialOverrides.push(override);
+      fixture.materialOverride = override;
+      applyDownlightEmissive(BABYLON, cloned, {
+        emissiveColor: new BABYLON.Color3(1, 0.86, 0.48),
+        emissiveIntensity: 3.4
+      });
+      const twinkleEntry = {
+        material: cloned,
+        baseIntensity: typeof cloned.emissiveIntensity === "number" ? cloned.emissiveIntensity : 3.4,
+        baseColor: cloned.emissiveColor?.clone?.() || new BABYLON.Color3(1, 0.86, 0.48),
+        phase: index * 0.73 + Math.random(),
+        speed: 1.4 + (index % 5) * 0.25 + Math.random() * 0.6,
+        sparkChance: 0.012 + Math.random() * 0.02,
+        rotationActive: true
+      };
+      downlight02TwinkleMaterials.push(twinkleEntry);
+      fixture.twinkle = twinkleEntry;
+    }
+
+    const light = new BABYLON.SpotLight(
+      `angji-down02-spot-${index}`,
+      fixture.center.clone(),
+      new BABYLON.Vector3(0, -1, 0),
+      Math.PI * 0.78,
+      1.9,
+      scene
+    );
+    light.diffuse = new BABYLON.Color3(1, 0.9, 0.62);
+    light.specular = new BABYLON.Color3(0.2, 0.15, 0.08);
+    light.intensity = 7.4;
+    light.range = 14;
+    light.falloffType = BABYLON.Light.FALLOFF_GLTF;
+    light.metadata = { nightRotationActive: true, nightFixtureGroup: fixture.group };
+
+    const includeMeshes = resolveLightIncludeMeshes(fixture.center);
+
+    if (includeMeshes.length) {
+      light.includedOnlyMeshes = includeMeshes;
+    }
+
+    downlightLights.push(light);
+    fixture.light = light;
+
+    const flareEntry = createDown02Flare(fixture.center.clone(), index);
+    flareEntry.rotationActive = true;
+    downlight02Flares.push(flareEntry);
+    fixture.flare = flareEntry;
+    fixture.instantiated = true;
+    fixture.active = true;
+  }
+
+  function releaseDown02Fixture(fixture, options = {}) {
+    const keepDescriptor = options.keepDescriptor !== false;
+
+    if (!fixture?.instantiated && !fixture?.light && !fixture?.flare) {
+      if (!keepDescriptor) {
+        fixture.active = false;
+        fixture.instantiated = false;
+      }
+
+      return;
+    }
+
+    if (fixture.light) {
+      const lightIndex = downlightLights.indexOf(fixture.light);
+
+      if (lightIndex >= 0) {
+        downlightLights.splice(lightIndex, 1);
+      }
+
+      try {
+        fixture.light.dispose();
+      } catch {
+        // ignore
+      }
+
+      fixture.light = null;
+    }
+
+    if (fixture.flare) {
+      const flareIndex = downlight02Flares.indexOf(fixture.flare);
+
+      if (flareIndex >= 0) {
+        downlight02Flares.splice(flareIndex, 1);
+      }
+
+      try {
+        nightGlowLayer?.removeIncludedOnlyMesh?.(fixture.flare.mesh);
+        fixture.flare.mesh?.dispose();
+      } catch {
+        // ignore
+      }
+
+      fixture.flare = null;
+    }
+
+    if (fixture.twinkle) {
+      const twinkleIndex = downlight02TwinkleMaterials.indexOf(fixture.twinkle);
+
+      if (twinkleIndex >= 0) {
+        downlight02TwinkleMaterials.splice(twinkleIndex, 1);
+      }
+
+      fixture.twinkle = null;
+    }
+
+    if (fixture.materialOverride) {
+      const overrideIndex = downlight02MaterialOverrides.indexOf(fixture.materialOverride);
+
+      if (overrideIndex >= 0) {
+        downlight02MaterialOverrides.splice(overrideIndex, 1);
+      }
+
+      try {
+        if (fixture.mesh && !fixture.mesh.isDisposed?.()) {
+          fixture.mesh.material = fixture.materialOverride.originalMaterial;
+        }
+      } catch {
+        // ignore
+      }
+
+      try {
+        fixture.materialOverride.clonedMaterial?.dispose?.();
+      } catch {
+        // ignore
+      }
+
+      fixture.materialOverride = null;
+    }
+
+    fixture.active = false;
+    fixture.instantiated = false;
+  }
+
+  function softDeactivateDown02Fixture(fixture) {
+    if (!fixture) {
+      return;
+    }
+
+    fixture.active = false;
+
+    if (fixture.light) {
+      fixture.light.metadata = { ...(fixture.light.metadata || {}), nightRotationActive: false };
+      fixture.light.setEnabled(false);
+    }
+
+    if (fixture.flare) {
+      fixture.flare.rotationActive = false;
+      try {
+        fixture.flare.mesh.isVisible = false;
+      } catch {
+        // ignore
+      }
+    }
+
+    if (fixture.twinkle) {
+      fixture.twinkle.rotationActive = false;
+    }
+
+    if (fixture.materialOverride && fixture.mesh && !fixture.mesh.isDisposed?.()) {
+      try {
+        fixture.mesh.material = fixture.materialOverride.originalMaterial;
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  function softActivateDown02Fixture(fixture) {
+    if (!fixture?.center || fixture.mesh?.isDisposed?.()) {
+      return;
+    }
+
+    if (!fixture.instantiated) {
+      instantiateDown02Fixture(fixture);
+      return;
+    }
+
+    fixture.active = true;
+
+    if (fixture.light) {
+      fixture.light.metadata = { ...(fixture.light.metadata || {}), nightRotationActive: true };
+      fixture.light.setEnabled(true);
+    }
+
+    if (fixture.flare) {
+      fixture.flare.rotationActive = true;
+    }
+
+    if (fixture.twinkle) {
+      fixture.twinkle.rotationActive = true;
+    }
+
+    if (fixture.materialOverride && fixture.mesh && !fixture.mesh.isDisposed?.()) {
+      try {
+        fixture.mesh.material = fixture.materialOverride.clonedMaterial;
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  function trimSoftFixtureCache(groupFixtures, activeCount) {
+    // Keep a small warm pool so re-visits are free, but don't let every
+    // rotated fixture permanently hold a SpotLight.
+    const maxSoft = Math.max(activeCount * 4, activeCount + 6);
+    const inactive = groupFixtures
+      .filter((fixture) => fixture.instantiated && !fixture.active)
+      .sort((left, right) => (left._softStamp || 0) - (right._softStamp || 0));
+
+    while (inactive.length > maxSoft) {
+      const oldest = inactive.shift();
+      releaseDown02Fixture(oldest, { keepDescriptor: true });
+    }
+  }
+
+  function applyDownlightFixtureActive(fixture, active) {
+    if (active) {
+      softActivateDown02Fixture(fixture);
+      fixture._softStamp = performance.now();
+      return;
+    }
+
+    // Soft-off: keep Spot/flare/clone warm for the next cycle so the 10s
+    // rotation does not dispose+recreate (the hitch the user sees).
+    softDeactivateDown02Fixture(fixture);
+    fixture._softStamp = performance.now();
+  }
+
+  function hasDownlightRotationConfig(nightLighting) {
+    const ratio = nightLighting?.down02RotationMaxRatio;
+    const count = nightLighting?.down03RotationActiveCount;
+
+    return (typeof ratio === "number" && ratio > 0 && ratio < 1)
+      || (typeof count === "number" && count > 0);
+  }
+
+  /**
+   * Rotate which Down02/Down03 fixtures are lit so only a small subset is
+   * active at once. Changes are queued and applied one fixture per frame so
+   * the 10s swap never freezes the main thread.
+   */
+  function startDownlightRotation(nightLighting) {
+    if (nightRotationObserver) {
+      return;
+    }
+
+    const groups = [];
+    const rotationWorkQueue = [];
+    const down02 = downlight02Fixtures.filter((fixture) => fixture.group === "down02");
+    const down02Ratio = nightLighting.down02RotationMaxRatio;
+
+    if (down02.length && typeof down02Ratio === "number" && down02Ratio > 0 && down02Ratio < 1) {
+      const minCount = typeof nightLighting.down02RotationMinCount === "number"
+        ? Math.max(1, Math.floor(nightLighting.down02RotationMinCount))
+        : 1;
+
+      groups.push({
+        fixtures: down02,
+        count: Math.min(down02.length, Math.max(minCount, Math.floor(down02.length * down02Ratio))),
+        intervalMs: Math.max(1000, nightLighting.down02RotationIntervalMs || 10000),
+        mode: "random",
+        queue: [],
+        nextAt: 0
+      });
+    }
+
+    const down03 = downlight02Fixtures.filter((fixture) => fixture.group === "down03");
+    const down03Count = nightLighting.down03RotationActiveCount;
+
+    if (down03.length && typeof down03Count === "number" && down03Count > 0 && down03Count < down03.length) {
+      groups.push({
+        fixtures: down03,
+        count: Math.floor(down03Count),
+        intervalMs: Math.max(1000, nightLighting.down03RotationIntervalMs || 10000),
+        // Sequential shuffle: every fixture gets a turn before any repeats.
+        mode: "sequence",
+        queue: [],
+        nextAt: 0
+      });
+    }
+
+    if (!groups.length) {
+      // No rotation: instantiate every descriptor (already the selected subset).
+      downlight02Fixtures.forEach((fixture) => applyDownlightFixtureActive(fixture, true));
+      return;
+    }
+
+    function pickGroupTargets(group) {
+      if (group.mode === "sequence") {
+        if (group.queue.length < group.count) {
+          const refill = group.fixtures.filter((fixture) => !group.queue.includes(fixture));
+
+          for (let i = refill.length - 1; i > 0; i -= 1) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [refill[i], refill[j]] = [refill[j], refill[i]];
+          }
+
+          group.queue.push(...refill);
+        }
+
+        return group.queue.splice(0, group.count);
+      }
+
+      return pickRandomItems(group.fixtures, group.count);
+    }
+
+    function enqueueGroupRotation(group, options = {}) {
+      const immediate = options.immediate === true;
+      const picked = pickGroupTargets(group);
+      const activeSet = new Set(picked);
+      const toDeactivate = [];
+      const toActivate = [];
+
+      group.fixtures.forEach((fixture) => {
+        const shouldBeActive = activeSet.has(fixture);
+
+        if (shouldBeActive && !fixture.active) {
+          toActivate.push(fixture);
+        } else if (!shouldBeActive && (fixture.active || fixture.instantiated)) {
+          toDeactivate.push(fixture);
+        }
+      });
+
+      if (immediate) {
+        // First paint: activate the lit set now (small — 3+2), soft-off the rest.
+        toActivate.forEach((fixture) => applyDownlightFixtureActive(fixture, true));
+        toDeactivate.forEach((fixture) => {
+          if (fixture.instantiated) {
+            softDeactivateDown02Fixture(fixture);
+          }
+        });
+        trimSoftFixtureCache(group.fixtures, group.count);
+        return;
+      }
+
+      // Deactivate first (cheap soft-off), then activate — one step per frame.
+      toDeactivate.forEach((fixture) => {
+        rotationWorkQueue.push({ fixture, active: false, group });
+      });
+      toActivate.forEach((fixture) => {
+        rotationWorkQueue.push({ fixture, active: true, group });
+      });
+      rotationWorkQueue.push({ trimGroup: group });
+    }
+
+    const startedAt = performance.now();
+    groups.forEach((group) => {
+      enqueueGroupRotation(group, { immediate: true });
+      group.nextAt = startedAt + group.intervalMs;
+    });
+
+    nightRotationObserver = scene.onBeforeRenderObservable.add(() => {
+      if (!nightMode || nightAssetsSuspended) {
+        return;
+      }
+
+      if (rotationWorkQueue.length) {
+        const job = rotationWorkQueue.shift();
+
+        if (job.trimGroup) {
+          trimSoftFixtureCache(job.trimGroup.fixtures, job.trimGroup.count);
+        } else if (job.fixture) {
+          applyDownlightFixtureActive(job.fixture, job.active);
+        }
+
+        return;
+      }
+
+      const now = performance.now();
+
+      groups.forEach((group) => {
+        if (now >= group.nextAt) {
+          enqueueGroupRotation(group);
+          group.nextAt = now + group.intervalMs;
+        }
+      });
+    });
   }
 
   function startDown02FlareTwinkle() {
@@ -7950,15 +9549,42 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
       return;
     }
 
+    let flareOcclusionFrame = 0;
+    let cachedOccluders = [];
+    const nightLighting = () => getActiveModelState()?.config?.nightLighting || {};
+    const occlusionInterval = () => Math.max(
+      1,
+      Math.floor(nightLighting().flareOcclusionIntervalFrames || 1)
+    );
+    const flareCullRadius = () => {
+      const configured = nightLighting().flareCullRadius;
+      return typeof configured === "number" && configured > 0 ? configured : Number.POSITIVE_INFINITY;
+    };
+
     nightFlareObserver = scene.onBeforeRenderObservable.add(() => {
-      if (!nightMode) {
+      if (!nightMode || nightAssetsSuspended) {
         return;
       }
 
       const camera = scene.activeCamera;
       const time = performance.now() * 0.001;
+      flareOcclusionFrame += 1;
+      const interval = occlusionInterval();
+      const cullRadius = flareCullRadius();
+      const cullRadiusSq = cullRadius * cullRadius;
+
+      if (flareOcclusionFrame % interval === 0) {
+        cachedOccluders = getNightColOccluderMeshes(getActiveModelState());
+      }
+
+      const occluders = cachedOccluders;
+      const runOcclusion = flareOcclusionFrame % interval === 0;
 
       downlight02TwinkleMaterials.forEach((entry) => {
+        if (entry.rotationActive === false) {
+          return;
+        }
+
         const pulse = 0.7
           + 0.18 * Math.sin(time * entry.speed + entry.phase)
           + 0.1 * Math.sin(time * entry.speed * 2.35 + entry.phase * 1.4);
@@ -7974,6 +9600,34 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
 
       // Same twinkle curve as the earlier building downlight flares.
       downlight02Flares.forEach((flare) => {
+        if (flare.rotationActive === false) {
+          flare.mesh.isVisible = false;
+          return;
+        }
+
+        let tooFar = false;
+
+        if (camera?.position && Number.isFinite(cullRadiusSq)) {
+          const offset = flare.mesh.position.subtract(camera.position);
+          tooFar = offset.lengthSquared() > cullRadiusSq;
+        }
+
+        if (tooFar) {
+          flare.mesh.isVisible = false;
+          return;
+        }
+
+        if (runOcclusion) {
+          flare._occluded = isDown02FlareOccluded(flare.mesh.position, occluders);
+        }
+
+        const occluded = Boolean(flare._occluded);
+        flare.mesh.isVisible = !occluded;
+
+        if (occluded) {
+          return;
+        }
+
         const twinkle = 0.55
           + 0.28 * Math.sin(time * flare.speed + flare.phase)
           + 0.17 * Math.sin(time * flare.speed * 2.35 + flare.phase * 1.7);
@@ -7996,7 +9650,84 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
     });
   }
 
+  function startNightSpotLightCulling() {
+    if (nightSpotCullObserver || downlightLights.length === 0) {
+      return;
+    }
+
+    let cullFrame = 0;
+
+    nightSpotCullObserver = scene.onBeforeRenderObservable.add(() => {
+      if (!nightMode || nightAssetsSuspended || downlightLights.length === 0) {
+        return;
+      }
+
+      const nightLighting = getActiveModelState()?.config?.nightLighting || {};
+      const maxActive = typeof nightLighting.maxActiveSpotLights === "number"
+        ? Math.max(1, Math.floor(nightLighting.maxActiveSpotLights))
+        : downlightLights.length;
+      const interval = Math.max(1, Math.floor(nightLighting.spotLightCullIntervalFrames || 3));
+      const cullRadius = typeof nightLighting.spotLightCullRadius === "number"
+        ? Math.max(1, nightLighting.spotLightCullRadius)
+        : Number.POSITIVE_INFINITY;
+
+      cullFrame += 1;
+
+      if (cullFrame % interval !== 0) {
+        return;
+      }
+
+      // No budget configured -> keep whatever Babylon already has enabled.
+      if (maxActive >= downlightLights.length && !Number.isFinite(cullRadius)) {
+        downlightLights.forEach((light) => {
+          light.setEnabled(light.metadata?.nightRotationActive !== false);
+        });
+        return;
+      }
+
+      const camera = scene.activeCamera;
+
+      if (!camera?.position) {
+        return;
+      }
+
+      const scored = downlightLights.map((light) => {
+        const position = light.getAbsolutePosition?.() || light.position;
+        const distanceSq = BABYLON.Vector3.DistanceSquared(camera.position, position);
+        return { light, distanceSq };
+      });
+
+      scored.sort((left, right) => left.distanceSq - right.distanceSq);
+
+      const radiusSq = cullRadius * cullRadius;
+      let enabled = 0;
+
+      scored.forEach((entry) => {
+        // Rotation-inactive fixtures stay off and never consume the budget.
+        const rotationActive = entry.light.metadata?.nightRotationActive !== false;
+        const withinRadius = entry.distanceSq <= radiusSq;
+        const shouldEnable = rotationActive && withinRadius && enabled < maxActive;
+
+        if (shouldEnable) {
+          enabled += 1;
+        }
+
+        entry.light.setEnabled(shouldEnable);
+      });
+    });
+  }
+
+  function disposeNightSpotLightCulling() {
+    if (nightSpotCullObserver) {
+      scene.onBeforeRenderObservable.remove(nightSpotCullObserver);
+      nightSpotCullObserver = null;
+    }
+  }
+
   function disposeDownlightLights() {
+    disposeNightSpotLightCulling();
+    // Release fixtures first (removes their lights from downlightLights cleanly).
+    disposeNightFlareSystem();
     downlightLights.forEach((light) => {
       try {
         light.dispose();
@@ -8005,7 +9736,6 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
       }
     });
     downlightLights = [];
-    disposeNightFlareSystem();
   }
 
   function restoreDownlight02MaterialOverrides() {
@@ -8054,12 +9784,14 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
     sceneMaterialLightLimitSnapshots = [];
   }
 
-  function prepareModelMaterialLightLimit(material) {
+  function prepareModelMaterialLightLimit(material, maxLights = 8) {
     if (!material || !("maxSimultaneousLights" in material)) {
       return;
     }
 
-    if ((material.maxSimultaneousLights || 4) >= 8) {
+    const targetLights = Math.max(4, maxLights);
+
+    if ((material.maxSimultaneousLights || 4) >= targetLights) {
       return;
     }
 
@@ -8073,10 +9805,10 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
     }
 
     // Ambient + moonlight + Down01/Down02 clustered spots.
-    material.maxSimultaneousLights = 8;
+    material.maxSimultaneousLights = targetLights;
   }
 
-  async function prepareModelMaterialsForNightLightsChunked(meshes, token) {
+  async function prepareModelMaterialsForNightLightsChunked(meshes, token, maxLights = 8) {
     restoreSceneMaterialLightLimits();
 
     const materials = collectUniqueMaterialsFromMeshes(meshes || []);
@@ -8087,9 +9819,9 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
       }
 
       const chunk = materials.slice(index, index + NIGHT_MATERIAL_CHUNK_SIZE);
-      chunk.forEach(prepareModelMaterialLightLimit);
+      chunk.forEach((material) => prepareModelMaterialLightLimit(material, maxLights));
 
-      // Yield only between chunks — keep night setup to a few frames total.
+      // Yield only between chunks -> keep night setup to a few frames total.
       if (index + NIGHT_MATERIAL_CHUNK_SIZE < materials.length) {
         await yieldNightFrame();
       }
@@ -8223,10 +9955,163 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
     restorePeopleMeshesVisibility();
   }
 
+  function createDown01SpotLight(cluster, index, options = {}) {
+    const {
+      intensity = 13.6,
+      range = 18,
+      direction = new BABYLON.Vector3(0, -1, 0),
+      angle = Math.PI * 0.72,
+      exponent = 2.2
+    } = options;
+
+    const light = new BABYLON.SpotLight(
+      `angji-downlight-spot-${index}`,
+      cluster.center.clone(),
+      direction.lengthSquared?.() > 1e-6 ? direction : new BABYLON.Vector3(0, -1, 0),
+      angle,
+      exponent,
+      scene
+    );
+    light.diffuse = new BABYLON.Color3(1, 0.88, 0.55);
+    light.specular = new BABYLON.Color3(0.15, 0.12, 0.06);
+    light.intensity = intensity;
+    light.range = range;
+    light.falloffType = BABYLON.Light.FALLOFF_GLTF;
+    light.metadata = { isDown01: true, nightRotationActive: true };
+
+    const includeMeshes = resolveLightIncludeMeshes(cluster.center);
+
+    if (includeMeshes.length) {
+      light.includedOnlyMeshes = includeMeshes;
+    }
+
+    downlightLights.push(light);
+    return light;
+  }
+
+  async function createDown01SpotsProgressive(clusters, token, options = {}) {
+    const {
+      intensityBase = 13.6,
+      range = 18,
+      initialSpots = DOWN01_INITIAL_SPOTS,
+      onInitialReady = null
+    } = options;
+    let created = 0;
+
+    for (let index = 0; index < clusters.length; index += 1) {
+      if (!isNightSetupActive(token)) {
+        return created;
+      }
+
+      const cluster = clusters[index];
+      createDown01SpotLight(cluster, index, {
+        intensity: intensityBase + Math.min(cluster.points?.length || 1, 6) * 0.5,
+        range,
+        direction: cluster.direction || new BABYLON.Vector3(0, -1, 0),
+        angle: cluster.angle || Math.PI * 0.72,
+        exponent: cluster.exponent || 2.2
+      });
+      created += 1;
+
+      if (created === Math.min(initialSpots, clusters.length) && typeof onInitialReady === "function") {
+        onInitialReady(created);
+      }
+
+      if ((index + 1) % NIGHT_CREATE_CHUNK === 0) {
+        await yieldNightFrame();
+      }
+    }
+
+    return created;
+  }
+
   function hasReadyNightDownlights(modelState) {
     return litModelState === modelState
-      && downlightLights.length > 0
-      && (downlight02Flares.length > 0 || downlight02TwinkleMaterials.length > 0);
+      && (
+        downlightLights.length > 0
+        || downlight02Fixtures.length > 0
+        || downlight02Flares.length > 0
+      );
+  }
+
+  function suspendNightAssets() {
+    nightAssetsSuspended = true;
+
+    downlightLights.forEach((light) => {
+      try {
+        light.setEnabled(false);
+      } catch {
+        // ignore
+      }
+    });
+
+    downlight02Flares.forEach((flare) => {
+      try {
+        flare.mesh.isVisible = false;
+      } catch {
+        // ignore
+      }
+    });
+
+    // Day look: restore original fixture materials but keep clones for resume.
+    downlight02MaterialOverrides.forEach(({ mesh, originalMaterial }) => {
+      try {
+        if (mesh && !mesh.isDisposed?.()) {
+          mesh.material = originalMaterial;
+        }
+      } catch {
+        // ignore
+      }
+    });
+
+    materialSnapshots.forEach(restoreMaterialEmissiveState);
+  }
+
+  function resumeNightAssets() {
+    nightAssetsSuspended = false;
+
+    materialSnapshots.forEach((snapshot) => {
+      if (snapshot?.material) {
+        applyDownlightEmissive(BABYLON, snapshot.material);
+      }
+    });
+
+    downlight02MaterialOverrides.forEach(({ mesh, clonedMaterial }) => {
+      try {
+        if (mesh && !mesh.isDisposed?.() && clonedMaterial) {
+          mesh.material = clonedMaterial;
+        }
+      } catch {
+        // ignore
+      }
+    });
+
+    downlightLights.forEach((light) => {
+      try {
+        const rotationActive = light.metadata?.nightRotationActive !== false;
+        light.setEnabled(rotationActive);
+      } catch {
+        // ignore
+      }
+    });
+
+    downlight02Flares.forEach((flare) => {
+      try {
+        if (flare.rotationActive !== false) {
+          flare.mesh.isVisible = true;
+        }
+      } catch {
+        // ignore
+      }
+    });
+
+    if (!nightFlareObserver) {
+      startDown02FlareTwinkle();
+    }
+
+    if (!nightSpotCullObserver && downlightLights.length) {
+      startNightSpotLightCulling();
+    }
   }
 
   async function runNightDownlightSetup(modelState, token) {
@@ -8237,12 +10122,15 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
     if (hasReadyNightDownlights(modelState)) {
       applyNightEnvironment();
       applyNightPeopleVisibility();
+      resumeNightAssets();
       return;
     }
 
     applyNightPeopleVisibility();
     disposeDownlightLights();
     restoreDownlightMaterials();
+    restoreSceneMaterialLightLimits();
+    nightIncludeMeshes = [];
     await yieldNightFrame();
 
     if (!isNightSetupActive(token)) {
@@ -8251,14 +10139,78 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
 
     const downlightMeshes = collectAngjiDownlightMeshes(modelState);
     const downlight02Meshes = collectAngjiDownlight02Meshes(modelState);
-    const selectedDown02Meshes = pickRandomItems(downlight02Meshes, DOWN02_TWINKLE_COUNT);
+    const downlight03Meshes = collectAngjiDownlight03Meshes(modelState);
+    const nightLighting = modelState.config?.nightLighting || {};
+    const usesRotation = hasDownlightRotationConfig(nightLighting);
+    const down02SelectCount = usesRotation
+      ? downlight02Meshes.length
+      : getNightDown02SelectCount(modelState.config, downlight02Meshes.length);
+    const down03SelectCount = usesRotation
+      ? downlight03Meshes.length
+      : getNightDown03SelectCount(modelState.config, downlight03Meshes.length);
+    const selectedDown02Meshes = usesRotation
+      ? downlight02Meshes
+      : pickRandomItems(downlight02Meshes, down02SelectCount);
+    const selectedDown03Meshes = usesRotation
+      ? downlight03Meshes
+      : pickRandomItems(downlight03Meshes, down03SelectCount);
     const materials01 = collectUniqueMaterialsFromMeshes(downlightMeshes);
-    const positions01 = collectDownlightWorldPositions(downlightMeshes);
-    const clusters01 = clusterDownlightPositions(BABYLON, positions01);
-    const litMeshes = collectNightLitMeshes(modelState);
+    const down01PerFixture = nightLighting.down01PerFixture === true;
+    const down01LocalRange = typeof nightLighting.down01LocalRange === "number"
+      ? Math.max(0.5, nightLighting.down01LocalRange)
+      : 18;
+    const down01Intensity = typeof nightLighting.down01Intensity === "number"
+      ? Math.max(1, nightLighting.down01Intensity)
+      : (down01PerFixture ? 14.4 : 13.6);
+    const down01MaxSpots = typeof nightLighting.down01MaxSpots === "number"
+      ? Math.max(1, Math.floor(nightLighting.down01MaxSpots))
+      : MAX_CLUSTERED_LIGHTS;
+    const down01InitialSpots = typeof nightLighting.down01InitialSpots === "number"
+      ? Math.max(1, Math.floor(nightLighting.down01InitialSpots))
+      : Math.min(DOWN01_INITIAL_SPOTS, down01MaxSpots);
+    const down01MergeDistance = typeof nightLighting.down01MergeDistance === "number"
+      ? Math.max(0.5, nightLighting.down01MergeDistance)
+      : CLUSTER_MERGE_DISTANCE;
+    const maxSimultaneousLights = getNightMaxSimultaneousLights(modelState.config);
+    nightIncludeRadius = typeof nightLighting.lightIncludeRadius === "number"
+      ? Math.max(4, nightLighting.lightIncludeRadius)
+      : LIGHT_INCLUDE_RADIUS;
 
-    // Only touch materials that receive night spots — much cheaper than whole model.
-    const materialsReady = await prepareModelMaterialsForNightLightsChunked(litMeshes, token);
+    const positions01 = down01PerFixture
+      ? []
+      : collectDownlightWorldPositions(downlightMeshes);
+    const clusters01 = down01PerFixture
+      ? []
+      : clusterDownlightPositions(BABYLON, positions01, {
+        mergeDistance: down01MergeDistance,
+        maxClusters: down01MaxSpots
+      });
+
+    // Descriptor pool first (positions only — no Spot/flare yet).
+    downlight02Fixtures = [
+      ...selectedDown02Meshes.map((mesh, index) => createFixtureDescriptor(mesh, "down02", index)),
+      ...selectedDown03Meshes.map((mesh, index) => (
+        createFixtureDescriptor(mesh, "down03", selectedDown02Meshes.length + index)
+      ))
+    ];
+
+    const seedPositions = [
+      ...clusters01.map((cluster) => cluster.center),
+      ...downlight02Fixtures.map((fixture) => fixture.center).filter(Boolean)
+    ];
+    const allLitMeshes = collectNightLitMeshes(modelState).filter((mesh) => (
+      !mesh.metadata?.angjiWallSurface
+    ));
+    refreshNightWallOccluders(modelState);
+    // Only materials near light positions get maxSimultaneousLights bumped.
+    const receiverMeshes = collectMeshesNearPositions(allLitMeshes, seedPositions, nightIncludeRadius);
+    nightIncludeMeshes = receiverMeshes;
+
+    const materialsReady = await prepareModelMaterialsForNightLightsChunked(
+      receiverMeshes,
+      token,
+      maxSimultaneousLights
+    );
 
     if (!materialsReady) {
       return;
@@ -8266,99 +10218,144 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
 
     materialSnapshots = materials01.map(captureMaterialEmissiveState);
     materials01.forEach((material) => applyDownlightEmissive(BABYLON, material));
-
-    downlight02MaterialOverrides = [];
-    downlight02TwinkleMaterials = [];
-
-    selectedDown02Meshes.forEach((mesh, index) => {
-      const original = mesh.material;
-
-      if (original && !original.subMaterials) {
-        const cloned = original.clone(`angji-down02-twinkle-mat-${index}`);
-        mesh.material = cloned;
-        downlight02MaterialOverrides.push({
-          mesh,
-          originalMaterial: original,
-          clonedMaterial: cloned
-        });
-        applyDownlightEmissive(BABYLON, cloned, {
-          emissiveColor: new BABYLON.Color3(1, 0.86, 0.48),
-          emissiveIntensity: 3.4
-        });
-        downlight02TwinkleMaterials.push({
-          material: cloned,
-          baseIntensity: typeof cloned.emissiveIntensity === "number" ? cloned.emissiveIntensity : 3.4,
-          baseColor: cloned.emissiveColor?.clone?.() || new BABYLON.Color3(1, 0.86, 0.48),
-          phase: index * 0.73 + Math.random(),
-          speed: 1.4 + (index % 5) * 0.25 + Math.random() * 0.6,
-          sparkChance: 0.012 + Math.random() * 0.02
-        });
-      }
-
-      mesh.computeWorldMatrix(true);
-      const center = mesh.getBoundingInfo?.()?.boundingBox?.centerWorld?.clone?.();
-
-      if (!center) {
-        return;
-      }
-
-      const light = new BABYLON.SpotLight(
-        `angji-down02-spot-${index}`,
-        center.clone(),
-        new BABYLON.Vector3(0, -1, 0),
-        Math.PI * 0.78,
-        1.9,
-        scene
-      );
-      light.diffuse = new BABYLON.Color3(1, 0.9, 0.62);
-      light.specular = new BABYLON.Color3(0.2, 0.15, 0.08);
-      light.intensity = 7.4;
-      light.range = 20;
-      light.falloffType = BABYLON.Light.FALLOFF_GLTF;
-
-      if (litMeshes.length) {
-        light.includedOnlyMeshes = litMeshes;
-      }
-
-      downlightLights.push(light);
-
-      const flarePos = center.clone();
-      flarePos.y -= 0.85;
-      downlight02Flares.push(createDown02Flare(flarePos, index));
-    });
-
-    clusters01.forEach((cluster, index) => {
-      const light = new BABYLON.SpotLight(
-        `angji-downlight-spot-${index}`,
-        cluster.center.clone(),
-        new BABYLON.Vector3(0, -1, 0),
-        Math.PI * 0.72,
-        2.2,
-        scene
-      );
-      light.diffuse = new BABYLON.Color3(1, 0.88, 0.55);
-      light.specular = new BABYLON.Color3(0.15, 0.12, 0.06);
-      light.intensity = 6.8 + Math.min(cluster.points.length, 6) * 0.5;
-      light.range = 18;
-      light.falloffType = BABYLON.Light.FALLOFF_GLTF;
-
-      if (litMeshes.length) {
-        light.includedOnlyMeshes = litMeshes;
-      }
-
-      downlightLights.push(light);
-    });
+    await yieldNightFrame();
 
     if (!isNightSetupActive(token)) {
       return;
     }
 
-    startDown02FlareTwinkle();
+    // Activate Down02/03 (lazy: rotation instantiates only the lit subset).
+    startDownlightRotation(nightLighting);
+    await yieldNightFrame();
+
+    if (!isNightSetupActive(token)) {
+      return;
+    }
+
+    let down01SpotCount = 0;
+    let observersStarted = false;
+
+    function ensureNightObservers() {
+      if (observersStarted) {
+        return;
+      }
+
+      startDown02FlareTwinkle();
+      startNightSpotLightCulling();
+      observersStarted = true;
+    }
+
+    if (down01PerFixture) {
+      const fixtureEntries = [];
+
+      downlightMeshes.forEach((mesh) => {
+        mesh.computeWorldMatrix(true);
+        const center = mesh.getBoundingInfo?.()?.boundingBox?.centerWorld?.clone?.();
+
+        if (!center) {
+          return;
+        }
+
+        fixtureEntries.push({
+          mesh,
+          position: center,
+          direction: getMeshLightDirection(BABYLON, mesh)
+        });
+      });
+
+      const fixtureClusters = [];
+
+      fixtureEntries.forEach((entry) => {
+        let nearest = null;
+        let nearestDistance = Number.POSITIVE_INFINITY;
+
+        fixtureClusters.forEach((cluster) => {
+          const distance = BABYLON.Vector3.Distance(entry.position, cluster.center);
+
+          if (distance < nearestDistance) {
+            nearest = cluster;
+            nearestDistance = distance;
+          }
+        });
+
+        const canMerge = nearest && nearestDistance <= down01MergeDistance;
+
+        if (canMerge || fixtureClusters.length >= down01MaxSpots) {
+          const target = canMerge
+            ? nearest
+            : fixtureClusters.reduce((best, cluster) => {
+              const distance = BABYLON.Vector3.Distance(entry.position, cluster.center);
+              if (!best || distance < best.distance) {
+                return { cluster, distance };
+              }
+              return best;
+            }, null)?.cluster;
+
+          if (target) {
+            target.points.push(entry.position);
+            target.directions.push(entry.direction);
+            target.center = target.points
+              .reduce((sum, point) => sum.add(point), BABYLON.Vector3.Zero())
+              .scale(1 / target.points.length);
+            return;
+          }
+        }
+
+        fixtureClusters.push({
+          center: entry.position.clone(),
+          points: [entry.position],
+          directions: [entry.direction]
+        });
+      });
+
+      const progressiveClusters = fixtureClusters.map((cluster) => {
+        const direction = cluster.directions
+          .reduce((sum, dir) => sum.add(dir), BABYLON.Vector3.Zero())
+          .normalize();
+
+        return {
+          center: cluster.center,
+          points: cluster.points,
+          direction: direction.lengthSquared() > 1e-6 ? direction : new BABYLON.Vector3(0, -1, 0),
+          angle: Math.PI * 0.62,
+          exponent: 2.2
+        };
+      });
+
+      down01SpotCount = await createDown01SpotsProgressive(progressiveClusters, token, {
+        intensityBase: down01Intensity,
+        range: down01LocalRange,
+        initialSpots: down01InitialSpots,
+        onInitialReady: () => ensureNightObservers()
+      });
+    } else {
+      down01SpotCount = await createDown01SpotsProgressive(clusters01, token, {
+        intensityBase: down01Intensity,
+        range: down01LocalRange,
+        initialSpots: down01InitialSpots,
+        onInitialReady: () => ensureNightObservers()
+      });
+    }
+
+    if (!isNightSetupActive(token)) {
+      return;
+    }
+
+    ensureNightObservers();
+    nightAssetsSuspended = false;
     litModelState = modelState;
     console.info(
-      `[angji-night] Down01 meshes=${downlightMeshes.length} spots=${clusters01.length}`
-      + ` / Down02 total=${downlight02Meshes.length} selected=${selectedDown02Meshes.length}`
+      `[night] ${modelState.config?.label || modelState.config?.overviewId || "model"}`
+      + ` Down01 meshes=${downlightMeshes.length} spots=${down01SpotCount}`
+      + ` mode=${down01PerFixture ? "perFixture" : "cluster"}`
+      + ` range=${down01LocalRange} intensity~${down01Intensity}`
+      + ` / Down02 pool=${selectedDown02Meshes.length} live=${downlight02Fixtures.filter((f) => f.group === "down02" && f.instantiated).length}`
+      + ` / Down03 pool=${selectedDown03Meshes.length} live=${downlight02Fixtures.filter((f) => f.group === "down03" && f.instantiated).length}`
       + ` flares=${downlight02Flares.length} twinkleMats=${downlight02TwinkleMaterials.length}`
+      + ` receivers=${receiverMeshes.length}/${allLitMeshes.length}`
+      + ` maxLights=${maxSimultaneousLights}`
+      + ` maxActiveSpots=${typeof nightLighting.maxActiveSpotLights === "number" ? nightLighting.maxActiveSpotLights : "all"}`
+      + ` rotation=${usesRotation ? "lazy" : "all"}`
     );
   }
 
@@ -8370,21 +10367,45 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
     if (hasReadyNightDownlights(modelState)) {
       applyNightEnvironment();
       applyNightPeopleVisibility();
+      resumeNightAssets();
       return;
+    }
+
+    if (litModelState && litModelState !== modelState) {
+      disposeNightLightingFully();
     }
 
     const token = ++nightSetupToken;
     void runNightDownlightSetup(modelState, token);
   }
 
-  function clearNightLighting() {
+  function disposeNightLightingFully() {
     cancelNightSetup();
     disposeDownlightLights();
     restoreDownlightMaterials();
     restoreSceneMaterialLightLimits();
     disposeMoonVisual();
     restorePeopleMeshesVisibility();
+    nightIncludeMeshes = [];
+    nightWallOccluders = [];
     litModelState = null;
+    nightAssetsSuspended = false;
+  }
+
+  function clearNightLighting(options = {}) {
+    const dispose = options.dispose === true;
+
+    if (dispose || !litModelState) {
+      disposeNightLightingFully();
+      return;
+    }
+
+    cancelNightSetup();
+    suspendNightAssets();
+
+    if (moonRoot) {
+      moonRoot.setEnabled(false);
+    }
   }
 
   function updateButton() {
@@ -8409,7 +10430,7 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
     if (enabled) {
       const modelState = getActiveModelState();
 
-      if (!isAngjiProjectConfig(modelState?.config)) {
+      if (!supportsNightModeConfig(modelState?.config)) {
         updateButton();
         return nightMode;
       }
@@ -8420,7 +10441,8 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
       enableDownlights(modelState);
     } else {
       nightMode = false;
-      clearNightLighting();
+      // Keep night assets cached — next toggle resumes instantly.
+      clearNightLighting({ dispose: false });
       applyDayEnvironment();
 
       const modelState = getActiveModelState();
@@ -8448,9 +10470,11 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
     if (!canKeepNightMode()) {
       if (nightMode) {
         setNightMode(false);
-      } else {
-        updateButton();
       }
+
+      // Leaving a night-capable model: drop the day-mode cache.
+      clearNightLighting({ dispose: true });
+      updateButton();
       return;
     }
 
@@ -8489,6 +10513,7 @@ function setModelSlideOffset(BABYLON, modelState, offsetX) {
 
 function setModelStateEnabled(modelState, enabled) {
   modelState.model.root.setEnabled(enabled);
+  setHistoryDisplayBoardsEnabled(modelState.historyDisplays, enabled);
 }
 
 function formatSunTime(value) {
@@ -8555,8 +10580,49 @@ function applyOrbitEnvironmentSettings(BABYLON, sun, modelState) {
   updateSunFromControls(BABYLON, sun);
 }
 
+function resolveCameraTargetFromPose(position, rotationY, lookDistance = 12, targetYOffset = 0) {
+  return {
+    x: position.x + Math.sin(rotationY) * lookDistance,
+    y: position.y + targetYOffset,
+    z: position.z + Math.cos(rotationY) * lookDistance
+  };
+}
+
+function resolveCameraViewConfig(cameraConfig, defaults = {}) {
+  if (!cameraConfig?.position) {
+    return cameraConfig || defaults;
+  }
+
+  if (cameraConfig.target) {
+    return cameraConfig;
+  }
+
+  if (typeof cameraConfig.rotationY !== "number") {
+    return cameraConfig;
+  }
+
+  const lookDistance = typeof cameraConfig.lookDistance === "number"
+    ? cameraConfig.lookDistance
+    : (defaults.lookDistance ?? 12);
+  const targetYOffset = typeof cameraConfig.targetYOffset === "number"
+    ? cameraConfig.targetYOffset
+    : (defaults.targetYOffset ?? 0);
+
+  return {
+    ...cameraConfig,
+    target: resolveCameraTargetFromPose(
+      cameraConfig.position,
+      cameraConfig.rotationY,
+      lookDistance,
+      targetYOffset
+    )
+  };
+}
+
 function getOrbitCameraSettings(modelState) {
-  const orbitSettings = modelState?.config?.orbitCamera;
+  const orbitSettings = resolveCameraViewConfig(modelState?.config?.orbitCamera, {
+    lookDistance: 48
+  });
 
   if (orbitSettings?.position && orbitSettings?.target) {
     return orbitSettings;
@@ -8686,12 +10752,12 @@ async function loadTourModelState(BABYLON, scene, config) {
   const model = normalizeModel(BABYLON, scene, result, meshes);
 
   model.root.name = `tour-building-root-${normalizeName(config.label)}`;
-  meshes = [...meshes, ...splitPeopleTargetMeshes(BABYLON, scene, meshes)];
+  const performanceSettings = getPerformanceSettings(config);
+  meshes = [...meshes, ...splitPeopleTargetMeshes(BABYLON, scene, meshes, performanceSettings)];
 
   let propPassThroughCount = 0;
   let furniturePassThroughCount = 0;
   const peopleTargetMeshes = [];
-  const isAngjiProject = isAngjiProjectConfig(config);
   const hasColLayer = hasColLayerConfig(config);
   const treatStairAsRamp = config.collision?.treatStairAsRamp === true
     && !isColLayerDiscreteStairConfig(config);
@@ -8732,7 +10798,7 @@ async function loadTourModelState(BABYLON, scene, config) {
       || angjiBuildingFloor2Surface
       || angjiBuildingFloor3Surface;
     const passThrough = hasColLayer ? !angjiCollisionLayer : (propPassThrough || furniture);
-    const peopleTarget = isPeopleFireballTarget(mesh);
+    const peopleTarget = isPeopleFireballTarget(mesh, performanceSettings);
 
     if (propPassThrough || (hasColLayer && passThrough)) {
       propPassThroughCount += 1;
@@ -8777,15 +10843,27 @@ async function loadTourModelState(BABYLON, scene, config) {
     }
   });
 
-  softenModelMaterialReflections(BABYLON, scene.materials);
+  const modelMaterials = collectUniqueMaterialsFromMeshes(meshes);
+  softenModelMaterialReflections(BABYLON, modelMaterials);
   hideTourStartMarker(model.tourStartNode, meshes);
 
   if (booleanParam("clay", CLAY_PREVIEW)) {
     applyClayPreviewMaterial(BABYLON, scene, meshes);
   }
 
-  const treeMeshes = meshes.filter((mesh) => mesh.isEnabled() && isDtvTreeMesh(mesh));
+  const treeMeshes = expandMergedDtvTreeMeshes(
+    BABYLON,
+    scene,
+    meshes.filter((mesh) => mesh.isEnabled() && isDtvTreeMesh(mesh)),
+    meshes
+  );
   const treeMeshIds = new Set(treeMeshes.map((mesh) => mesh.uniqueId));
+  const blendOptimized = optimizeModelBlendMaterials(BABYLON, meshes, {
+    optimizeDtv: performanceSettings.optimizeDtvBlendToAlphaTest,
+    optimizeNonEssential: performanceSettings.optimizeNonEssentialBlendToAlphaTest,
+    performanceSettings
+  });
+  const cutoutAlphaFixed = fixCutoutTextureAlphaOnMeshes(meshes, performanceSettings);
 
   let usedCollisionFallback = false;
   let collisionMeshes;
@@ -8897,9 +10975,45 @@ async function loadTourModelState(BABYLON, scene, config) {
     };
   });
 
-  freezeSceneMaterials(scene.materials);
+  freezeSceneMaterials(modelMaterials);
 
-  return {
+  const walkableGroundMeshes = Array.from(groundMeshMap.values());
+  const roleCounts = meshes.reduce((counts, mesh) => {
+    const role = mesh.metadata?.angjiCollisionRole;
+
+    if (role) {
+      counts[role] = (counts[role] || 0) + 1;
+    }
+
+    return counts;
+  }, {});
+
+  console.info(
+    `[collision] ${config.label}: colLayer=${hasColLayer ? "on" : "off"}`,
+    `meshes=${meshes.length}`,
+    `materials=${modelMaterials.length}`,
+    `collision=${collisionMeshes.length}`,
+    `walkable=${walkableGroundMeshes.length}`,
+    `trees=${treeMeshes.length}`,
+    `blendOpt=${blendOptimized}`,
+    `cutoutAlpha=${cutoutAlphaFixed}`,
+    `roles=${JSON.stringify(roleCounts)}`,
+    `fallback=${usedCollisionFallback ? "yes" : "no"}`
+  );
+
+  if (hasColLayer && collisionMeshes.length === 0) {
+    console.warn(
+      `[collision] ${config.label}: colLayer enabled but no 0_COL_* meshes matched. Check material names.`
+    );
+  }
+
+  if (!hasColLayer && collisionMeshes.length > 500) {
+    console.warn(
+      `[collision] ${config.label}: non-colLayer path is using ${collisionMeshes.length} collision meshes (heavy).`
+    );
+  }
+
+  const modelState = {
     config,
     result,
     meshes,
@@ -8907,10 +11021,10 @@ async function loadTourModelState(BABYLON, scene, config) {
     baseRootPosition: model.root.position.clone(),
     propPassThroughCount,
     furniturePassThroughCount,
-    angjiCollisionLayerCount: isAngjiProject ? collisionMeshes.length : undefined,
+    angjiCollisionLayerCount: hasColLayer ? collisionMeshes.length : undefined,
     usedCollisionFallback,
     collisionMeshes,
-    walkableGroundMeshes: Array.from(groundMeshMap.values()),
+    walkableGroundMeshes,
     rampSurfaceMeshes,
     stairSurfaceMeshes,
     floorSurfaceMeshes,
@@ -8920,8 +11034,13 @@ async function loadTourModelState(BABYLON, scene, config) {
     angjiExternalFloorMeshes,
     peopleTargetMeshes,
     treeMeshes,
-    projectileHitMeshes: meshes.filter((mesh) => mesh.isEnabled() && !isDescendantOf(mesh, model.tourStartNode))
+    projectileHitMeshes: meshes.filter((mesh) => mesh.isEnabled() && !isDescendantOf(mesh, model.tourStartNode)),
+    historyDisplays: []
   };
+
+  modelState.historyDisplays = attachHistoryDisplayBoards(BABYLON, scene, modelState);
+
+  return modelState;
 }
 
 function registerBabylonFbxLoader(BABYLON) {
