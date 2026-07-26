@@ -338,16 +338,12 @@ function isOccludedByCol(BABYLON, scene, boardPosition, occluders, options = {})
     return true;
   }
 
-  const occluderSet = new Set(occluders);
-  const picked = scene.pickWithRay(
-    ray,
-    (mesh) => occluderSet.has(mesh) && mesh.isEnabled?.() !== false && !mesh.isDisposed?.(),
-    true
-  );
-
-  if (hitBlocks(picked)) {
-    return true;
-  }
+  // Invisible COL often misses scene.pickWithRay — use intersectsMesh, but only on
+  // AABB-overlapping candidates. Full COL sweeps freeze Angji night orbit zoom.
+  const maxTests = typeof options.maxOccluderTests === "number"
+    ? Math.max(4, options.maxOccluderTests)
+    : 28;
+  const candidates = [];
 
   for (let index = 0; index < occluders.length; index += 1) {
     const mesh = occluders[index];
@@ -356,7 +352,32 @@ function isOccludedByCol(BABYLON, scene, boardPosition, occluders, options = {})
       continue;
     }
 
-    if (hitBlocks(ray.intersectsMesh(mesh, true))) {
+    const boundingInfo = mesh.getBoundingInfo?.();
+
+    if (!boundingInfo) {
+      continue;
+    }
+
+    const { minimumWorld, maximumWorld } = boundingInfo.boundingBox;
+
+    if (
+      typeof ray.intersectsBoxMinMax === "function"
+      && !ray.intersectsBoxMinMax(minimumWorld, maximumWorld)
+    ) {
+      continue;
+    }
+
+    candidates.push(mesh);
+
+    if (candidates.length >= maxTests * 2) {
+      break;
+    }
+  }
+
+  const testCount = Math.min(candidates.length, maxTests);
+
+  for (let index = 0; index < testCount; index += 1) {
+    if (hitBlocks(ray.intersectsMesh(candidates[index], true))) {
       return true;
     }
   }
@@ -798,6 +819,9 @@ function attachModalBoard(BABYLON, scene, modelState, sourceMesh, board, url, oc
     }
   });
 
+  let modalOcclusionFrame = 0;
+  let cachedModalOccluded = false;
+
   const observer = scene.onBeforeRenderObservable.add(() => {
     if (plane.isDisposed?.() || sourceMesh.isDisposed?.()) {
       return;
@@ -809,7 +833,23 @@ function attachModalBoard(BABYLON, scene, modelState, sourceMesh, board, url, oc
     }
 
     plane.computeWorldMatrix(true);
-    plane.isVisible = !isOccludedByCol(BABYLON, scene, plane.getAbsolutePosition(), occluders);
+
+    modalOcclusionFrame += 1;
+    const orbiting = !document.body.classList.contains("walk-mode-active");
+    const nightOrbit = orbiting && document.body.classList.contains("is-night-mode");
+    const occlusionInterval = nightOrbit ? 5 : (orbiting ? 4 : 1);
+
+    if (modalOcclusionFrame === 1 || modalOcclusionFrame % occlusionInterval === 0) {
+      cachedModalOccluded = isOccludedByCol(
+        BABYLON,
+        scene,
+        plane.getAbsolutePosition(),
+        occluders,
+        { maxOccluderTests: nightOrbit ? 22 : 28 }
+      );
+    }
+
+    plane.isVisible = !cachedModalOccluded;
   });
 
   return {
@@ -1048,6 +1088,9 @@ function attachEmbedBoard(BABYLON, scene, modelState, sourceMesh, board, url, oc
     console.warn(`[display-board] history iframe failed → ${url}`);
   });
 
+  let occlusionFrame = 0;
+  let cachedOccluded = false;
+
   const observer = scene.onBeforeRenderObservable.add(() => {
     if (htmlMesh.isDisposed?.() || proxy.isDisposed?.()) {
       return;
@@ -1094,9 +1137,21 @@ function attachEmbedBoard(BABYLON, scene, modelState, sourceMesh, board, url, oc
     }
 
     const boardPosition = proxy.getAbsolutePosition();
-    const occluded = isOccludedByCol(BABYLON, scene, boardPosition, occluders, {
-      boardNormal: getBoardWorldNormal()
-    });
+    // Throttle COL occlusion — full sweeps hitch on night zoom, but never skip
+    // entirely (that made Angji boards draw through walls again).
+    occlusionFrame += 1;
+    const orbiting = !document.body.classList.contains("walk-mode-active");
+    const nightOrbit = orbiting && document.body.classList.contains("is-night-mode");
+    const occlusionInterval = nightOrbit ? 5 : (orbiting ? 6 : 2);
+
+    if (occlusionFrame === 1 || occlusionFrame % occlusionInterval === 0) {
+      cachedOccluded = isOccludedByCol(BABYLON, scene, boardPosition, occluders, {
+        boardNormal: getBoardWorldNormal(),
+        maxOccluderTests: nightOrbit ? 22 : (orbiting ? 20 : 32)
+      });
+    }
+
+    const occluded = cachedOccluded;
 
     // CSS overlay always draws above WebGL, so the player character can never cover
     // the iframe. When the character stands between camera and board, swap to the

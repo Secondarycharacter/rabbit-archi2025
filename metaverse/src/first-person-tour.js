@@ -16,7 +16,7 @@ import {
   attachHistoryDisplayBoards,
   disposeHistoryDisplayBoards,
   setHistoryDisplayBoardsEnabled
-} from "./history-display-board.js?v=night-light-occlusion-20260726bk";
+} from "./history-display-board.js?v=down0-world-y-20260726bx";
 import {
   getAngjiIndoorBackgroundGuestSpawns,
   getAngjiOutdoorBackgroundGuestSpawns,
@@ -135,7 +135,7 @@ const MODEL_CONFIGS = [
   },
   {
     file: "Angji.glb",
-    modelCacheVersion: "20260705-c-ramp-1f",
+    modelCacheVersion: "20260727-rlb-lights",
     label: "앵지",
     overviewId: "angji",
     tourBgm: "angji/angji_tour_bgm.mp3",
@@ -168,15 +168,21 @@ const MODEL_CONFIGS = [
       }
     ],
     nightLighting: {
-      // Without this block night ran on defaults: ALL SpotLights enabled at
-      // once (no distance budget) and flare occlusion raycasts every frame —
-      // the main reasons night mode lagged far behind day mode.
+      // Angji GLB uses RLB_* presets. Night: 2 SpotLights per light type (cull keeps ≤8).
+      enableDown01: false,
+      enableDown02: false,
+      enableDown03: false,
+      enableDown0: false,
+      enableRlbPresetLights: true,
+      lightsPerType: 2,
       maxSimultaneousLights: 8,
       maxActiveSpotLights: 8,
       spotLightCullIntervalFrames: 3,
       spotLightCullRadius: 55,
-      lightIncludeRadius: 18,
-      // Flares are few and cheap — keep them visible at any distance.
+      lightIncludeRadius: 16,
+      rlbDefaultIntensity: 22,
+      rlbDefaultRange: 12,
+      rlbDefaultAngleDegrees: 110,
       flareOcclusionIntervalFrames: 6
     },
     orbitCamera: {
@@ -266,30 +272,21 @@ const MODEL_CONFIGS = [
       }
     ],
     nightLighting: {
-      // Many fixtures can look "on" (emissive + flares). Real SpotLights are expensive:
-      // cost ~ activeSpots × maxSimultaneousLights × lit pixels. Keep shader budget at 8
-      // and only enable the nearest SpotLights each few frames (see maxActiveSpotLights).
-      down01PerFixture: false,
-      down01MaxSpots: 16,
-      down01InitialSpots: 8,
-      down01MergeDistance: 5.5,
-      down01Intensity: 28,
-      down01LocalRange: 18,
-      lightIncludeRadius: 18,
-      down02SelectRatio: 1,
-      down03SelectRatio: 1,
-      // Exterior Down02: 5% but at least 3 lit at once, re-rolled randomly every 10s.
-      down02RotationMaxRatio: 0.05,
-      down02RotationMinCount: 3,
-      down02RotationIntervalMs: 10000,
-      // Exterior Down03 (7 fixtures): 2 lit at a time, sequential rotation every 10s.
-      down03RotationActiveCount: 2,
-      down03RotationIntervalMs: 10000,
+      // Perf: only Light_Down0 real SpotLights. Down01/02/03 off.
+      enableDown01: false,
+      enableDown02: false,
+      enableDown03: false,
+      enableDown0: true,
       maxSimultaneousLights: 8,
       maxActiveSpotLights: 8,
       spotLightCullIntervalFrames: 3,
       spotLightCullRadius: 55,
-      // Flares are few and cheap — keep them visible at any distance.
+      lightIncludeRadius: 16,
+      down0Intensity: 24,
+      down0LocalRange: 12,
+      // World-space -Y; receivers = any mesh inside range + cone (no fixed material list).
+      down0AngleDegrees: 140,
+      down0ReceiverMode: "range",
       flareOcclusionIntervalFrames: 6
     },
     orbitCamera: {
@@ -2321,6 +2318,12 @@ function isAngjiDownlightMaterialName(name) {
   return /^lightdown0*1$/.test(normalized);
 }
 
+function isAngjiDownlight0MaterialName(name) {
+  const normalized = normalizeMaterialName(name).replace(/[\s_-]+/g, "");
+  // Light_Down0 / Light_Down00 only — must not match Down01/02/03.
+  return /^lightdown0+$/.test(normalized);
+}
+
 function isAngjiDownlight02MaterialName(name) {
   const normalized = normalizeMaterialName(name).replace(/[\s_-]+/g, "");
   // Angji GLB uses "Light_Down02" (also tolerate Light_Down2 / suffixes).
@@ -2332,6 +2335,102 @@ function isAngjiDownlight03MaterialName(name) {
   return /^lightdown0*3(?:\.\d+)?$/.test(normalized) || normalized.includes("lightdown03");
 }
 
+/** RabbitLightBaker / SketchUp RLB_* preset types used in Angji.glb (skip LightCover). */
+const RLB_NIGHT_PRESET_TYPE_MAP = {
+  downlight: "DownLight",
+  spotlight: "SpotLight",
+  linelight: "LineLight",
+  panellight: "PanelLight",
+  outdoorlight: "OutdoorLight",
+  walllight: "WallLight",
+  covelight: "CoveLight",
+  windowlight: "WindowLight",
+  emergencylight: "EmergencyLight",
+  glassglow: "GlassGlow",
+  signlight: "SignLight",
+  stairlight: "StairLight",
+  groundlight: "GroundLight"
+};
+
+const RLB_NIGHT_LIGHT_PROFILES = {
+  DownLight: { intensity: 26, range: 10, angle: 100 },
+  SpotLight: { intensity: 30, range: 12, angle: 70 },
+  Down02: { intensity: 28, range: 12, angle: 90 },
+  LineLight: { intensity: 18, range: 8, angle: 140 },
+  PanelLight: { intensity: 20, range: 9, angle: 120 },
+  OutdoorLight: { intensity: 34, range: 16, angle: 100 },
+  WallLight: { intensity: 22, range: 9, angle: 110 },
+  CoveLight: { intensity: 16, range: 7, angle: 150 },
+  WindowLight: { intensity: 18, range: 10, angle: 120 },
+  EmergencyLight: { intensity: 14, range: 6, angle: 100 },
+  GlassGlow: { intensity: 12, range: 5, angle: 160 },
+  SignLight: { intensity: 16, range: 7, angle: 100 },
+  StairLight: { intensity: 14, range: 6, angle: 100 },
+  GroundLight: { intensity: 20, range: 8, angle: 120 }
+};
+
+function resolveRlbNightFixtureType(name) {
+  const normalized = normalizeMaterialName(name).replace(/[\s_-]+/g, "").toLowerCase();
+
+  if (!normalized || normalized.includes("lightcover")) {
+    return null;
+  }
+
+  // Legacy Angji SoftSpot markers that remain in the re-authored GLB
+  if (/^lightdown0*2(?:\.\d+)?$/.test(normalized) || normalized.includes("lightdown02")) {
+    return "Down02";
+  }
+
+  if (!normalized.startsWith("rlb")) {
+    return null;
+  }
+
+  const rest = normalized.slice(3);
+  return RLB_NIGHT_PRESET_TYPE_MAP[rest] || null;
+}
+
+function collectAngjiLightsByPresetType(modelState) {
+  const meshes = modelState?.meshes || [];
+  const byType = new Map();
+
+  meshes.forEach((mesh) => {
+    if (mesh?.isEnabled?.() === false) {
+      return;
+    }
+
+    if (typeof mesh.getTotalVertices === "function" && mesh.getTotalVertices() <= 0) {
+      return;
+    }
+
+    const names = getMaterialNames(mesh);
+    let type = null;
+
+    for (const name of names) {
+      type = resolveRlbNightFixtureType(name);
+      if (type) {
+        break;
+      }
+    }
+
+    if (!type) {
+      const meshName = normalizeName(mesh.name || mesh.id || "");
+      type = resolveRlbNightFixtureType(meshName);
+    }
+
+    if (!type) {
+      return;
+    }
+
+    if (!byType.has(type)) {
+      byType.set(type, []);
+    }
+
+    byType.get(type).push(mesh);
+  });
+
+  return byType;
+}
+
 function collectAngjiDownlightMeshes(modelState) {
   const meshes = modelState?.meshes || [];
 
@@ -2339,6 +2438,27 @@ function collectAngjiDownlightMeshes(modelState) {
     mesh?.isEnabled?.() !== false
     && getMaterialNames(mesh).some((name) => isAngjiDownlightMaterialName(name))
   ));
+}
+
+function collectAngjiDownlight0Meshes(modelState) {
+  const meshes = modelState?.meshes || [];
+
+  return meshes.filter((mesh) => {
+    if (mesh?.isEnabled?.() === false) {
+      return false;
+    }
+
+    if (typeof mesh.getTotalVertices === "function" && mesh.getTotalVertices() <= 0) {
+      return false;
+    }
+
+    if (getMaterialNames(mesh).some((name) => isAngjiDownlight0MaterialName(name))) {
+      return true;
+    }
+
+    const meshName = normalizeName(mesh.name || mesh.id || "").replace(/[\s_-]+/g, "");
+    return /^lightdown0+$/.test(meshName);
+  });
 }
 
 function collectAngjiDownlight02Meshes(modelState) {
@@ -2516,6 +2636,22 @@ function restoreMaterialEmissiveState(snapshot) {
 
 function isDtvTreeMesh(mesh) {
   return getMaterialNames(mesh).some((name) => normalizeName(name).startsWith("dtv"));
+}
+
+function isPeopleYawFacingMesh(mesh, performanceSettings = DEFAULT_PERFORMANCE_SETTINGS) {
+  // Same camera-yaw treatment as DTV trees. Skip Geochang's renamed
+  // DefaultMaterial8 sheet (also named "people") — that is a prop, not cards.
+  const treatPeopleAsProp = performanceSettings?.treatPeopleMaterialAsCutoutProp === true;
+
+  return getMaterialNames(mesh).some((name) => {
+    const normalized = normalizeName(name);
+
+    if (treatPeopleAsProp && isGeochangPeopleCutoutPropMaterialName(normalized)) {
+      return false;
+    }
+
+    return normalized === "people";
+  });
 }
 
 function findConnectedVertexIslands(indices, vertexCount) {
@@ -7368,7 +7504,16 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
       return;
     }
 
-    const viewerPosition = walkMode ? walkCamera.position : orbitCamera.position;
+    // Night orbit zoom already stresses GPU; yaw-pivoting every DTV/people card
+    // each wheel tick freezes the main thread.
+    if (!walkMode && options.getIsAngjiNightMode?.()) {
+      return;
+    }
+
+    // Face the rendering camera (TPS cam in tour), not the character eye/root.
+    const viewerPosition = walkMode
+      ? (tpsCamera?.position || scene.activeCamera?.position || walkCamera.position)
+      : orbitCamera.position;
     treeFacingFrameCounter += 1;
 
     const movedEnough = !lastTreeViewerPosition
@@ -7415,6 +7560,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
 
     activeModelState = nextModelState;
     preloadProjectGuests();
+    setColMeshesPickableForMode(walkMode);
 
     if (isAngjiProjectConfig(nextModelState.config)) {
       if (walkMode) {
@@ -8074,6 +8220,30 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     }
   }
 
+  // Orbit wheel zoom uses scene.pick; COL collision meshes are invisible but
+  // still pickable for walk rays — that makes night close-zooms hitch hard.
+  // Keep COL pickable only in walk; orbit/night flares still use intersectsMesh.
+  function setColMeshesPickableForMode(pickable) {
+    const meshes = activeCollisionMeshes?.length
+      ? activeCollisionMeshes
+      : (activeModelState?.collisionMeshes || []);
+
+    meshes.forEach((mesh) => {
+      if (!mesh || mesh.isDisposed?.()) {
+        return;
+      }
+
+      if (
+        mesh.metadata?.angjiCollisionLayer
+        || mesh.metadata?.angjiCollisionInvisible
+        || mesh.metadata?.angjiWallSurface
+        || mesh.metadata?.angjiFloorSurface
+      ) {
+        mesh.isPickable = pickable;
+      }
+    });
+  }
+
   async function enterWalkMode(shouldLockPointer = false, walkEntryOptions = {}) {
     const walkModelState = activeModelState.tourModelState || activeModelState;
 
@@ -8089,6 +8259,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     await tpsSystem?.ensureLoaded?.();
     scene.activeCamera = tpsCamera;
     walkMode = true;
+    setColMeshesPickableForMode(true);
 
     if (walkModelState === activeModelState) {
       setModelState(walkModelState);
@@ -8124,6 +8295,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
   function enterOrbitMode() {
     walkMode = false;
     document.body.classList.remove("walk-mode-active");
+    setColMeshesPickableForMode(false);
     clearFireballs();
     resetEnemy();
 
@@ -8153,6 +8325,9 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     // Restore the project's initial orbit framing after leaving tour.
     applyOrbitCameraStart(BABYLON, orbitCamera, orbitModelState);
     applyOrbitCameraConstraints(BABYLON, orbitCamera, orbitModelState);
+    if (options.getIsAngjiNightMode?.()) {
+      orbitCamera.zoomToMouseLocation = false;
+    }
     floorLabel.textContent = "Orbit View";
     currentLabel = "orbit view";
     setStatus("Orbit view ready. Middle mouse rotates, Shift+middle pans, wheel zooms to cursor. Use Tour Mode to enter walk mode.");
@@ -8519,6 +8694,8 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
   const DAY_FOG_END = typeof scene.fogEnd === "number" ? scene.fogEnd : 1000;
 
   // Deep night sky + cool moonlight wash.
+  // Restored to pre-tuning values (same as origin/main night look ~ before
+  // the site-darkness experiments).
   const NIGHT_CLEAR_COLOR = new BABYLON.Color4(0.018, 0.028, 0.06, 1);
   const NIGHT_FOG_COLOR = new BABYLON.Color3(0.03, 0.045, 0.09);
   const NIGHT_FOG_DENSITY = 0.008;
@@ -8536,6 +8713,12 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
   const NIGHT_CREATE_CHUNK = 4;
   const LIGHT_INCLUDE_RADIUS = 18;
   const DOWN01_INITIAL_SPOTS = 8;
+  // Bump when receiver/moon policy changes so day→night cache rebuilds.
+  const NIGHT_RECEIVER_POLICY_VERSION = 13;
+  // Outdoor plaza/site gets strong moon on horizontal normals; tone it down
+  // so surroundings don't read brighter than the building walls.
+  const NIGHT_SITE_DIFFUSE_SCALE = 0.58;
+  const NIGHT_SITE_MATERIAL_RE = /(terrain|landscape|siteground|asphalt|aspalt|asp1|colgasp|paver|groundcover|vegetationgrass|grasslight|ext(?:erior)?floor|externalfloor|대지|조경)/;
 
   let nightMode = false;
   let nightSetupToken = 0;
@@ -8554,7 +8737,9 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
   let nightIncludeRadius = LIGHT_INCLUDE_RADIUS;
   let nightWallOccluders = [];
   let nightAssetsSuspended = false;
+  let nightReceiverPolicyVersion = 0;
   let materialSnapshots = [];
+  let siteMaterialSnapshots = [];
   let sceneMaterialLightLimitSnapshots = [];
   let peopleVisibilitySnapshots = [];
   let litModelState = null;
@@ -8600,6 +8785,30 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
 
   function getActiveModelState() {
     return options.getActiveModelState?.() || null;
+  }
+
+  function isWalkMode() {
+    return Boolean(options.isWalkMode?.());
+  }
+
+  function getOrbitCamera() {
+    return options.getOrbitCamera?.() || null;
+  }
+
+  function applyNightOrbitZoomPolicy(isNight) {
+    const orbitCamera = getOrbitCamera();
+
+    if (!orbitCamera) {
+      return;
+    }
+
+    // Night close-zoom: picking against dense geometry freezes the frame.
+    // Keep day orbit zoom-to-cursor; night uses center zoom.
+    orbitCamera.zoomToMouseLocation = isNight
+      ? false
+      : ORBIT_MOUSE_CONTROL_SETTINGS.zoomToMouseLocation;
+
+    document.body.classList.toggle("is-night-mode", Boolean(isNight));
   }
 
   function canToggleNightMode() {
@@ -9009,14 +9218,211 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
     return false;
   }
 
+  function getNightMeshNameBlob(mesh) {
+    return normalizeName([
+      mesh?.name || "",
+      mesh?.id || "",
+      ...getMaterialNames(mesh)
+    ].join(" "));
+  }
+
+  function isMostlyHorizontalNightSlab(mesh) {
+    const bounds = getCachedMeshBounds(BABYLON, mesh);
+
+    if (!bounds?.size) {
+      return false;
+    }
+
+    const height = bounds.size.y;
+    const footprint = Math.max(bounds.size.x, bounds.size.z);
+
+    // Thin wide slabs = plaza / site ground (not walls or tall volumes).
+    return footprint >= 2.5 && height <= Math.min(3.8, footprint * 0.42);
+  }
+
+  function boundsOverlapHorizontal(a, b, pad = 1.5, yPad = 2.5) {
+    if (!a || !b) {
+      return false;
+    }
+
+    return (
+      a.min.x <= b.max.x + pad
+      && a.max.x >= b.min.x - pad
+      && a.min.z <= b.max.z + pad
+      && a.max.z >= b.min.z - pad
+      && a.min.y <= b.max.y + yPad
+      && a.max.y >= b.min.y - yPad
+    );
+  }
+
+  function meshOverlapsExternalSiteCol(mesh, externalFloorMeshes) {
+    const meshBounds = getCachedMeshBounds(BABYLON, mesh);
+
+    if (!meshBounds) {
+      return false;
+    }
+
+    return (externalFloorMeshes || []).some((colMesh) => {
+      const colBounds = getCachedMeshBounds(BABYLON, colMesh);
+      return boundsOverlapHorizontal(meshBounds, colBounds);
+    });
+  }
+
+  function isNightSiteMaterialName(nameBlob) {
+    return NIGHT_SITE_MATERIAL_RE.test(nameBlob || "");
+  }
+
+  function isNightSiteScaleReceiver(mesh) {
+    if (!mesh) {
+      return false;
+    }
+
+    // Invisible COL outdoor floors + any mesh tagged during night setup.
+    if (mesh.metadata?.angjiExternalFloorSurface || mesh.metadata?.nightSiteScaleReceiver) {
+      return true;
+    }
+
+    // Never treat building walls as site ground.
+    if (mesh.metadata?.angjiWallSurface || mesh.metadata?.angjiCollisionRole === "wall") {
+      return false;
+    }
+
+    const nameBlob = getNightMeshNameBlob(mesh);
+
+    // Visual outdoor mats: grass / pavers / COL_G_ASP1 asphalt / groundcover.
+    // (Old keyword list missed these, so plaza kept Spot + full moon wash.)
+    if (isNightSiteMaterialName(nameBlob)) {
+      return true;
+    }
+
+    return false;
+  }
+
+  function markNightSiteScaleReceivers(modelState) {
+    const externalFloorMeshes = modelState?.angjiExternalFloorMeshes || [];
+    const litMeshes = collectNightLitMeshes(modelState);
+    let marked = 0;
+
+    litMeshes.forEach((mesh) => {
+      if (!mesh || mesh.isDisposed?.()) {
+        return;
+      }
+
+      if (mesh.metadata?.angjiWallSurface || mesh.metadata?.angjiCollisionRole === "wall") {
+        if (mesh.metadata?.nightSiteScaleReceiver) {
+          mesh.metadata.nightSiteScaleReceiver = false;
+        }
+        return;
+      }
+
+      const byMaterial = isNightSiteMaterialName(getNightMeshNameBlob(mesh));
+      const byColOverlap = externalFloorMeshes.length > 0
+        && isMostlyHorizontalNightSlab(mesh)
+        && meshOverlapsExternalSiteCol(mesh, externalFloorMeshes);
+      const isSite = Boolean(
+        mesh.metadata?.angjiExternalFloorSurface
+        || byMaterial
+        || byColOverlap
+      );
+
+      mesh.metadata = {
+        ...(mesh.metadata || {}),
+        nightSiteScaleReceiver: isSite
+      };
+
+      if (isSite) {
+        marked += 1;
+      }
+    });
+
+    console.info(`[night] site receivers marked=${marked} (moon-only + diffuse scale)`);
+    return marked;
+  }
+
+  function captureSiteMaterialState(material) {
+    return {
+      material,
+      diffuseColor: material.diffuseColor?.clone?.() || null,
+      albedoColor: material.albedoColor?.clone?.() || null
+    };
+  }
+
+  function applySiteMaterialDarkeningFromSnapshot(snapshot, scale = NIGHT_SITE_DIFFUSE_SCALE) {
+    const { material } = snapshot || {};
+
+    if (!material) {
+      return;
+    }
+
+    if (typeof material.unfreeze === "function") {
+      material.unfreeze();
+    }
+
+    if (snapshot.diffuseColor && material.diffuseColor?.copyFrom) {
+      material.diffuseColor.copyFrom(snapshot.diffuseColor);
+      material.diffuseColor.scaleInPlace(scale);
+    }
+
+    if (snapshot.albedoColor && material.albedoColor?.copyFrom) {
+      material.albedoColor.copyFrom(snapshot.albedoColor);
+      material.albedoColor.scaleInPlace(scale);
+    }
+
+    if (typeof material.freeze === "function") {
+      material.freeze();
+    }
+  }
+
+  function restoreSiteMaterialState(snapshot) {
+    const { material } = snapshot || {};
+
+    if (!material) {
+      return;
+    }
+
+    if (typeof material.unfreeze === "function") {
+      material.unfreeze();
+    }
+
+    if (snapshot.diffuseColor && material.diffuseColor?.copyFrom) {
+      material.diffuseColor.copyFrom(snapshot.diffuseColor);
+    }
+
+    if (snapshot.albedoColor && material.albedoColor?.copyFrom) {
+      material.albedoColor.copyFrom(snapshot.albedoColor);
+    }
+
+    if (typeof material.freeze === "function") {
+      material.freeze();
+    }
+  }
+
+  function restoreNightSiteMaterials() {
+    siteMaterialSnapshots.forEach(restoreSiteMaterialState);
+    siteMaterialSnapshots = [];
+  }
+
+  function applyNightSiteMaterials(modelState) {
+    restoreNightSiteMaterials();
+
+    const siteMeshes = collectNightLitMeshes(modelState).filter((mesh) => isNightSiteScaleReceiver(mesh));
+    const materials = collectUniqueMaterialsFromMeshes(siteMeshes);
+
+    siteMaterialSnapshots = materials.map((material) => {
+      const snapshot = captureSiteMaterialState(material);
+      applySiteMaterialDarkeningFromSnapshot(snapshot);
+      return snapshot;
+    });
+  }
+
   function filterNightLightReceivers(meshes, lightPosition) {
     const candidates = (meshes || []).filter((mesh) => {
       if (!mesh || mesh.isDisposed?.()) {
         return false;
       }
 
-      // Walls lit from the fixture side also brighten the far face and look like bleed.
-      if (mesh.metadata?.angjiWallSurface) {
+      // Surrounding site/terrain: moon-only (spots wash large outdoor slabs).
+      if (isNightSiteScaleReceiver(mesh)) {
         return false;
       }
 
@@ -9027,6 +9433,7 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
       return candidates;
     }
 
+    // Drop meshes whose center is behind a COL wall from this fixture.
     return candidates.filter((mesh) => !isMeshOccludedFromLight(lightPosition, mesh, nightWallOccluders));
   }
 
@@ -9049,6 +9456,27 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
 
     // Occlusion can over-reject (coplanar COL). Keep near non-wall receivers.
     return pool.filter((mesh) => !mesh.metadata?.angjiWallSurface);
+  }
+
+  function assignSpotLightReceivers(light, position) {
+    const includeMeshes = resolveLightIncludeMeshes(position);
+
+    // Babylon: unset / empty includedOnlyMeshes means "light the whole scene".
+    // After wall-occlusion filtering that often left lists empty and washed out night.
+    if (includeMeshes.length) {
+      light.includedOnlyMeshes = includeMeshes;
+      light.metadata = { ...(light.metadata || {}), nightNoReceivers: false };
+      return true;
+    }
+
+    light.includedOnlyMeshes = [];
+    light.setEnabled(false);
+    light.metadata = {
+      ...(light.metadata || {}),
+      nightNoReceivers: true,
+      nightRotationActive: false
+    };
+    return false;
   }
 
   function refreshNightWallOccluders(modelState) {
@@ -9126,6 +9554,361 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
     return direction.normalize();
   }
 
+  // Down0 fixtures are often authored sideways in the GLB. Always aim world -Y
+  // so the wash falls on floors, and walls that sit inside the cone also light.
+  function getDown0LightDirection(BABYLON) {
+    return new BABYLON.Vector3(0, -1, 0);
+  }
+
+  function getWallSignLightDirection(BABYLON, mesh) {
+    mesh.computeWorldMatrix(true);
+    const center = mesh.getBoundingInfo?.()?.boundingBox?.centerWorld?.clone?.()
+      || mesh.getAbsolutePosition().clone();
+    const faceYaw = getTreeMeshFaceYawOffset(BABYLON, mesh);
+    const forward = new BABYLON.Vector3(Math.sin(faceYaw), 0, Math.cos(faceYaw));
+    const candidates = [forward, forward.scale(-1)];
+
+    let best = candidates[0];
+    let bestScore = Number.NEGATIVE_INFINITY;
+
+    candidates.forEach((candidate) => {
+      let score = 0;
+
+      nightWallOccluders.forEach((wall) => {
+        const wallCenter = wall.getBoundingInfo?.()?.boundingBox?.centerWorld;
+
+        if (!wallCenter) {
+          return;
+        }
+
+        const toWall = wallCenter.subtract(center);
+        toWall.y = 0;
+        const distance = toWall.length();
+
+        if (distance < 0.2 || distance > 14) {
+          return;
+        }
+
+        toWall.scaleInPlace(1 / distance);
+        const alignment = BABYLON.Vector3.Dot(candidate, toWall);
+
+        if (alignment > 0) {
+          score += alignment * (1 / (0.5 + distance));
+        }
+      });
+
+      if (score > bestScore) {
+        bestScore = score;
+        best = candidate;
+      }
+    });
+
+    const direction = best.clone();
+    direction.y = -0.18;
+
+    if (direction.lengthSquared() < 1e-6) {
+      return new BABYLON.Vector3(0, -0.15, 1).normalize();
+    }
+
+    return direction.normalize();
+  }
+
+  function meshMatchesMaterialNames(mesh, materialNames) {
+    if (!materialNames?.length) {
+      return false;
+    }
+
+    const targets = materialNames.map((name) => normalizeName(name));
+
+    return getMaterialNames(mesh).some((name) => targets.includes(normalizeName(name)));
+  }
+
+  function isDown0FixtureMesh(mesh) {
+    return getMaterialNames(mesh).some((name) => (
+      isAngjiDownlight0MaterialName(name)
+      || isAngjiDownlightMaterialName(name)
+      || isAngjiDownlight02MaterialName(name)
+      || isAngjiDownlight03MaterialName(name)
+    ));
+  }
+
+  // Eligible to receive Down0: visible scene geometry inside the Spot range/cone.
+  // No fixed wall/floor material list — only skip invisible COL, movers, and fixtures.
+  function isDown0RangeReceiver(mesh) {
+    if (!mesh || mesh.isDisposed?.()) {
+      return false;
+    }
+
+    if (mesh.metadata?.angjiCollisionInvisible || mesh.metadata?.angjiCollisionLayer) {
+      return false;
+    }
+
+    if (
+      mesh.metadata?.tourGuest
+      || mesh.metadata?.treeMesh
+      || mesh.metadata?.peopleYawMesh
+    ) {
+      return false;
+    }
+
+    if (isDown0FixtureMesh(mesh)) {
+      return false;
+    }
+
+    if (typeof mesh.visibility === "number" && mesh.visibility <= 0.02) {
+      return false;
+    }
+
+    if (mesh.isEnabled?.() === false) {
+      return false;
+    }
+
+    return true;
+  }
+
+  function collectDown0RangePool(modelState) {
+    return collectNightLitMeshes(modelState).filter((mesh) => isDown0RangeReceiver(mesh));
+  }
+
+  function resolveDown0RangeReceivers(position, direction, range, options = {}) {
+    const searchRadius = Math.max(range + 2, 6);
+    const coneCos = typeof options.coneCos === "number"
+      ? options.coneCos
+      : Math.cos(BABYLON.Tools.ToRadians(70));
+    const modelState = litModelState || getActiveModelState();
+    const poolSource = options.pool || collectDown0RangePool(modelState);
+    const pool = collectMeshesNearPosition(poolSource, position, searchRadius);
+    const receivers = [];
+
+    pool.forEach((mesh) => {
+      if (!isDown0RangeReceiver(mesh)) {
+        return;
+      }
+
+      let center;
+
+      try {
+        center = mesh.getBoundingInfo?.()?.boundingBox?.centerWorld;
+      } catch {
+        return;
+      }
+
+      if (!center) {
+        return;
+      }
+
+      const toMesh = center.subtract(position);
+      const distance = toMesh.length();
+
+      if (distance > range) {
+        return;
+      }
+
+      if (distance < 0.12) {
+        receivers.push(mesh);
+        return;
+      }
+
+      // Inside Spot cone (world -Y aim by default).
+      if (BABYLON.Vector3.Dot(toMesh.normalize(), direction) < coneCos) {
+        return;
+      }
+
+      receivers.push(mesh);
+    });
+
+    return receivers;
+  }
+
+  function getRlbLightProfile(type, nightLighting = {}) {
+    const base = RLB_NIGHT_LIGHT_PROFILES[type] || {
+      intensity: 20,
+      range: 10,
+      angle: 110
+    };
+    return {
+      intensity: typeof nightLighting.rlbDefaultIntensity === "number"
+        ? nightLighting.rlbDefaultIntensity
+        : base.intensity,
+      range: typeof nightLighting.rlbDefaultRange === "number"
+        ? nightLighting.rlbDefaultRange
+        : base.range,
+      angleDegrees: typeof nightLighting.rlbDefaultAngleDegrees === "number"
+        ? nightLighting.rlbDefaultAngleDegrees
+        : base.angle
+    };
+  }
+
+  function instantiateRlbPresetFixture(fixture, type, nightLighting = {}) {
+    if (fixture.instantiated || !fixture.center || fixture.mesh?.isDisposed?.()) {
+      return false;
+    }
+
+    const profile = getRlbLightProfile(type, nightLighting);
+    const { mesh, index } = fixture;
+    const original = mesh.material;
+
+    if (original && !original.subMaterials) {
+      const cloned = original.clone(`angji-rlb-${type}-mat-${index}`);
+      mesh.material = cloned;
+      const override = {
+        mesh,
+        originalMaterial: original,
+        clonedMaterial: cloned
+      };
+      downlight02MaterialOverrides.push(override);
+      fixture.materialOverride = override;
+      applyDownlightEmissive(BABYLON, cloned, {
+        emissiveColor: new BABYLON.Color3(1, 0.88, 0.55),
+        emissiveIntensity: 2.8
+      });
+    }
+
+    const light = new BABYLON.SpotLight(
+      `angji-rlb-${type}-${index}`,
+      fixture.center.clone(),
+      new BABYLON.Vector3(0, -1, 0),
+      (Math.max(20, profile.angleDegrees) * Math.PI) / 180,
+      1.6,
+      scene
+    );
+    light.diffuse = new BABYLON.Color3(1, 0.92, 0.7);
+    light.specular = new BABYLON.Color3(0.22, 0.16, 0.08);
+    light.intensity = profile.intensity;
+    light.range = profile.range;
+    light.falloffType = BABYLON.Light.FALLOFF_GLTF;
+    light.metadata = {
+      nightRotationActive: true,
+      nightFixtureGroup: `rlb_${type}`,
+      rlbType: type
+    };
+    assignSpotLightReceivers(light, fixture.center);
+    light.setEnabled(true);
+
+    downlightLights.push(light);
+    fixture.light = light;
+    fixture.instantiated = true;
+    fixture.active = true;
+    return true;
+  }
+
+  function createRlbPresetTypeLights(modelState, nightLighting = {}) {
+    const byType = collectAngjiLightsByPresetType(modelState);
+    const perType = Math.max(
+      1,
+      Math.floor(
+        typeof nightLighting.lightsPerType === "number" ? nightLighting.lightsPerType : 2
+      )
+    );
+    const summary = [];
+    let created = 0;
+
+    for (const [type, meshes] of byType.entries()) {
+      const picked = pickRandomItems(meshes, Math.min(perType, meshes.length));
+      let typeCreated = 0;
+
+      picked.forEach((mesh) => {
+        const fixture = createFixtureDescriptor(mesh, `rlb_${type}`, created);
+        downlight02Fixtures.push(fixture);
+
+        if (instantiateRlbPresetFixture(fixture, type, nightLighting)) {
+          created += 1;
+          typeCreated += 1;
+        }
+      });
+
+      summary.push(`${type}:${typeCreated}/${meshes.length}`);
+    }
+
+    console.info(
+      `[night] RLB preset lights perType=${perType} created=${created}`
+      + (summary.length ? ` · ${summary.join(" ")}` : " · none found")
+    );
+    return { created, byType, summary };
+  }
+
+  function createDown0WallWashLights(downlight0Meshes, options = {}) {
+    const {
+      intensity = 24,
+      range = 12,
+      angleDegrees = 140,
+      pool = null
+    } = options;
+    const angle = (Math.max(20, angleDegrees) * Math.PI) / 180;
+    const coneCos = Math.cos(angle * 0.5);
+    const worldDown = getDown0LightDirection(BABYLON);
+    const receiverPool = pool || collectDown0RangePool(litModelState || getActiveModelState());
+    let created = 0;
+    let litCount = 0;
+
+    downlight0Meshes.forEach((mesh, index) => {
+      mesh.computeWorldMatrix(true);
+      const center = mesh.getBoundingInfo?.()?.boundingBox?.centerWorld?.clone?.();
+
+      if (!center) {
+        console.warn(`[night] Down0 fixture ${index} missing bounds — skipped`);
+        return;
+      }
+
+      const direction = worldDown.clone();
+      const lightOrigin = center.add(new BABYLON.Vector3(0, 0.25, 0));
+      const receivers = resolveDown0RangeReceivers(
+        lightOrigin,
+        direction,
+        range,
+        { coneCos, pool: receiverPool }
+      );
+
+      const light = new BABYLON.SpotLight(
+        `angji-down0-wallwash-${index}`,
+        lightOrigin,
+        direction,
+        angle,
+        1.15,
+        scene
+      );
+      light.diffuse = new BABYLON.Color3(1, 0.94, 0.78);
+      light.specular = new BABYLON.Color3(0.28, 0.22, 0.12);
+      light.intensity = intensity;
+      light.range = range;
+      light.falloffType = BABYLON.Light.FALLOFF_GLTF;
+
+      if (receivers.length) {
+        light.includedOnlyMeshes = receivers;
+        light.setEnabled(true);
+        light.metadata = {
+          isDown0: true,
+          nightAlwaysOn: true,
+          nightRotationActive: true,
+          nightNoReceivers: false,
+          nightFixtureGroup: "down0",
+          nightReceiverMode: "range"
+        };
+        litCount += 1;
+      } else {
+        light.includedOnlyMeshes = [];
+        light.setEnabled(false);
+        light.metadata = {
+          isDown0: true,
+          nightAlwaysOn: false,
+          nightRotationActive: false,
+          nightNoReceivers: true,
+          nightFixtureGroup: "down0"
+        };
+        console.warn(`[night] Down0 fixture ${index} has no meshes in range/cone`);
+      }
+
+      downlightLights.push(light);
+      created += 1;
+    });
+
+    console.info(
+      `[night] Down0 fixtures mesh=${downlight0Meshes.length} lights=${created} lit=${litCount}`
+      + ` aim=world-Y- angle=${angleDegrees} range=${range} mode=range`
+    );
+    return litCount;
+  }
+
   function createFixtureDescriptor(mesh, group, index) {
     mesh.computeWorldMatrix(true);
     const center = mesh.getBoundingInfo?.()?.boundingBox?.centerWorld?.clone?.() || null;
@@ -9193,12 +9976,7 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
     light.range = 14;
     light.falloffType = BABYLON.Light.FALLOFF_GLTF;
     light.metadata = { nightRotationActive: true, nightFixtureGroup: fixture.group };
-
-    const includeMeshes = resolveLightIncludeMeshes(fixture.center);
-
-    if (includeMeshes.length) {
-      light.includedOnlyMeshes = includeMeshes;
-    }
+    assignSpotLightReceivers(light, fixture.center);
 
     downlightLights.push(light);
     fixture.light = light;
@@ -9552,10 +10330,6 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
     let flareOcclusionFrame = 0;
     let cachedOccluders = [];
     const nightLighting = () => getActiveModelState()?.config?.nightLighting || {};
-    const occlusionInterval = () => Math.max(
-      1,
-      Math.floor(nightLighting().flareOcclusionIntervalFrames || 1)
-    );
     const flareCullRadius = () => {
       const configured = nightLighting().flareCullRadius;
       return typeof configured === "number" && configured > 0 ? configured : Number.POSITIVE_INFINITY;
@@ -9569,16 +10343,20 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
       const camera = scene.activeCamera;
       const time = performance.now() * 0.001;
       flareOcclusionFrame += 1;
-      const interval = occlusionInterval();
+      const inOrbit = typeof isWalkMode === "function" ? !isWalkMode() : false;
+      // Orbit zoom already stresses picking/GPU — skip COL flare rays there.
+      const interval = inOrbit
+        ? Number.POSITIVE_INFINITY
+        : Math.max(1, Math.floor(nightLighting().flareOcclusionIntervalFrames || 1));
       const cullRadius = flareCullRadius();
       const cullRadiusSq = cullRadius * cullRadius;
 
-      if (flareOcclusionFrame % interval === 0) {
+      if (Number.isFinite(interval) && flareOcclusionFrame % interval === 0) {
         cachedOccluders = getNightColOccluderMeshes(getActiveModelState());
       }
 
       const occluders = cachedOccluders;
-      const runOcclusion = flareOcclusionFrame % interval === 0;
+      const runOcclusion = Number.isFinite(interval) && flareOcclusionFrame % interval === 0;
 
       downlight02TwinkleMaterials.forEach((entry) => {
         if (entry.rotationActive === false) {
@@ -9680,6 +10458,11 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
       // No budget configured -> keep whatever Babylon already has enabled.
       if (maxActive >= downlightLights.length && !Number.isFinite(cullRadius)) {
         downlightLights.forEach((light) => {
+          if (light.metadata?.nightNoReceivers) {
+            light.setEnabled(false);
+            return;
+          }
+
           light.setEnabled(light.metadata?.nightRotationActive !== false);
         });
         return;
@@ -9702,9 +10485,31 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
       const radiusSq = cullRadius * cullRadius;
       let enabled = 0;
 
+      // Signboard Down0 always keeps a slot when in range — real wall wash must stay on.
       scored.forEach((entry) => {
-        // Rotation-inactive fixtures stay off and never consume the budget.
-        const rotationActive = entry.light.metadata?.nightRotationActive !== false;
+        const rotationActive = entry.light.metadata?.nightRotationActive !== false
+          && !entry.light.metadata?.nightNoReceivers;
+        const withinRadius = entry.distanceSq <= radiusSq;
+        const alwaysOn = entry.light.metadata?.nightAlwaysOn === true
+          || entry.light.metadata?.isDown0 === true;
+
+        if (!(rotationActive && withinRadius && alwaysOn)) {
+          return;
+        }
+
+        entry.light.setEnabled(true);
+        enabled += 1;
+        entry._handled = true;
+      });
+
+      scored.forEach((entry) => {
+        if (entry._handled) {
+          return;
+        }
+
+        // Rotation-inactive / no-receiver fixtures stay off and never consume the budget.
+        const rotationActive = entry.light.metadata?.nightRotationActive !== false
+          && !entry.light.metadata?.nightNoReceivers;
         const withinRadius = entry.distanceSq <= radiusSq;
         const shouldEnable = rotationActive && withinRadius && enabled < maxActive;
 
@@ -9760,6 +10565,7 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
   function restoreDownlightMaterials() {
     materialSnapshots.forEach(restoreMaterialEmissiveState);
     materialSnapshots = [];
+    restoreNightSiteMaterials();
     restoreDownlight02MaterialOverrides();
   }
 
@@ -9978,12 +10784,7 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
     light.range = range;
     light.falloffType = BABYLON.Light.FALLOFF_GLTF;
     light.metadata = { isDown01: true, nightRotationActive: true };
-
-    const includeMeshes = resolveLightIncludeMeshes(cluster.center);
-
-    if (includeMeshes.length) {
-      light.includedOnlyMeshes = includeMeshes;
-    }
+    assignSpotLightReceivers(light, cluster.center);
 
     downlightLights.push(light);
     return light;
@@ -10027,6 +10828,7 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
 
   function hasReadyNightDownlights(modelState) {
     return litModelState === modelState
+      && nightReceiverPolicyVersion === NIGHT_RECEIVER_POLICY_VERSION
       && (
         downlightLights.length > 0
         || downlight02Fixtures.length > 0
@@ -10065,6 +10867,7 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
     });
 
     materialSnapshots.forEach(restoreMaterialEmissiveState);
+    siteMaterialSnapshots.forEach(restoreSiteMaterialState);
   }
 
   function resumeNightAssets() {
@@ -10074,6 +10877,10 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
       if (snapshot?.material) {
         applyDownlightEmissive(BABYLON, snapshot.material);
       }
+    });
+
+    siteMaterialSnapshots.forEach((snapshot) => {
+      applySiteMaterialDarkeningFromSnapshot(snapshot);
     });
 
     downlight02MaterialOverrides.forEach(({ mesh, clonedMaterial }) => {
@@ -10088,6 +10895,11 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
 
     downlightLights.forEach((light) => {
       try {
+        if (light.metadata?.nightNoReceivers) {
+          light.setEnabled(false);
+          return;
+        }
+
         const rotationActive = light.metadata?.nightRotationActive !== false;
         light.setEnabled(rotationActive);
       } catch {
@@ -10137,77 +10949,69 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
       return;
     }
 
-    const downlightMeshes = collectAngjiDownlightMeshes(modelState);
-    const downlight02Meshes = collectAngjiDownlight02Meshes(modelState);
-    const downlight03Meshes = collectAngjiDownlight03Meshes(modelState);
     const nightLighting = modelState.config?.nightLighting || {};
-    const usesRotation = hasDownlightRotationConfig(nightLighting);
-    const down02SelectCount = usesRotation
-      ? downlight02Meshes.length
-      : getNightDown02SelectCount(modelState.config, downlight02Meshes.length);
-    const down03SelectCount = usesRotation
-      ? downlight03Meshes.length
-      : getNightDown03SelectCount(modelState.config, downlight03Meshes.length);
-    const selectedDown02Meshes = usesRotation
-      ? downlight02Meshes
-      : pickRandomItems(downlight02Meshes, down02SelectCount);
-    const selectedDown03Meshes = usesRotation
-      ? downlight03Meshes
-      : pickRandomItems(downlight03Meshes, down03SelectCount);
-    const materials01 = collectUniqueMaterialsFromMeshes(downlightMeshes);
-    const down01PerFixture = nightLighting.down01PerFixture === true;
-    const down01LocalRange = typeof nightLighting.down01LocalRange === "number"
-      ? Math.max(0.5, nightLighting.down01LocalRange)
-      : 18;
-    const down01Intensity = typeof nightLighting.down01Intensity === "number"
-      ? Math.max(1, nightLighting.down01Intensity)
-      : (down01PerFixture ? 14.4 : 13.6);
-    const down01MaxSpots = typeof nightLighting.down01MaxSpots === "number"
-      ? Math.max(1, Math.floor(nightLighting.down01MaxSpots))
-      : MAX_CLUSTERED_LIGHTS;
-    const down01InitialSpots = typeof nightLighting.down01InitialSpots === "number"
-      ? Math.max(1, Math.floor(nightLighting.down01InitialSpots))
-      : Math.min(DOWN01_INITIAL_SPOTS, down01MaxSpots);
-    const down01MergeDistance = typeof nightLighting.down01MergeDistance === "number"
-      ? Math.max(0.5, nightLighting.down01MergeDistance)
-      : CLUSTER_MERGE_DISTANCE;
+    const enableRlbPresetLights = nightLighting.enableRlbPresetLights === true;
+    const enableDown01 = nightLighting.enableDown01 === true;
+    const enableDown02 = nightLighting.enableDown02 === true;
+    const enableDown03 = nightLighting.enableDown03 === true;
+    const enableDown0 = enableRlbPresetLights
+      ? nightLighting.enableDown0 === true
+      : nightLighting.enableDown0 !== false;
+    const downlight0Meshes = enableDown0 ? collectAngjiDownlight0Meshes(modelState) : [];
+    const down0Intensity = typeof nightLighting.down0Intensity === "number"
+      ? Math.max(1, nightLighting.down0Intensity)
+      : 24;
+    const down0LocalRange = typeof nightLighting.down0LocalRange === "number"
+      ? Math.max(1, nightLighting.down0LocalRange)
+      : 12;
+    const down0AngleDegrees = typeof nightLighting.down0AngleDegrees === "number"
+      ? Math.max(20, nightLighting.down0AngleDegrees)
+      : 140;
     const maxSimultaneousLights = getNightMaxSimultaneousLights(modelState.config);
     nightIncludeRadius = typeof nightLighting.lightIncludeRadius === "number"
       ? Math.max(4, nightLighting.lightIncludeRadius)
       : LIGHT_INCLUDE_RADIUS;
 
-    const positions01 = down01PerFixture
-      ? []
-      : collectDownlightWorldPositions(downlightMeshes);
-    const clusters01 = down01PerFixture
-      ? []
-      : clusterDownlightPositions(BABYLON, positions01, {
-        mergeDistance: down01MergeDistance,
-        maxClusters: down01MaxSpots
-      });
+    // Always reset fixture descriptors before rebuilding night lights.
+    downlight02Fixtures = [];
+    if (enableDown01 || enableDown02 || enableDown03) {
+      console.warn("[night] Down01/02/03 requested but current build keeps them disabled for perf");
+    }
 
-    // Descriptor pool first (positions only — no Spot/flare yet).
-    downlight02Fixtures = [
-      ...selectedDown02Meshes.map((mesh, index) => createFixtureDescriptor(mesh, "down02", index)),
-      ...selectedDown03Meshes.map((mesh, index) => (
-        createFixtureDescriptor(mesh, "down03", selectedDown02Meshes.length + index)
-      ))
-    ];
+    let rlbResult = { created: 0, summary: [] };
+    let seedPositions = [];
 
-    const seedPositions = [
-      ...clusters01.map((cluster) => cluster.center),
-      ...downlight02Fixtures.map((fixture) => fixture.center).filter(Boolean)
-    ];
-    const allLitMeshes = collectNightLitMeshes(modelState).filter((mesh) => (
-      !mesh.metadata?.angjiWallSurface
-    ));
+    if (enableRlbPresetLights) {
+      // Create 2 lights/type first so we know seed positions for receiver prep.
+      rlbResult = createRlbPresetTypeLights(modelState, nightLighting);
+      seedPositions = downlightLights
+        .map((light) => light?.position?.clone?.())
+        .filter(Boolean);
+    } else {
+      seedPositions = downlight0Meshes.map((mesh) => {
+        mesh.computeWorldMatrix(true);
+        return mesh.getBoundingInfo?.()?.boundingBox?.centerWorld?.clone?.();
+      }).filter(Boolean);
+    }
+
+    markNightSiteScaleReceivers(modelState);
+    applyNightSiteMaterials(modelState);
     refreshNightWallOccluders(modelState);
-    // Only materials near light positions get maxSimultaneousLights bumped.
-    const receiverMeshes = collectMeshesNearPositions(allLitMeshes, seedPositions, nightIncludeRadius);
-    nightIncludeMeshes = receiverMeshes;
+
+    // Prep light limits for meshes near active fixtures (range-based).
+    const rangePool = collectDown0RangePool(modelState);
+    const seedRange = enableRlbPresetLights
+      ? Math.max(
+        nightIncludeRadius,
+        typeof nightLighting.rlbDefaultRange === "number" ? nightLighting.rlbDefaultRange + 2 : 14
+      )
+      : Math.max(nightIncludeRadius, down0LocalRange + 2);
+    nightIncludeMeshes = seedPositions.length
+      ? collectMeshesNearPositions(rangePool, seedPositions, seedRange)
+      : rangePool;
 
     const materialsReady = await prepareModelMaterialsForNightLightsChunked(
-      receiverMeshes,
+      nightIncludeMeshes,
       token,
       maxSimultaneousLights
     );
@@ -10216,146 +11020,52 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
       return;
     }
 
-    materialSnapshots = materials01.map(captureMaterialEmissiveState);
-    materials01.forEach((material) => applyDownlightEmissive(BABYLON, material));
     await yieldNightFrame();
 
     if (!isNightSetupActive(token)) {
       return;
     }
 
-    // Activate Down02/03 (lazy: rotation instantiates only the lit subset).
-    startDownlightRotation(nightLighting);
-    await yieldNightFrame();
+    let down0SpotCount = 0;
+    if (enableDown0) {
+      down0SpotCount = createDown0WallWashLights(downlight0Meshes, {
+        intensity: down0Intensity,
+        range: down0LocalRange,
+        angleDegrees: down0AngleDegrees,
+        pool: rangePool
+      });
+    }
+
+    // Re-bind RLB receivers now that material light limits are ready.
+    if (enableRlbPresetLights) {
+      downlightLights.forEach((light) => {
+        if (light?.metadata?.rlbType && light.position) {
+          assignSpotLightReceivers(light, light.position);
+        }
+      });
+    }
 
     if (!isNightSetupActive(token)) {
       return;
     }
 
-    let down01SpotCount = 0;
-    let observersStarted = false;
-
-    function ensureNightObservers() {
-      if (observersStarted) {
-        return;
-      }
-
-      startDown02FlareTwinkle();
+    if (downlightLights.length) {
       startNightSpotLightCulling();
-      observersStarted = true;
     }
 
-    if (down01PerFixture) {
-      const fixtureEntries = [];
-
-      downlightMeshes.forEach((mesh) => {
-        mesh.computeWorldMatrix(true);
-        const center = mesh.getBoundingInfo?.()?.boundingBox?.centerWorld?.clone?.();
-
-        if (!center) {
-          return;
-        }
-
-        fixtureEntries.push({
-          mesh,
-          position: center,
-          direction: getMeshLightDirection(BABYLON, mesh)
-        });
-      });
-
-      const fixtureClusters = [];
-
-      fixtureEntries.forEach((entry) => {
-        let nearest = null;
-        let nearestDistance = Number.POSITIVE_INFINITY;
-
-        fixtureClusters.forEach((cluster) => {
-          const distance = BABYLON.Vector3.Distance(entry.position, cluster.center);
-
-          if (distance < nearestDistance) {
-            nearest = cluster;
-            nearestDistance = distance;
-          }
-        });
-
-        const canMerge = nearest && nearestDistance <= down01MergeDistance;
-
-        if (canMerge || fixtureClusters.length >= down01MaxSpots) {
-          const target = canMerge
-            ? nearest
-            : fixtureClusters.reduce((best, cluster) => {
-              const distance = BABYLON.Vector3.Distance(entry.position, cluster.center);
-              if (!best || distance < best.distance) {
-                return { cluster, distance };
-              }
-              return best;
-            }, null)?.cluster;
-
-          if (target) {
-            target.points.push(entry.position);
-            target.directions.push(entry.direction);
-            target.center = target.points
-              .reduce((sum, point) => sum.add(point), BABYLON.Vector3.Zero())
-              .scale(1 / target.points.length);
-            return;
-          }
-        }
-
-        fixtureClusters.push({
-          center: entry.position.clone(),
-          points: [entry.position],
-          directions: [entry.direction]
-        });
-      });
-
-      const progressiveClusters = fixtureClusters.map((cluster) => {
-        const direction = cluster.directions
-          .reduce((sum, dir) => sum.add(dir), BABYLON.Vector3.Zero())
-          .normalize();
-
-        return {
-          center: cluster.center,
-          points: cluster.points,
-          direction: direction.lengthSquared() > 1e-6 ? direction : new BABYLON.Vector3(0, -1, 0),
-          angle: Math.PI * 0.62,
-          exponent: 2.2
-        };
-      });
-
-      down01SpotCount = await createDown01SpotsProgressive(progressiveClusters, token, {
-        intensityBase: down01Intensity,
-        range: down01LocalRange,
-        initialSpots: down01InitialSpots,
-        onInitialReady: () => ensureNightObservers()
-      });
-    } else {
-      down01SpotCount = await createDown01SpotsProgressive(clusters01, token, {
-        intensityBase: down01Intensity,
-        range: down01LocalRange,
-        initialSpots: down01InitialSpots,
-        onInitialReady: () => ensureNightObservers()
-      });
-    }
-
-    if (!isNightSetupActive(token)) {
-      return;
-    }
-
-    ensureNightObservers();
     nightAssetsSuspended = false;
+    nightReceiverPolicyVersion = NIGHT_RECEIVER_POLICY_VERSION;
     litModelState = modelState;
     console.info(
       `[night] ${modelState.config?.label || modelState.config?.overviewId || "model"}`
-      + ` Down01 meshes=${downlightMeshes.length} spots=${down01SpotCount}`
-      + ` mode=${down01PerFixture ? "perFixture" : "cluster"}`
-      + ` range=${down01LocalRange} intensity~${down01Intensity}`
-      + ` / Down02 pool=${selectedDown02Meshes.length} live=${downlight02Fixtures.filter((f) => f.group === "down02" && f.instantiated).length}`
-      + ` / Down03 pool=${selectedDown03Meshes.length} live=${downlight02Fixtures.filter((f) => f.group === "down03" && f.instantiated).length}`
-      + ` flares=${downlight02Flares.length} twinkleMats=${downlight02TwinkleMaterials.length}`
-      + ` receivers=${receiverMeshes.length}/${allLitMeshes.length}`
+      + (enableRlbPresetLights
+        ? ` RLB perType=${nightLighting.lightsPerType ?? 2} created=${rlbResult.created}`
+          + (rlbResult.summary?.length ? ` [${rlbResult.summary.join(", ")}]` : "")
+        : ` Down01/02/03=off / Down0 wallwash=${down0SpotCount}`)
+      + ` receivers=${nightIncludeMeshes.length}`
+      + ` pool=${rangePool.length}`
       + ` maxLights=${maxSimultaneousLights}`
       + ` maxActiveSpots=${typeof nightLighting.maxActiveSpotLights === "number" ? nightLighting.maxActiveSpotLights : "all"}`
-      + ` rotation=${usesRotation ? "lazy" : "all"}`
     );
   }
 
@@ -10389,6 +11099,7 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
     nightIncludeMeshes = [];
     nightWallOccluders = [];
     litModelState = null;
+    nightReceiverPolicyVersion = 0;
     nightAssetsSuspended = false;
   }
 
@@ -10437,11 +11148,13 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
 
       nightMode = true;
       // Paint sky/fog/moon immediately; stagger heavy light/material work.
+      applyNightOrbitZoomPolicy(true);
       applyNightEnvironment();
       enableDownlights(modelState);
     } else {
       nightMode = false;
       // Keep night assets cached — next toggle resumes instantly.
+      applyNightOrbitZoomPolicy(false);
       clearNightLighting({ dispose: false });
       applyDayEnvironment();
 
@@ -10479,6 +11192,7 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
     }
 
     if (nightMode) {
+      applyNightOrbitZoomPolicy(true);
       applyNightEnvironment();
       applyNightPeopleVisibility();
       enableDownlights(getActiveModelState());
@@ -10857,7 +11571,13 @@ async function loadTourModelState(BABYLON, scene, config) {
     meshes.filter((mesh) => mesh.isEnabled() && isDtvTreeMesh(mesh)),
     meshes
   );
+  const peopleYawMeshes = meshes.filter((mesh) => (
+    mesh.isEnabled()
+    && isPeopleYawFacingMesh(mesh, performanceSettings)
+    && !treeMeshes.some((treeMesh) => treeMesh.uniqueId === mesh.uniqueId)
+  ));
   const treeMeshIds = new Set(treeMeshes.map((mesh) => mesh.uniqueId));
+  peopleYawMeshes.forEach((mesh) => treeMeshIds.add(mesh.uniqueId));
   const blendOptimized = optimizeModelBlendMaterials(BABYLON, meshes, {
     optimizeDtv: performanceSettings.optimizeDtvBlendToAlphaTest,
     optimizeNonEssential: performanceSettings.optimizeNonEssentialBlendToAlphaTest,
@@ -10975,6 +11695,19 @@ async function loadTourModelState(BABYLON, scene, config) {
     };
   });
 
+  peopleYawMeshes.forEach((mesh) => {
+    attachTreeYawPivot(BABYLON, scene, mesh, model.root);
+    mesh.checkCollisions = false;
+    mesh.metadata = {
+      ...(mesh.metadata || {}),
+      peopleYawMesh: true,
+      passThrough: true
+    };
+  });
+
+  // Trees + People cards share the same camera-yaw update path.
+  const yawFacingMeshes = [...treeMeshes, ...peopleYawMeshes];
+
   freezeSceneMaterials(modelMaterials);
 
   const walkableGroundMeshes = Array.from(groundMeshMap.values());
@@ -10995,6 +11728,7 @@ async function loadTourModelState(BABYLON, scene, config) {
     `collision=${collisionMeshes.length}`,
     `walkable=${walkableGroundMeshes.length}`,
     `trees=${treeMeshes.length}`,
+    `peopleYaw=${peopleYawMeshes.length}`,
     `blendOpt=${blendOptimized}`,
     `cutoutAlpha=${cutoutAlphaFixed}`,
     `roles=${JSON.stringify(roleCounts)}`,
@@ -11033,7 +11767,7 @@ async function loadTourModelState(BABYLON, scene, config) {
     angjiBuildingFloor3Meshes,
     angjiExternalFloorMeshes,
     peopleTargetMeshes,
-    treeMeshes,
+    treeMeshes: yawFacingMeshes,
     projectileHitMeshes: meshes.filter((mesh) => mesh.isEnabled() && !isDescendantOf(mesh, model.tourStartNode)),
     historyDisplays: []
   };
@@ -11308,6 +12042,7 @@ async function start() {
   angjiNightMode = createAngjiNightModeController(BABYLON, scene, ambient, sun, {
     getActiveModelState: () => controls?.getActiveModelState?.() || displayedModelState,
     isWalkMode: () => controls?.isWalkMode?.() || false,
+    getOrbitCamera: () => orbitCamera,
     onNightModeChange: (isNight) => {
       void controls?.refreshAngjiGuestsForNightMode?.().catch((error) => {
         console.error("[angji-night] guest refresh failed", error);
