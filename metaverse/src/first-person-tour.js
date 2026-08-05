@@ -16,7 +16,7 @@ import {
   attachHistoryDisplayBoards,
   disposeHistoryDisplayBoards,
   setHistoryDisplayBoardsEnabled
-} from "./history-display-board.js?v=down0-world-y-20260726bx";
+} from "./history-display-board.js?v=chungju-display-mesh-20260805";
 import {
   getAngjiIndoorBackgroundGuestSpawns,
   getAngjiOutdoorBackgroundGuestSpawns,
@@ -221,10 +221,18 @@ const MODEL_CONFIGS = [
   },
   {
     file: "Chungju.glb",
-    tourFile: "Chungju_tour.glb",
+    modelCacheVersion: "20260805-chungju-ramp-bridge",
     label: "충주",
     overviewId: "chungju",
     moveSpeedMultiplier: 3,
+    collision: {
+      colLayer: true,
+      // Steep 2F ramps + moveSpeedMultiplier 3 need a larger per-frame step budget.
+      maxRampStepUp: 1.05,
+      // COL ramp meshes can sit slightly above floor slabs in the GLB export.
+      bridgeRampFloorGaps: true,
+      rampFloorBridgeHorizontal: 1.5
+    },
     performance: {
       localCollisionRadius: 18,
       localGroundRadius: 24,
@@ -232,9 +240,22 @@ const MODEL_CONFIGS = [
       treeFacingMinMoveDistance: 0.35,
       treeFacingIntervalFrames: 3
     },
+    displayBoards: [
+      {
+        materialName: "Display_01_01",
+        meshName: "3DGeom-5110",
+        url: "https://rabbit-archi2025.com/history/history.html",
+        aspectWidth: 9,
+        aspectHeight: 6,
+        interactionMode: "modal",
+        contentFlipHorizontal: true
+      }
+    ],
     orbitCamera: {
       position: { x: 50.91, y: 40.94, z: 74.48 },
       target: { x: 10.67, y: 16.05, z: 24.47 },
+      upperBetaDegrees: 82,
+      zoomOutMultiplier: 3,
       time: 11
     },
     tourCamera: {
@@ -434,6 +455,12 @@ const FLOOR_NODE_KEYWORDS = [
 ];
 const GROUND_NORMAL_MIN_Y = 0.55;
 const CLASSIFIED_GROUND_NORMAL_MIN_Y = 0.18;
+/** Ramps/stairs: allow steeper treads than flat COL floors (~84° vs ~80° from horizontal). */
+const RAMP_GROUND_NORMAL_MIN_Y = 0.08;
+/** Horizontal reach when bridging a COL floor slab to a nearby COL ramp with a vertical gap. */
+const RAMP_FLOOR_BRIDGE_HORIZONTAL = 1.35;
+const RAMP_BRIDGE_PROBE_DISTANCES = [0.24, 0.48, 0.72, 1.05, 1.35];
+const RAMP_BRIDGE_LATERAL_OFFSETS = [0, 0.2, -0.2, 0.35, -0.35, 0.55, -0.55];
 const WALL_NORMAL_MAX_Y = 0.9;
 const MIN_COLLISION_DISTANCE = 0.04;
 const MIN_WALL_SLIDE_DISTANCE = 0.012;
@@ -1740,6 +1767,20 @@ function buildLocalGroundMeshSet(BABYLON, position, groundMeshes, radius, config
     }
   });
 
+  if (hasColRampFloorBridgeConfig(config)) {
+    const bridgeBand = ANGJI_SLOPE_GROUND_Y_BAND + getProjectMaxRampStepUp(config) + 0.35;
+
+    groundMeshes.forEach((mesh) => {
+      if (!isColRampGroundMesh(mesh)) {
+        return;
+      }
+
+      if (isMeshWithinVerticalBand(BABYLON, mesh, position.y, bridgeBand)) {
+        merged.set(mesh.uniqueId, mesh);
+      }
+    });
+  }
+
   return new Set(merged.values());
 }
 
@@ -1754,6 +1795,222 @@ function hasExactMaterialName(mesh, names) {
   const normalizedTargets = new Set(names.map((name) => normalizeName(name)));
 
   return getMaterialNames(mesh).some((name) => normalizedTargets.has(normalizeName(name)));
+}
+
+function boundsOverlapXZ(a, b, padding = 0) {
+  return a.min.x - padding <= b.max.x
+    && b.min.x - padding <= a.max.x
+    && a.min.z - padding <= b.max.z
+    && b.min.z - padding <= a.max.z;
+}
+
+function auditColRampFloorConnectivity(BABYLON, modelState) {
+  if (!modelState || !hasColLayerConfig(modelState.config)) {
+    return null;
+  }
+
+  const rampMeshes = modelState.meshes.filter((mesh) => (
+    mesh.metadata?.angjiRampSurface
+    && mesh.metadata?.angjiCollisionLayer
+    && mesh.isEnabled?.() !== false
+  ));
+  const floorMeshes = modelState.meshes.filter((mesh) => (
+    mesh.metadata?.angjiFloorSurface
+    && mesh.isEnabled?.() !== false
+  ));
+  const issues = [];
+
+  rampMeshes.forEach((rampMesh) => {
+    const rampBounds = getCachedMeshBounds(BABYLON, rampMesh);
+
+    if (!rampBounds) {
+      return;
+    }
+
+    const overlappingFloors = floorMeshes.filter((floorMesh) => {
+      const floorBounds = getCachedMeshBounds(BABYLON, floorMesh);
+
+      if (!floorBounds) {
+        return false;
+      }
+
+      return boundsOverlapXZ(rampBounds, floorBounds, 0.12);
+    });
+
+    if (!overlappingFloors.length) {
+      issues.push({
+        type: "no-floor-xz-overlap",
+        ramp: rampMesh.name || rampMesh.id,
+        rampY: `${rampBounds.min.y.toFixed(2)}-${rampBounds.max.y.toFixed(2)}`
+      });
+      return;
+    }
+
+    overlappingFloors.forEach((floorMesh) => {
+      const floorBounds = getCachedMeshBounds(BABYLON, floorMesh);
+      const yGap = rampBounds.min.y > floorBounds.max.y
+        ? rampBounds.min.y - floorBounds.max.y
+        : floorBounds.min.y > rampBounds.max.y
+          ? floorBounds.min.y - rampBounds.max.y
+          : 0;
+
+      if (yGap > getProjectMaxRampStepUp(modelState.config) + 0.05) {
+        issues.push({
+          type: "floor-ramp-y-gap",
+          ramp: rampMesh.name || rampMesh.id,
+          floor: floorMesh.name || floorMesh.id,
+          gapMeters: Number(yGap.toFixed(2))
+        });
+      }
+    });
+  });
+
+  if (issues.length) {
+    console.warn(
+      `[collision] ${modelState.config?.label || "model"}: ${issues.length} COL ramp connectivity issue(s).`,
+      issues
+    );
+  } else if (rampMeshes.length) {
+    console.info(
+      `[collision] ${modelState.config?.label || "model"}: ${rampMeshes.length} COL ramp mesh(es) overlap floor COL in XZ.`
+    );
+  }
+
+  return { rampMeshes: rampMeshes.length, floorMeshes: floorMeshes.length, issues };
+}
+
+function raycastColRampAt(BABYLON, scene, x, z, referenceEyeY, rampMeshSet, maxRampStepUp) {
+  const rayOrigin = new BABYLON.Vector3(x, referenceEyeY + GROUND_RAY_UP, z);
+  const ray = new BABYLON.Ray(
+    rayOrigin,
+    BABYLON.Vector3.Down(),
+    GROUND_RAY_UP + GROUND_RAY_DOWN + maxRampStepUp + 0.75
+  );
+  const hit = getRayHits(scene, ray, (mesh) => (
+    rampMeshSet.has(mesh)
+    && mesh.isPickable !== false
+    && mesh.isEnabled()
+  ))
+    .map(getValidGroundHit)
+    .filter(Boolean)
+    .sort((a, b) => b.pickedPoint.y - a.pickedPoint.y)[0];
+
+  if (!hit?.pickedPoint) {
+    return null;
+  }
+
+  const eyeY = hit.pickedPoint.y + EYE_HEIGHT;
+  const verticalDelta = eyeY - referenceEyeY;
+
+  if (verticalDelta < MIN_STEP_UP || verticalDelta > maxRampStepUp) {
+    return null;
+  }
+
+  return {
+    hit,
+    eyeY,
+    verticalDelta
+  };
+}
+
+function findColRampBridgeStepPose(BABYLON, scene, position, movement, groundMeshSet, options = {}) {
+  const maxRampStepUp = options.maxRampStepUp ?? MAX_RAMP_STEP_UP;
+  const horizontalReach = options.rampFloorBridgeHorizontal ?? RAMP_FLOOR_BRIDGE_HORIZONTAL;
+  const moveDistance = movement.length();
+
+  if (moveDistance <= 0.01) {
+    return null;
+  }
+
+  const direction = movement.normalizeToNew();
+  const lateralAxis = new BABYLON.Vector3(direction.z, 0, -direction.x).normalize();
+  const rampMeshSet = new Set(
+    [...groundMeshSet].filter((mesh) => isColRampGroundMesh(mesh))
+  );
+
+  if (!rampMeshSet.size) {
+    return null;
+  }
+
+  const probeDistances = options.probeDistances ?? RAMP_BRIDGE_PROBE_DISTANCES;
+  const lateralOffsets = options.lateralOffsets ?? RAMP_BRIDGE_LATERAL_OFFSETS;
+
+  for (const distance of probeDistances) {
+    const probeDistance = Math.min(Math.max(distance, moveDistance), horizontalReach);
+
+    for (const lateralOffset of lateralOffsets) {
+      const lateral = lateralAxis.scale(lateralOffset);
+      const probe = position.add(direction.scale(probeDistance)).add(lateral);
+      const stepPose = raycastColRampAt(
+        BABYLON,
+        scene,
+        probe.x,
+        probe.z,
+        position.y,
+        rampMeshSet,
+        maxRampStepUp
+      );
+
+      if (stepPose) {
+        return stepPose;
+      }
+    }
+  }
+
+  return null;
+}
+
+function isColRampMeshAhead(BABYLON, position, movement, groundMeshSet, options = {}) {
+  const horizontalReach = options.rampFloorBridgeHorizontal ?? RAMP_FLOOR_BRIDGE_HORIZONTAL;
+  const maxRampStepUp = options.maxRampStepUp ?? MAX_RAMP_STEP_UP;
+  const moveDistance = movement.length();
+
+  if (moveDistance <= 0.01) {
+    return false;
+  }
+
+  const direction = movement.normalizeToNew();
+  const forward = new BABYLON.Vector3(direction.x, 0, direction.z).normalize();
+  const flatPos = new BABYLON.Vector3(position.x, 0, position.z);
+  const feetY = position.y - EYE_HEIGHT;
+
+  for (const mesh of groundMeshSet) {
+    if (!isColRampGroundMesh(mesh)) {
+      continue;
+    }
+
+    const bounds = getCachedMeshBounds(BABYLON, mesh);
+
+    if (!bounds) {
+      continue;
+    }
+
+    const clampedX = Math.max(bounds.min.x, Math.min(position.x, bounds.max.x));
+    const clampedZ = Math.max(bounds.min.z, Math.min(position.z, bounds.max.z));
+    const closest = new BABYLON.Vector3(clampedX, 0, clampedZ);
+    const toMesh = closest.subtract(flatPos);
+    const flatDist = toMesh.length();
+
+    if (flatDist > horizontalReach) {
+      continue;
+    }
+
+    if (flatDist > 0.02) {
+      toMesh.normalize();
+
+      if (BABYLON.Vector3.Dot(toMesh, forward) < 0.12) {
+        continue;
+      }
+    }
+
+    if (bounds.max.y < feetY - 0.35 || bounds.min.y > feetY + maxRampStepUp + 0.45) {
+      continue;
+    }
+
+    return true;
+  }
+
+  return false;
 }
 
 function auditAngjiTourElements(modelState) {
@@ -1873,6 +2130,40 @@ function isGeochangProjectConfig(config) {
 /** Orbit Night Mode button + night lighting/BGM (Angji-style). */
 function supportsNightModeConfig(config) {
   return isAngjiProjectConfig(config) || isGeochangProjectConfig(config);
+}
+
+function getRampGroundNormalMinY(config) {
+  const configured = config?.collision?.rampGroundNormalMinY;
+
+  if (typeof configured === "number" && configured > 0) {
+    return configured;
+  }
+
+  return RAMP_GROUND_NORMAL_MIN_Y;
+}
+
+function getRampFloorBridgeHorizontal(config) {
+  const configured = config?.collision?.rampFloorBridgeHorizontal;
+
+  if (typeof configured === "number" && configured > 0) {
+    return configured;
+  }
+
+  return RAMP_FLOOR_BRIDGE_HORIZONTAL;
+}
+
+function hasColRampFloorBridgeConfig(config) {
+  return hasColLayerConfig(config) && config?.collision?.bridgeRampFloorGaps === true;
+}
+
+function getProjectMaxRampStepUp(config) {
+  const configured = config?.collision?.maxRampStepUp;
+
+  if (typeof configured === "number" && configured > 0) {
+    return configured;
+  }
+
+  return MAX_RAMP_STEP_UP;
 }
 
 function isColLayerDiscreteStairConfig(config) {
@@ -3974,9 +4265,13 @@ function getValidGroundHit(hit) {
 
   const normal = hit.getNormal?.(true);
 
-  if (isFloorSurface(hit.pickedMesh) || isStairSurface(hit.pickedMesh) || isRampSurface(hit.pickedMesh)) {
+  if (isRampSurface(hit.pickedMesh)) {
+    return !normal || Math.abs(normal.y) >= RAMP_GROUND_NORMAL_MIN_Y ? hit : null;
+  }
+
+  if (isFloorSurface(hit.pickedMesh) || isStairSurface(hit.pickedMesh)) {
     const minNormalY = hit.pickedMesh.metadata?.angjiVisualStairSurface
-      ? 0.08
+      ? RAMP_GROUND_NORMAL_MIN_Y
       : CLASSIFIED_GROUND_NORMAL_MIN_Y;
 
     return !normal || Math.abs(normal.y) >= minNormalY ? hit : null;
@@ -4008,7 +4303,8 @@ function getBlockingBodyHit(hit) {
   const normal = hit.getNormal?.(true);
 
   if (hit.pickedMesh.metadata?.angjiRampSurface && hit.pickedMesh.metadata?.angjiCollisionLayer) {
-    if (normal && normal.y >= WALL_NORMAL_MAX_Y) {
+    // Walkable ramp treads can be steeper than flat COL floors; only near-vertical faces block.
+    if (normal && normal.y >= RAMP_GROUND_NORMAL_MIN_Y) {
       return null;
     }
 
@@ -4016,7 +4312,7 @@ function getBlockingBodyHit(hit) {
   }
 
   if (hit.pickedMesh.metadata?.angjiRampSurface) {
-    if (normal && normal.y >= CLASSIFIED_GROUND_NORMAL_MIN_Y) {
+    if (normal && normal.y >= RAMP_GROUND_NORMAL_MIN_Y) {
       return null;
     }
 
@@ -5107,12 +5403,12 @@ function selectBestGroundCandidate(candidates, options = {}) {
     }
   }
 
-  if (stairs.length) {
-    return stairs.sort(compareGroundCandidateDelta)[0];
-  }
-
   if (options.preferRampSurface && ramps.length) {
     return selectBestRampCandidate(ramps, options);
+  }
+
+  if (stairs.length) {
+    return stairs.sort(compareGroundCandidateDelta)[0];
   }
 
   if (ramps.length) {
@@ -5168,10 +5464,11 @@ function isNearColDiscreteStairContext(BABYLON, scene, position, movement, groun
   return false;
 }
 
-function getLocomotionSurfaceState(BABYLON, scene, position, groundMeshSet) {
+function getLocomotionSurfaceState(BABYLON, scene, position, groundMeshSet, options = {}) {
+  const maxRampStepUp = options.maxRampStepUp ?? MAX_RAMP_STEP_UP;
   const hit = findGroundHit(BABYLON, scene, position, groundMeshSet, {
     referenceEyeY: position.y,
-    maxStepUp: MAX_RAMP_STEP_UP,
+    maxStepUp: maxRampStepUp,
     compactProbes: true,
     groundSelect: { preferRampSurface: true }
   });
@@ -5186,7 +5483,9 @@ function getLocomotionSurfaceState(BABYLON, scene, position, groundMeshSet) {
   };
 }
 
-function isNearColRampContext(BABYLON, scene, position, movement, groundMeshSet) {
+function isNearColRampContext(BABYLON, scene, position, movement, groundMeshSet, options = {}) {
+  const maxRampStepUp = options.maxRampStepUp ?? MAX_RAMP_STEP_UP;
+  const bridgeHorizontal = options.rampFloorBridgeHorizontal ?? RAMP_FLOOR_BRIDGE_HORIZONTAL;
   const moveDistance = movement.length();
 
   if (moveDistance <= 0.01) {
@@ -5199,7 +5498,7 @@ function isNearColRampContext(BABYLON, scene, position, movement, groundMeshSet)
     const probePosition = position.add(direction.scale(Math.min(distance, moveDistance)));
     const hit = findGroundHit(BABYLON, scene, probePosition, groundMeshSet, {
       referenceEyeY: position.y,
-      maxStepUp: MAX_RAMP_STEP_UP,
+      maxStepUp: maxRampStepUp,
       compactProbes: true,
       groundSelect: { preferRampSurface: true }
     });
@@ -5209,7 +5508,10 @@ function isNearColRampContext(BABYLON, scene, position, movement, groundMeshSet)
     }
   }
 
-  return false;
+  return isColRampMeshAhead(BABYLON, position, movement, groundMeshSet, {
+    maxRampStepUp,
+    rampFloorBridgeHorizontal: bridgeHorizontal
+  });
 }
 
 function isOnColDiscreteStairAt(BABYLON, scene, position, groundMeshSet) {
@@ -5342,7 +5644,10 @@ function tryMoveWithCollision(BABYLON, scene, camera, movement, collisionMeshSet
   const nearColRamp = options.nearColRamp ?? (
     !onColRamp
     && !onColStair
-    && isNearColRampContext(BABYLON, scene, previousPosition, movement, groundMeshSet)
+    && isNearColRampContext(BABYLON, scene, previousPosition, movement, groundMeshSet, {
+      maxRampStepUp: options.maxRampStepUp,
+      rampFloorBridgeHorizontal: options.rampFloorBridgeHorizontal
+    })
   );
   const nearColStair = colDiscreteAssist
     && !onColStair
@@ -5355,8 +5660,10 @@ function tryMoveWithCollision(BABYLON, scene, camera, movement, collisionMeshSet
   const assistContext = slopeContext || stairContext;
   const maxStairStepUp = options.maxStairStepUp ?? (colDiscreteAssist ? ANGJI_MAX_STAIR_STEP_UP : MAX_STAIR_STEP_UP);
   const maxRampStepUp = options.maxRampStepUp ?? MAX_RAMP_STEP_UP;
+  const bridgeRampFloorGaps = options.bridgeRampFloorGaps === true;
+  const rampFloorBridgeHorizontal = options.rampFloorBridgeHorizontal ?? RAMP_FLOOR_BRIDGE_HORIZONTAL;
   const activeMaxStepUp = assistContext ? maxStairStepUp : rampContext ? maxRampStepUp : MAX_STEP_UP;
-  const useCompactGroundProbes = true;
+  const useCompactGroundProbes = !bridgeRampFloorGaps;
   const groundSelect = {
     preferStairDescent: options.preferSlopeTransition
       && isOnBuildingFloorAt(BABYLON, scene, previousPosition, groundMeshSet),
@@ -5371,11 +5678,17 @@ function tryMoveWithCollision(BABYLON, scene, camera, movement, collisionMeshSet
   };
   const rampStepOptions = {
     maxVerticalDelta: maxRampStepUp,
-    probeDistances: SHORT_STAIR_PROBE_DISTANCES,
+    probeDistances: bridgeRampFloorGaps ? RAMP_BRIDGE_PROBE_DISTANCES : SHORT_STAIR_PROBE_DISTANCES,
     tryLateralProbes: true,
-    lateralOffsets: RAMP_STEP_LATERAL_OFFSETS,
-    compactProbes: true,
+    lateralOffsets: bridgeRampFloorGaps ? RAMP_BRIDGE_LATERAL_OFFSETS : RAMP_STEP_LATERAL_OFFSETS,
+    compactProbes: !bridgeRampFloorGaps,
     slopeFilter: "ramp"
+  };
+  const rampBridgeOptions = {
+    maxRampStepUp,
+    rampFloorBridgeHorizontal,
+    probeDistances: RAMP_BRIDGE_PROBE_DISTANCES,
+    lateralOffsets: RAMP_BRIDGE_LATERAL_OFFSETS
   };
   const stairStepOptions = {
     maxVerticalDelta: maxStairStepUp,
@@ -5418,7 +5731,22 @@ function tryMoveWithCollision(BABYLON, scene, camera, movement, collisionMeshSet
     return centerPose;
   };
   const rejectBlockedMove = (collisionHit, reason) => {
-    if (rampContext && canStepUp && collisionHit && isStairCollisionHit(collisionHit)) {
+    if ((rampContext || bridgeRampFloorGaps) && canStepUp && collisionHit && isStairCollisionHit(collisionHit)) {
+      if (bridgeRampFloorGaps) {
+        const bridgePose = findColRampBridgeStepPose(
+          BABYLON,
+          scene,
+          previousPosition,
+          movement,
+          groundMeshSet,
+          rampBridgeOptions
+        );
+
+        if (bridgePose) {
+          return applyStepUp(BABYLON, camera, movement, bridgePose);
+        }
+      }
+
       const rampStepPose = findStepUpPose(
         BABYLON,
         scene,
@@ -5480,7 +5808,22 @@ function tryMoveWithCollision(BABYLON, scene, camera, movement, collisionMeshSet
       }
     }
 
-    if ((rampContext) && canStepUp) {
+    if (bridgeRampFloorGaps && canStepUp) {
+      const bridgePose = findColRampBridgeStepPose(
+        BABYLON,
+        scene,
+        previousPosition,
+        movement,
+        groundMeshSet,
+        rampBridgeOptions
+      );
+
+      if (bridgePose) {
+        return applyStepUp(BABYLON, camera, movement, bridgePose);
+      }
+    }
+
+    if (rampContext && canStepUp) {
       const rampStepPose = findStepUpPose(BABYLON, scene, previousPosition, movement, groundMeshSet, rampStepOptions);
 
       if (rampStepPose) {
@@ -5552,6 +5895,21 @@ function tryMoveWithCollision(BABYLON, scene, camera, movement, collisionMeshSet
 
   if (verticalDelta > maxNormalStepUp) {
     if (canStepUp) {
+      if (bridgeRampFloorGaps) {
+        const bridgePose = findColRampBridgeStepPose(
+          BABYLON,
+          scene,
+          previousPosition,
+          movement,
+          groundMeshSet,
+          rampBridgeOptions
+        );
+
+        if (bridgePose) {
+          return applyStepUp(BABYLON, camera, movement, bridgePose);
+        }
+      }
+
       if (rampContext && verticalDelta <= maxRampStepUp) {
         const rampStepPose = findStepUpPose(BABYLON, scene, previousPosition, movement, groundMeshSet, rampStepOptions);
 
@@ -5774,6 +6132,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
   let jinjuRooftopGuestSpawnToken = 0;
   let jinjuRooftopGuestScheduleRunCount = 0;
   let jinjuIndoorGuestSpawnComplete = false;
+  let jinjuRooftopPendingAfterIndoor = false;
   let jinjuRamp1FHasBeenContacted = false;
   let jinjuOutdoorDisposedForIndoor = false;
   let jinjuIndoorDisposedForRooftop = false;
@@ -6060,6 +6419,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     jinjuRooftopGuestScheduleRunCount = 0;
     jinjuRooftopGuestSpawnToken += 1;
     jinjuIndoorGuestSpawnComplete = false;
+    jinjuRooftopPendingAfterIndoor = false;
     jinjuRamp1FHasBeenContacted = false;
     jinjuOutdoorDisposedForIndoor = false;
     jinjuIndoorDisposedForRooftop = false;
@@ -6083,6 +6443,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     jinjuOutdoorDisposedForIndoor = false;
     jinjuIndoorDisposedForRooftop = false;
     jinjuIndoorGuestSpawnComplete = false;
+    jinjuRooftopPendingAfterIndoor = false;
     jinjuWasOnExternalGroundFloor = false;
     jinjuWasOnRamp1F = false;
     jinjuWasOnRamp2F = false;
@@ -6361,9 +6722,51 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
       return;
     }
 
+    if (!jinjuIndoorGuestSpawnComplete) {
+      console.info("[jinju-rooftop-guest] skip indoor dispose until indoor spawn complete");
+      return;
+    }
+
     guestCharacterSystem?.disposeGuests?.({ onlyIds: getJinjuIndoorGuestIds() });
     jinjuIndoorDisposedForRooftop = true;
     console.info("[jinju-rooftop-guest] indoor guests disposed after R10 reveal");
+  }
+
+  function maybeStartJinjuRooftopGuestSpawn(reason) {
+    if (!walkMode || !isJinjuProjectConfig(activeModelState.config)) {
+      return false;
+    }
+
+    if (!jinjuIndoorGuestSpawnComplete) {
+      jinjuRooftopPendingAfterIndoor = true;
+      console.info(`[jinju-rooftop-guest] deferred (${reason}) until indoor spawn complete`);
+      return false;
+    }
+
+    const rooftopStuck = jinjuRooftopGuestActivationStarted && !hasAnyJinjuRooftopGuests();
+
+    if (jinjuRooftopGuestActivationStarted && !rooftopStuck) {
+      return false;
+    }
+
+    if (rooftopStuck) {
+      console.warn(`[jinju-rooftop-guest] retrying stuck activation (${reason})`);
+      jinjuRooftopGuestActivationStarted = false;
+    }
+
+    jinjuRooftopPendingAfterIndoor = false;
+    jinjuRooftopGuestActivationStarted = true;
+    console.info(`[jinju-rooftop-guest] ramp 2F contact -> starting rooftop guest spawn (${reason})`);
+    void scheduleJinjuRooftopGuestSpawn();
+    return true;
+  }
+
+  function flushPendingJinjuRooftopGuestSpawn(reason = "indoor spawn complete") {
+    if (!jinjuRooftopPendingAfterIndoor && !isJinjuPlayerContactingRamp2F()) {
+      return;
+    }
+
+    maybeStartJinjuRooftopGuestSpawn(reason);
   }
 
   function disposeJinjuOutdoorGuestsForIndoor() {
@@ -6461,16 +6864,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
         cancelJinjuRooftopGuestSpawn("ramp 2F descent -> restoring indoor guests");
         restoreJinjuIndoorGuestsAfterRooftop("ramp 2F descent");
       } else {
-        const rooftopStuck = jinjuRooftopGuestActivationStarted && !hasAnyJinjuRooftopGuests();
-        if (!jinjuRooftopGuestActivationStarted || rooftopStuck) {
-          if (rooftopStuck) {
-            console.warn("[jinju-rooftop-guest] ramp 2F contact -> retrying stuck rooftop activation");
-            jinjuRooftopGuestActivationStarted = false;
-          }
-          jinjuRooftopGuestActivationStarted = true;
-          console.info(`[jinju-rooftop-guest] ramp 2F contact -> starting rooftop guest spawn (${JINJU_ROOFTOP_GUEST_CONFIG_VERSION})`);
-          void scheduleJinjuRooftopGuestSpawn();
-        }
+        maybeStartJinjuRooftopGuestSpawn(JINJU_ROOFTOP_GUEST_CONFIG_VERSION);
       }
     }
 
@@ -6830,6 +7224,13 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
         jinjuRooftopGuestActivationStarted = false;
         return;
       }
+
+      if (!jinjuIndoorGuestSpawnComplete) {
+        jinjuRooftopPendingAfterIndoor = true;
+        jinjuRooftopGuestActivationStarted = false;
+        console.info("[jinju-rooftop-guest] walk spawn blocked until indoor guests finish loading");
+        return;
+      }
     } else if (!allowInOrbit) {
       return;
     }
@@ -6899,8 +7300,10 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
 
         const markNumber = getJinjuRooftopMarkFromSpawnId(spawn.id);
 
-        if (walkMode && markNumber === 10) {
+        if (walkMode && markNumber === 10 && jinjuIndoorGuestSpawnComplete) {
           disposeJinjuIndoorGuestsForRooftop();
+        } else if (walkMode && markNumber === 10) {
+          console.info("[jinju-rooftop-guest] skip indoor dispose at R10 (indoor spawn still loading)");
         }
 
         const delayMs = getJinjuRooftopGuestRevealDelayMs(spawn.id);
@@ -7010,6 +7413,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
         jinjuIndoorGuestSpawnRetryAfter = 0;
         jinjuIndoorGuestSpawnComplete = true;
         disposeJinjuOutdoorGuestsForIndoor();
+        flushPendingJinjuRooftopGuestSpawn("indoor spawn complete");
         console.info(
           `[jinju-indoor-guest] schedule run #${scheduleRunId} complete -> spawn-once latch held (audit: auditJinjuGuestState())`
         );
@@ -7211,6 +7615,13 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     const report = auditAngjiTourElements(walkModelState);
     console.info("[angji-tour-audit]", report?.summary || "no model");
     console.table(report?.summary || {});
+    return report;
+  };
+
+  window.auditColRampFloorConnectivity = () => {
+    const walkModelState = activeModelState.tourModelState || activeModelState;
+    const report = auditColRampFloorConnectivity(BABYLON, walkModelState);
+    console.info("[ramp-connectivity-audit]", report);
     return report;
   };
 
@@ -7986,7 +8397,8 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
       BABYLON,
       scene,
       walkCamera.position,
-      localGroundMeshSet
+      localGroundMeshSet,
+      { maxRampStepUp: getProjectMaxRampStepUp(activeModelState.config) }
     );
 
     return walkFrameLocomotion;
@@ -8001,8 +8413,9 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     }
 
     const discreteStair = isColLayerDiscreteStairConfig(activeModelState.config);
+    const rampSnapTolerance = getProjectMaxRampStepUp(activeModelState.config);
     const stairSnapTolerance = onColRamp
-      ? MAX_RAMP_STEP_UP
+      ? rampSnapTolerance
       : discreteStair
         ? ANGJI_MAX_STAIR_STEP_UP
         : hasColLayerConfig(activeModelState.config)
@@ -8492,6 +8905,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
 
       const colLayer = hasColLayerConfig(activeModelState.config);
       const discreteStair = colLayer && isColLayerDiscreteStairConfig(activeModelState.config);
+      const projectMaxRampStepUp = getProjectMaxRampStepUp(activeModelState.config);
       const probeMovement = direction.clone().scale(moveSpeed);
       const locomotion = colLayer ? getWalkLocomotionState() : null;
       const onColRamp = Boolean(locomotion?.onColRamp);
@@ -8510,7 +8924,11 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
         scene,
         walkCamera.position,
         probeMovement,
-        localGroundMeshSet
+        localGroundMeshSet,
+        {
+          maxRampStepUp: projectMaxRampStepUp,
+          rampFloorBridgeHorizontal: getRampFloorBridgeHorizontal(activeModelState.config)
+        }
       );
       const walkSpeedCap = CONTROLLER_SETTINGS.moveSpeed
         * modelSpeedMultiplier
@@ -8527,11 +8945,13 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
           stairAssistMode: discreteStair && (onColStair || nearColStair) ? "colDiscrete" : "none",
           preferSlopeTransition: true,
           maxStairStepUp: ANGJI_MAX_STAIR_STEP_UP,
-          maxRampStepUp: MAX_RAMP_STEP_UP
+          maxRampStepUp: projectMaxRampStepUp,
+          bridgeRampFloorGaps: hasColRampFloorBridgeConfig(activeModelState.config),
+          rampFloorBridgeHorizontal: getRampFloorBridgeHorizontal(activeModelState.config)
         }
         : {};
-      const useColSubsteps = discreteStair
-        && onColStair
+      const useColSubsteps = colLayer
+        && (onColStair || onColRamp || nearColRamp)
         && appliedMovement.length() > MOVE_COLLISION_SUBSTEP_STAIR;
       const moveResult = useColSubsteps
         ? tryMoveWithCollisionSubsteps(
@@ -11230,6 +11650,86 @@ function setModelStateEnabled(modelState, enabled) {
   setHistoryDisplayBoardsEnabled(modelState.historyDisplays, enabled);
 }
 
+function setOrbitVisualMeshesVisible(orbitModelState, visible) {
+  (orbitModelState?.meshes || []).forEach((mesh) => {
+    if (mesh.metadata?.angjiCollisionLayer) {
+      return;
+    }
+
+    if (visible) {
+      const stored = mesh.metadata?.orbitVisualStored;
+      mesh.isVisible = stored?.isVisible ?? true;
+      mesh.visibility = typeof stored?.visibility === "number" ? stored.visibility : 1;
+      if (mesh.metadata?.orbitVisualStored) {
+        const nextMeta = { ...mesh.metadata };
+        delete nextMeta.orbitVisualStored;
+        mesh.metadata = nextMeta;
+      }
+      return;
+    }
+
+    if (!mesh.metadata?.orbitVisualStored) {
+      mesh.metadata = {
+        ...(mesh.metadata || {}),
+        orbitVisualStored: {
+          isVisible: mesh.isVisible !== false,
+          visibility: typeof mesh.visibility === "number" ? mesh.visibility : 1
+        }
+      };
+    }
+
+    mesh.isVisible = false;
+    mesh.visibility = 0;
+  });
+}
+
+function setOrbitCollisionCompanionMode(orbitModelState, active) {
+  if (!orbitModelState?.model?.root) {
+    return;
+  }
+
+  orbitModelState.model.root.setEnabled(true);
+  setOrbitVisualMeshesVisible(orbitModelState, !active);
+  setHistoryDisplayBoardsEnabled(orbitModelState.historyDisplays, !active);
+}
+
+function linkTourCollisionFromOrbit(tourModelState, orbitModelState) {
+  if (!tourModelState?.config?.tourUseOrbitCollision || !orbitModelState) {
+    return;
+  }
+
+  if ((orbitModelState.collisionMeshes || []).length === 0) {
+    console.warn("[collision] Chungju orbit model has no 0_COL_* meshes for tour inheritance.");
+    return;
+  }
+
+  if ((tourModelState.collisionMeshes || []).length > 0) {
+    return;
+  }
+
+  tourModelState.collisionMeshes = orbitModelState.collisionMeshes;
+  tourModelState.walkableGroundMeshes = orbitModelState.walkableGroundMeshes;
+  tourModelState.rampSurfaceMeshes = orbitModelState.rampSurfaceMeshes;
+  tourModelState.stairSurfaceMeshes = orbitModelState.stairSurfaceMeshes;
+  tourModelState.floorSurfaceMeshes = orbitModelState.floorSurfaceMeshes;
+  tourModelState.angjiBuildingFloor1Meshes = orbitModelState.angjiBuildingFloor1Meshes;
+  tourModelState.angjiBuildingFloor2Meshes = orbitModelState.angjiBuildingFloor2Meshes;
+  tourModelState.angjiBuildingFloor3Meshes = orbitModelState.angjiBuildingFloor3Meshes;
+  tourModelState.angjiExternalFloorMeshes = orbitModelState.angjiExternalFloorMeshes;
+  tourModelState.projectileHitMeshes = [
+    ...(tourModelState.projectileHitMeshes || []),
+    ...orbitModelState.collisionMeshes
+  ];
+  tourModelState.collisionInheritedFromOrbit = true;
+  tourModelState.angjiCollisionLayerCount = orbitModelState.angjiCollisionLayerCount;
+  tourModelState.usedCollisionFallback = false;
+
+  console.info(
+    `[collision] ${tourModelState.config.label} tour inherits orbit collision `
+    + `(meshes=${orbitModelState.collisionMeshes.length})`
+  );
+}
+
 function formatSunTime(value) {
   const hour = Math.floor(value);
   const minutes = Math.round((value - hour) * 60);
@@ -11480,7 +11980,6 @@ async function loadTourModelState(BABYLON, scene, config) {
   await processTourMeshesInChunks(meshes, (mesh) => {
     getCachedMeshBounds(BABYLON, mesh);
 
-    const furniture = isChungjuProjectConfig(config) && isFurnitureMesh(mesh);
     const propPassThrough = isTourPropMesh(mesh);
     const angjiCollisionLayer = hasColLayer && hasAngjiCollisionMaterial(mesh);
     const angjiFurnitureSurface = hasColLayer && hasAngjiFurnitureMaterial(mesh);
@@ -11511,15 +12010,11 @@ async function loadTourModelState(BABYLON, scene, config) {
       || angjiBuildingFloor1Surface
       || angjiBuildingFloor2Surface
       || angjiBuildingFloor3Surface;
-    const passThrough = hasColLayer ? !angjiCollisionLayer : (propPassThrough || furniture);
+    const passThrough = hasColLayer ? !angjiCollisionLayer : propPassThrough;
     const peopleTarget = isPeopleFireballTarget(mesh, performanceSettings);
 
     if (propPassThrough || (hasColLayer && passThrough)) {
       propPassThroughCount += 1;
-    }
-
-    if (furniture) {
-      furniturePassThroughCount += 1;
     }
 
     if (peopleTarget && mesh.isEnabled()) {
@@ -11532,7 +12027,7 @@ async function loadTourModelState(BABYLON, scene, config) {
       ...(mesh.metadata || {}),
       passThrough,
       peopleTarget,
-      furniture: furniture || angjiFurnitureSurface,
+      furniture: angjiFurnitureSurface,
       tourProp: propPassThrough,
       angjiCollisionLayer,
       angjiCollisionRole: hasColLayer ? getAngjiCollisionMaterialRole(mesh) : null,
@@ -11741,6 +12236,14 @@ async function loadTourModelState(BABYLON, scene, config) {
     );
   }
 
+  if (hasColLayer) {
+    auditColRampFloorConnectivity(BABYLON, {
+      config,
+      meshes,
+      model
+    });
+  }
+
   if (!hasColLayer && collisionMeshes.length > 500) {
     console.warn(
       `[collision] ${config.label}: non-colLayer path is using ${collisionMeshes.length} collision meshes (heavy).`
@@ -11864,6 +12367,7 @@ async function start() {
     reportModelLoadProgress(completedModelLoadSteps, modelLoadSteps);
     orbitModelState.tourModelState = tourModelState;
     tourModelState.orbitModelState = orbitModelState;
+    linkTourCollisionFromOrbit(tourModelState, orbitModelState);
 
     return orbitModelState;
   }));
@@ -11921,11 +12425,26 @@ async function start() {
 
   function showActiveModelState(nextModelState, previousModelState) {
     if (previousModelState && previousModelState !== nextModelState) {
-      setModelStateEnabled(previousModelState, false);
+      if (previousModelState.collisionInheritedFromOrbit && previousModelState.orbitModelState) {
+        setOrbitCollisionCompanionMode(previousModelState.orbitModelState, false);
+      }
+
+      const keepOrbitForTourCollision = (
+        nextModelState.collisionInheritedFromOrbit
+        && previousModelState === nextModelState.orbitModelState
+      );
+
+      if (!keepOrbitForTourCollision) {
+        setModelStateEnabled(previousModelState, false);
+      }
     }
 
     setModelSlideOffset(BABYLON, nextModelState, 0);
     setModelStateEnabled(nextModelState, true);
+
+    if (nextModelState.collisionInheritedFromOrbit && nextModelState.orbitModelState) {
+      setOrbitCollisionCompanionMode(nextModelState.orbitModelState, true);
+    }
     displayedModelState = nextModelState;
     const orbitModelState = nextModelState.orbitModelState || nextModelState;
     applyOrbitCameraStart(BABYLON, orbitCamera, orbitModelState);

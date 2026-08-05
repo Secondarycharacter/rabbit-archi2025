@@ -214,14 +214,21 @@ function fitLocalFaceWorldLandscape(BABYLON, sourceMesh, bounds, aspectWidth, as
   };
 }
 
-function findDisplayBoardMeshes(meshes, materialName) {
+function findDisplayBoardMeshes(meshes, materialName, board = {}) {
   const target = normalizeMaterialName(materialName);
+  const meshName = board?.meshName ? normalizeMaterialName(board.meshName) : null;
 
-  return (meshes || []).filter((mesh) => (
-    mesh
-    && mesh.isEnabled?.() !== false
-    && getMeshMaterialNames(mesh).some((name) => normalizeMaterialName(name) === target)
-  ));
+  return (meshes || []).filter((mesh) => {
+    if (!mesh || mesh.isEnabled?.() === false) {
+      return false;
+    }
+
+    if (meshName && normalizeMaterialName(mesh.name || "") !== meshName) {
+      return false;
+    }
+
+    return getMeshMaterialNames(mesh).some((name) => normalizeMaterialName(name) === target);
+  });
 }
 
 function makeDisplaySourceTransparent(BABYLON, sourceMesh) {
@@ -788,7 +795,8 @@ function attachModalBoard(BABYLON, scene, modelState, sourceMesh, board, url, oc
     scene,
     false
   );
-  paintHistoryPreviewTexture(dynamicTexture);
+  const orientation = getBoardContentOrientation(board);
+  paintHistoryPreviewTexture(dynamicTexture, orientation);
 
   const material = new BABYLON.StandardMaterial(`history-board-mat-${sourceMesh.uniqueId}`, scene);
   material.diffuseTexture = dynamicTexture;
@@ -967,8 +975,14 @@ function attachEmbedBoard(BABYLON, scene, modelState, sourceMesh, board, url, oc
     surfaceOffset: typeof board.surfaceOffset === "number" ? board.surfaceOffset : null
   });
   const orientation = getBoardContentOrientation(board);
+  const maxEmbedWorld = typeof board.embedMaxWorldSize === "number" ? board.embedMaxWorldSize : 400;
 
-  if (!pose || pose.worldWidth > 40 || pose.worldHeight > 40) {
+  if (!pose || pose.worldWidth > maxEmbedWorld || pose.worldHeight > maxEmbedWorld) {
+    console.warn(
+      `[display-board] embed skipped ${sourceMesh.name}: `
+      + `${pose?.worldWidth?.toFixed(1) ?? "?"}x${pose?.worldHeight?.toFixed(1) ?? "?"} `
+      + `(limit ${maxEmbedWorld})`
+    );
     return null;
   }
 
@@ -1216,7 +1230,7 @@ export function attachHistoryDisplayBoards(BABYLON, scene, modelState) {
     const url = resolveHistoryDisplayUrl(board.url, {
       embed: interactionMode === "embed"
     });
-    const sourceMeshes = findDisplayBoardMeshes(modelState.meshes, materialName);
+    const sourceMeshes = findDisplayBoardMeshes(modelState.meshes, materialName, board);
 
     if (!sourceMeshes.length) {
       console.warn(`[display-board] No meshes found for material ${materialName}`);
