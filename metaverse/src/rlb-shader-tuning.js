@@ -10,6 +10,7 @@ import {
   RLB_TUNING_TYPE_ORDER,
   resolveRlbSpillShapeCode
 } from "./rlb-fixture-types.js";
+import { RLB_ANGJI_NIGHT_PRESET } from "./rlb-angji-night-preset.js?v=rlb-shader-proximity-20260819-group-v47";
 
 export const RLB_TUNING_STORAGE_KEY = "angji-rlb-shader-tuning-v9";
 const RLB_TUNING_STORAGE_FALLBACK_KEYS = [
@@ -537,6 +538,37 @@ function mergeTuningState(saved) {
   return merged;
 }
 
+function isRlbLocalDevHost() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  const host = window.location.hostname;
+
+  if (!host || host === "localhost" || host === "127.0.0.1") {
+    return true;
+  }
+
+  const devParam = new URLSearchParams(window.location.search).get("dev");
+  return devParam === "1" || devParam === "true";
+}
+
+function bakedNightPresetState() {
+  return mergeTuningState(RLB_ANGJI_NIGHT_PRESET);
+}
+
+function maybeCaptureLocalTuningPreset(raw) {
+  if (!isRlbLocalDevHost() || !raw || typeof fetch !== "function") {
+    return;
+  }
+
+  fetch("http://127.0.0.1:8766/rlb-preset", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: raw
+  }).catch(() => {});
+}
+
 function readStoredTuningRaw() {
   const primary = localStorage.getItem(RLB_TUNING_STORAGE_KEY);
 
@@ -558,16 +590,21 @@ function readStoredTuningRaw() {
 
 export function loadRlbTuningState() {
   if (typeof window === "undefined") {
-    return createDefaultRlbTuningState();
+    return bakedNightPresetState();
+  }
+
+  if (!isRlbLocalDevHost()) {
+    return bakedNightPresetState();
   }
 
   try {
     const stored = readStoredTuningRaw();
 
     if (!stored.raw) {
-      return createDefaultRlbTuningState();
+      return bakedNightPresetState();
     }
 
+    maybeCaptureLocalTuningPreset(stored.raw);
     const merged = mergeTuningState(JSON.parse(stored.raw));
 
     if (stored.source && stored.source !== RLB_TUNING_STORAGE_KEY) {
@@ -577,8 +614,8 @@ export function loadRlbTuningState() {
 
     return merged;
   } catch (error) {
-    console.warn("[rlb-tune] load failed, using defaults:", error);
-    return createDefaultRlbTuningState();
+    console.warn("[rlb-tune] load failed, using baked night preset:", error);
+    return bakedNightPresetState();
   }
 }
 
@@ -588,7 +625,9 @@ export function saveRlbTuningState(state) {
   }
 
   try {
-    localStorage.setItem(RLB_TUNING_STORAGE_KEY, JSON.stringify(state));
+    const raw = JSON.stringify(state);
+    localStorage.setItem(RLB_TUNING_STORAGE_KEY, raw);
+    maybeCaptureLocalTuningPreset(raw);
     return true;
   } catch (error) {
     console.warn("[rlb-tune] save failed:", error);
