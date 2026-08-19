@@ -1,4 +1,4 @@
-import { FIREBASE_CONFIG, OVERVIEW_ADMIN_PASSCODE } from "./firebase-config.js?v=tps-jump-nocol-20260629";
+﻿import { FIREBASE_CONFIG, OVERVIEW_ADMIN_PASSCODE } from "./firebase-config.js?v=tps-jump-nocol-20260629";
 import { createTpsSystem } from "./controllers/createTpsSystem.js?v=jump-nocol-windup-20260725";
 import {
   CONTROLLER_SETTINGS,
@@ -77,7 +77,53 @@ import {
   getJinjuRooftopSequentialGuestSpawns
 } from "./jinju-rooftop-guest-config.js?v=jinju-rooftop-marie-sit-clips-20260705";
 import { createGuestCharacterSystem, shouldSnapPatrolFloorAtTarget } from "./guest-character-system.js?v=angji-night-marie-extra-20260719";
-import { applyLocalDevToolsVisibility, isLocalDevEnvironment } from "./local-dev.js?v=local-dev-20260629";
+import { applyLocalDevToolsVisibility, isLocalDevEnvironment } from "./local-dev.js?v=local-dev-20260819";
+import { setupAngjiRlbProximityGlow, shouldSkipMaterialFreeze } from "./rlb-proximity-glow.js?v=rlb-shader-proximity-20260819-group-v46";
+
+async function setupLocalRlbShaderTuningPanel(options = {}) {
+  if (!isLocalDevEnvironment()) {
+    return null;
+  }
+
+  try {
+    const { createRlbShaderTuningPanel } = await import(
+      "./rlb-shader-tuning-panel.js?v=rlb-shader-proximity-20260819-group-v46"
+    );
+    return createRlbShaderTuningPanel(options);
+  } catch (error) {
+    console.info("[rlb-tune] admin panel not bundled — night lighting uses baked defaults");
+    return null;
+  }
+}
+
+function ensureAngjiRlbProximityGlow(BABYLON, scene, modelState, getCamera) {
+  if (!isAngjiProjectConfig(modelState?.config)) {
+    return null;
+  }
+
+  if (modelState.rlbProximityGlow && !modelState.rlbProximityGlow.isDisposed?.()) {
+    return modelState.rlbProximityGlow;
+  }
+
+  try {
+    modelState.rlbProximityGlow = setupAngjiRlbProximityGlow(
+      BABYLON,
+      scene,
+      {
+        meshes: modelState.meshes,
+        model: modelState.model,
+        config: modelState.config
+      },
+      { getCamera }
+    );
+    console.log("[rlb-glow] re-created proximity glow for Angji model state");
+  } catch (error) {
+    console.error("[rlb-glow] re-setup failed:", error);
+    modelState.rlbProximityGlow = null;
+  }
+
+  return modelState.rlbProximityGlow;
+}
 
 const MODEL_ROOT = "./assets/models/";
 const DEFAULT_MODEL_CACHE_VERSION = "1";
@@ -135,7 +181,7 @@ const MODEL_CONFIGS = [
   },
   {
     file: "Angji.glb",
-    modelCacheVersion: "20260727-rlb-lights",
+    modelCacheVersion: "20260807-angji-glb",
     label: "앵지",
     overviewId: "angji",
     tourBgm: "angji/angji_tour_bgm.mp3",
@@ -148,7 +194,8 @@ const MODEL_CONFIGS = [
       localGroundRadius: 24,
       localMeshUpdateDistance: 4,
       treeFacingMinMoveDistance: 0.35,
-      treeFacingIntervalFrames: 3
+      treeFacingIntervalFrames: 3,
+      treeFacingInOrbit: true
     },
     displayBoards: [
       {
@@ -168,22 +215,28 @@ const MODEL_CONFIGS = [
       }
     ],
     nightLighting: {
-      // Angji GLB uses RLB_* presets. Night: 2 SpotLights per light type (cull keeps ≤8).
+      // RLB wall/floor uses shader proximity (rlb-proximity-shader-plugin.js), not SpotLights.
       enableDown01: false,
       enableDown02: false,
       enableDown03: false,
       enableDown0: false,
-      enableRlbPresetLights: true,
-      lightsPerType: 2,
-      maxSimultaneousLights: 8,
-      maxActiveSpotLights: 8,
+      enableRlbPresetLights: false,
+      maxSimultaneousLights: 4,
+      maxActiveSpotLights: 4,
       spotLightCullIntervalFrames: 3,
       spotLightCullRadius: 55,
       lightIncludeRadius: 16,
-      rlbDefaultIntensity: 22,
-      rlbDefaultRange: 12,
-      rlbDefaultAngleDegrees: 110,
       flareOcclusionIntervalFrames: 6
+    },
+    rlbProximityGlow: {
+      emissiveOnAllFixtures: true,
+      useShaderProximity: true,
+      useOverlayFallback: false,
+      shaderPriorityOnly: true,
+      shaderMaxLights: 320,
+      spillOcclusion: true,
+      activeOnlyAtNight: true,
+      logShaderMaterialNames: false
     },
     orbitCamera: {
       position: { x: -143.86, y: 53.30, z: 6.29 },
@@ -515,6 +568,29 @@ const ORBIT_MOUSE_CONTROL_SETTINGS = {
   shiftMiddlePanMultiplier: 1,
   zoomToMouseLocation: true
 };
+// ArcRotateCamera zoom-to-cursor runs scene.pick every wheel tick — dense interior
+// geometry freezes the main thread when the camera is close.
+const ORBIT_CLOSE_ZOOM_PICK_RADIUS = 12;
+
+function resolveOrbitZoomToMouseLocation(orbitCamera, isNight) {
+  if (!orbitCamera || isNight) {
+    return false;
+  }
+
+  if (orbitCamera.radius <= ORBIT_CLOSE_ZOOM_PICK_RADIUS) {
+    return false;
+  }
+
+  return ORBIT_MOUSE_CONTROL_SETTINGS.zoomToMouseLocation;
+}
+
+function applyOrbitZoomPickPolicy(orbitCamera, isNight) {
+  if (!orbitCamera) {
+    return;
+  }
+
+  orbitCamera.zoomToMouseLocation = resolveOrbitZoomToMouseLocation(orbitCamera, isNight);
+}
 const DEFAULT_TOUR_CAMERA = {
   position: { x: 36.59, y: 2.02, z: 9.59 },
   target: { x: 26.94, y: 4.55, z: 8.86 }
@@ -528,7 +604,9 @@ const FIREBALL_SETTINGS = {
   spawnDistance: 0.8,
   maxDistance: 80,
   hitFadeMs: 850,
-  hitRotationRadians: Math.PI / 2
+  hitRotationRadians: Math.PI / 2,
+  // Off: ray hits (walls/people/NPC proximity) were stopping projectiles mid-flight.
+  collisionEnabled: false
 };
 const MATERIAL_REFLECTION_SETTINGS = {
   specularIntensity: 0,
@@ -2598,9 +2676,11 @@ function getPerformanceSettings(config) {
 
 function freezeSceneMaterials(materials) {
   materials.forEach((material) => {
-    if (material && typeof material.freeze === "function") {
-      material.freeze();
+    if (!material || typeof material.freeze !== "function" || shouldSkipMaterialFreeze(material)) {
+      return;
     }
+
+    material.freeze();
   });
 }
 
@@ -3233,6 +3313,169 @@ function expandMergedDtvTreeMeshes(BABYLON, scene, treeMeshes, allMeshes) {
   }
 
   return expanded;
+}
+
+/**
+ * People cards: pivot at geometry foot (bbox), not node origin — avoids
+ * multi-card blocks looking like they split when yawing toward the camera.
+ */
+function getPeopleYawPivotWorldPosition(BABYLON, mesh) {
+  mesh.computeWorldMatrix(true);
+  mesh.refreshBoundingInfo?.(true, true);
+  const bounds = mesh.getBoundingInfo?.()?.boundingBox;
+
+  if (!bounds) {
+    return mesh.getAbsolutePosition().clone();
+  }
+
+  const centerWorld = bounds.centerWorld;
+  const minWorld = bounds.minimumWorld;
+  return new BABYLON.Vector3(centerWorld.x, minWorld.y, centerWorld.z);
+}
+
+function getPeopleBlockYawPivotWorldPosition(BABYLON, meshes) {
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let minZ = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxZ = Number.NEGATIVE_INFINITY;
+  let found = false;
+
+  meshes.forEach((mesh) => {
+    mesh.computeWorldMatrix(true);
+    mesh.refreshBoundingInfo?.(true, true);
+    const bounds = mesh.getBoundingInfo?.()?.boundingBox;
+
+    if (!bounds) {
+      return;
+    }
+
+    found = true;
+    minX = Math.min(minX, bounds.minimumWorld.x);
+    minY = Math.min(minY, bounds.minimumWorld.y);
+    minZ = Math.min(minZ, bounds.minimumWorld.z);
+    maxX = Math.max(maxX, bounds.maximumWorld.x);
+    maxZ = Math.max(maxZ, bounds.maximumWorld.z);
+  });
+
+  if (!found) {
+    return meshes[0]?.getAbsolutePosition?.()?.clone?.() || BABYLON.Vector3.Zero();
+  }
+
+  return new BABYLON.Vector3((minX + maxX) * 0.5, minY, (minZ + maxZ) * 0.5);
+}
+
+/**
+ * Group People cards that should yaw as one block (GLB sibling nodes, or
+ * fireball-split components from the same source mesh).
+ */
+function collectPeopleYawBlockGroups(peopleYawMeshes) {
+  const assigned = new Set();
+  const groups = [];
+
+  // Fireball split components from one welded mesh -> one block.
+  const splitBySource = new Map();
+  peopleYawMeshes.forEach((mesh) => {
+    const sourceId = mesh.metadata?.fireballSourceMeshId;
+
+    if (!mesh.metadata?.fireballSplitComponent || sourceId == null) {
+      return;
+    }
+
+    if (!splitBySource.has(sourceId)) {
+      splitBySource.set(sourceId, []);
+    }
+
+    splitBySource.get(sourceId).push(mesh);
+  });
+
+  splitBySource.forEach((groupMeshes) => {
+    groups.push(groupMeshes);
+    groupMeshes.forEach((mesh) => assigned.add(mesh.uniqueId));
+  });
+
+  // GLB parent with 2+ People siblings (Angji exports blocks this way).
+  const byParent = new Map();
+  peopleYawMeshes.forEach((mesh) => {
+    if (assigned.has(mesh.uniqueId)) {
+      return;
+    }
+
+    const parentKey = mesh.parent?.uniqueId ?? `root:${mesh.uniqueId}`;
+    if (!byParent.has(parentKey)) {
+      byParent.set(parentKey, []);
+    }
+
+    byParent.get(parentKey).push(mesh);
+  });
+
+  byParent.forEach((groupMeshes) => {
+    if (groupMeshes.length > 1) {
+      groups.push(groupMeshes);
+      groupMeshes.forEach((mesh) => assigned.add(mesh.uniqueId));
+      return;
+    }
+
+    groups.push(groupMeshes);
+    assigned.add(groupMeshes[0].uniqueId);
+  });
+
+  return groups;
+}
+
+function attachPeopleBlockYawPivot(BABYLON, scene, groupMeshes, modelRoot) {
+  if (!groupMeshes.length) {
+    return null;
+  }
+
+  const isBlock = groupMeshes.length > 1;
+  const leader = groupMeshes.reduce((best, mesh) => {
+    if (!best) {
+      return mesh;
+    }
+
+    const bestBounds = getLocalVertexBounds(BABYLON, best);
+    const meshBounds = getLocalVertexBounds(BABYLON, mesh);
+    const bestSize = bestBounds
+      ? (bestBounds.max.x - bestBounds.min.x) * (bestBounds.max.z - bestBounds.min.z)
+      : 0;
+    const meshSize = meshBounds
+      ? (meshBounds.max.x - meshBounds.min.x) * (meshBounds.max.z - meshBounds.min.z)
+      : 0;
+
+    return meshSize > bestSize ? mesh : best;
+  }, null);
+
+  modelRoot.computeWorldMatrix(true);
+  const worldPos = isBlock
+    ? getPeopleBlockYawPivotWorldPosition(BABYLON, groupMeshes)
+    : getPeopleYawPivotWorldPosition(BABYLON, leader);
+  const rootWorldInverse = modelRoot.getWorldMatrix().clone();
+  rootWorldInverse.invert();
+  const localPos = BABYLON.Vector3.TransformCoordinates(worldPos, rootWorldInverse);
+  const pivotId = isBlock
+    ? `people-block-yaw-${groupMeshes.map((mesh) => mesh.uniqueId).join("-")}`
+    : `people-yaw-pivot-${leader.uniqueId}`;
+  const pivot = new BABYLON.TransformNode(pivotId, scene);
+  pivot.parent = modelRoot;
+  pivot.position.copyFrom(localPos);
+  pivot.rotation.set(0, 0, 0);
+  pivot.rotationQuaternion = null;
+
+  groupMeshes.forEach((mesh) => {
+    mesh.billboardMode = 0;
+    mesh.computeWorldMatrix(true);
+    mesh.setParent(pivot, true);
+    mesh.computeWorldMatrix(true);
+    mesh.metadata = {
+      ...(mesh.metadata || {}),
+      treeYawPivot: pivot,
+      peopleYawBlock: isBlock,
+      treeFaceYawOffset: getTreeMeshFaceYawOffset(BABYLON, leader)
+    };
+  });
+
+  return pivot;
 }
 
 /**
@@ -7915,12 +8158,6 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
       return;
     }
 
-    // Night orbit zoom already stresses GPU; yaw-pivoting every DTV/people card
-    // each wheel tick freezes the main thread.
-    if (!walkMode && options.getIsAngjiNightMode?.()) {
-      return;
-    }
-
     // Face the rendering camera (TPS cam in tour), not the character eye/root.
     const viewerPosition = walkMode
       ? (tpsCamera?.position || scene.activeCamera?.position || walkCamera.position)
@@ -7942,9 +8179,20 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
       lastTreeViewerPosition = viewerPosition.clone();
     }
 
+    const rotatedYawPivots = new Set();
     activeTreeMeshes.forEach((mesh) => {
       if (!mesh.isEnabled() || (typeof mesh.visibility === "number" && mesh.visibility <= 0.02)) {
         return;
+      }
+
+      const pivot = mesh.metadata?.treeYawPivot;
+
+      if (pivot && rotatedYawPivots.has(pivot.uniqueId)) {
+        return;
+      }
+
+      if (pivot) {
+        rotatedYawPivots.add(pivot.uniqueId);
       }
 
       faceTreeMeshTowardPlayer(BABYLON, mesh, viewerPosition);
@@ -7967,9 +8215,19 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     lastTreeViewerPosition = null;
     treeFacingFrameCounter = 0;
     const previousConfig = activeModelState?.config;
+    const previousModelState = activeModelState;
+    if (previousModelState && previousModelState !== nextModelState) {
+      previousModelState.rlbProximityGlow?.dispose?.();
+    }
     resetGuestProjectOnSwitch(previousConfig, nextModelState.config);
 
     activeModelState = nextModelState;
+    ensureAngjiRlbProximityGlow(
+      BABYLON,
+      scene,
+      nextModelState,
+      () => scene.activeCamera || orbitCamera
+    );
     preloadProjectGuests();
     setColMeshesPickableForMode(walkMode);
 
@@ -8081,6 +8339,10 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
   }
 
   function isFireballHitMesh(mesh) {
+    if (isTourGuestMesh(mesh)) {
+      return false;
+    }
+
     return projectileHitMeshSet.has(mesh)
       && mesh.isPickable
       && mesh.isEnabled()
@@ -8123,36 +8385,39 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     for (let index = fireballs.length - 1; index >= 0; index -= 1) {
       const fireball = fireballs[index];
       const stepDistance = FIREBALL_SETTINGS.speed * deltaScale;
-      const ray = new BABYLON.Ray(fireball.mesh.position, fireball.direction, stepDistance + FIREBALL_SETTINGS.radius);
-      // First hit only -> multiPick against the building mesh set was a frame hitch.
-      const picked = scene.pickWithRay(ray, isFireballHitMesh);
-      const hit = picked?.hit && picked.pickedMesh && picked.pickedPoint ? picked : null;
-      const enemyHitDistance = getEnemyHitDistance(fireball.mesh.position, fireball.direction, stepDistance + FIREBALL_SETTINGS.radius);
-      const meshHitDistance = typeof hit?.distance === "number" ? hit.distance : Number.POSITIVE_INFINITY;
 
-      if (enemyHitDistance !== null && enemyHitDistance <= meshHitDistance) {
-        damageEnemy();
-        inputDiagnostics.lastFireball = `enemy hit:${enemyState.hp}/${ENEMY_SETTINGS.maxHp}`;
-        setStatus(enemyState.hp > 0 ? `Enemy hit. HP ${enemyState.hp}/${ENEMY_SETTINGS.maxHp}.` : "Enemy defeated.");
-        disposeFireballProjectile(fireball);
-        fireballs.splice(index, 1);
-        continue;
-      }
+      if (FIREBALL_SETTINGS.collisionEnabled) {
+        const ray = new BABYLON.Ray(fireball.mesh.position, fireball.direction, stepDistance + FIREBALL_SETTINGS.radius);
+        // First hit only -> multiPick against the building mesh set was a frame hitch.
+        const picked = scene.pickWithRay(ray, isFireballHitMesh);
+        const hit = picked?.hit && picked.pickedMesh && picked.pickedPoint ? picked : null;
+        const enemyHitDistance = getEnemyHitDistance(fireball.mesh.position, fireball.direction, stepDistance + FIREBALL_SETTINGS.radius);
+        const meshHitDistance = typeof hit?.distance === "number" ? hit.distance : Number.POSITIVE_INFINITY;
 
-      if (hit) {
-        const targetName = hit.pickedMesh.name || hit.pickedMesh.id || "mesh";
-
-        if (isPeopleFireballTarget(hit.pickedMesh, getPerformanceSettings(getActiveModelState()?.config))) {
-          animatePeopleFireballHit(BABYLON, scene, hit.pickedMesh);
-          inputDiagnostics.lastFireball = `people hit:${targetName}`;
-          setStatus("People target hit. The target is fading out.");
-        } else {
-          inputDiagnostics.lastFireball = `impact:${targetName}`;
+        if (enemyHitDistance !== null && enemyHitDistance <= meshHitDistance) {
+          damageEnemy();
+          inputDiagnostics.lastFireball = `enemy hit:${enemyState.hp}/${ENEMY_SETTINGS.maxHp}`;
+          setStatus(enemyState.hp > 0 ? `Enemy hit. HP ${enemyState.hp}/${ENEMY_SETTINGS.maxHp}.` : "Enemy defeated.");
+          disposeFireballProjectile(fireball);
+          fireballs.splice(index, 1);
+          continue;
         }
 
-        disposeFireballProjectile(fireball);
-        fireballs.splice(index, 1);
-        continue;
+        if (hit) {
+          const targetName = hit.pickedMesh.name || hit.pickedMesh.id || "mesh";
+
+          if (isPeopleFireballTarget(hit.pickedMesh, getPerformanceSettings(getActiveModelState()?.config))) {
+            animatePeopleFireballHit(BABYLON, scene, hit.pickedMesh);
+            inputDiagnostics.lastFireball = `people hit:${targetName}`;
+            setStatus("People target hit. The target is fading out.");
+          } else {
+            inputDiagnostics.lastFireball = `impact:${targetName}`;
+          }
+
+          disposeFireballProjectile(fireball);
+          fireballs.splice(index, 1);
+          continue;
+        }
       }
 
       fireball.mesh.position.addInPlace(fireball.direction.scale(stepDistance));
@@ -8738,9 +9003,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     // Restore the project's initial orbit framing after leaving tour.
     applyOrbitCameraStart(BABYLON, orbitCamera, orbitModelState);
     applyOrbitCameraConstraints(BABYLON, orbitCamera, orbitModelState);
-    if (options.getIsAngjiNightMode?.()) {
-      orbitCamera.zoomToMouseLocation = false;
-    }
+    applyOrbitZoomPickPolicy(orbitCamera, options.getIsAngjiNightMode?.());
     floorLabel.textContent = "Orbit View";
     currentLabel = "orbit view";
     setStatus("Orbit view ready. Middle mouse rotates, Shift+middle pans, wheel zooms to cursor. Use Tour Mode to enter walk mode.");
@@ -8863,6 +9126,10 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
   });
 
   scene.onBeforeRenderObservable.add(() => {
+    if (!walkMode) {
+      applyOrbitZoomPickPolicy(orbitCamera, options.getIsAngjiNightMode?.());
+    }
+
     updateTreeMeshesFacingViewer();
 
     if (!walkMode) {
@@ -9216,18 +9483,7 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
   }
 
   function applyNightOrbitZoomPolicy(isNight) {
-    const orbitCamera = getOrbitCamera();
-
-    if (!orbitCamera) {
-      return;
-    }
-
-    // Night close-zoom: picking against dense geometry freezes the frame.
-    // Keep day orbit zoom-to-cursor; night uses center zoom.
-    orbitCamera.zoomToMouseLocation = isNight
-      ? false
-      : ORBIT_MOUSE_CONTROL_SETTINGS.zoomToMouseLocation;
-
+    applyOrbitZoomPickPolicy(getOrbitCamera(), isNight);
     document.body.classList.toggle("is-night-mode", Boolean(isNight));
   }
 
@@ -10212,39 +10468,112 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
     return true;
   }
 
+  function softDeactivateRlbFixture(fixture) {
+    if (!fixture) {
+      return;
+    }
+
+    fixture.active = false;
+
+    if (fixture.light) {
+      fixture.light.metadata = { ...(fixture.light.metadata || {}), nightRotationActive: false };
+      fixture.light.setEnabled(false);
+    }
+
+    if (fixture.materialOverride && fixture.mesh && !fixture.mesh.isDisposed?.()) {
+      try {
+        fixture.mesh.material = fixture.materialOverride.originalMaterial;
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  function softActivateRlbFixture(fixture, nightLighting = {}) {
+    if (!fixture?.center || fixture.mesh?.isDisposed?.()) {
+      return;
+    }
+
+    const type = fixture.rlbType || String(fixture.group || "").replace(/^rlb_/, "");
+
+    if (!type) {
+      return;
+    }
+
+    if (!fixture.instantiated) {
+      instantiateRlbPresetFixture(fixture, type, nightLighting);
+      return;
+    }
+
+    fixture.active = true;
+
+    if (fixture.light) {
+      assignSpotLightReceivers(fixture.light, fixture.center);
+      fixture.light.metadata = {
+        ...(fixture.light.metadata || {}),
+        nightRotationActive: true,
+        nightNoReceivers: false
+      };
+      fixture.light.setEnabled(true);
+    }
+
+    if (fixture.materialOverride && fixture.mesh && !fixture.mesh.isDisposed?.()) {
+      try {
+        fixture.mesh.material = fixture.materialOverride.clonedMaterial;
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  function activateNearestRlbFixtures(maxCount, nightLighting = {}) {
+    const camera = scene.activeCamera;
+
+    if (!camera?.position) {
+      return 0;
+    }
+
+    const rlbFixtures = downlight02Fixtures.filter((fixture) => (
+      fixture.group?.startsWith("rlb_") && fixture.center
+    ));
+    const scored = rlbFixtures
+      .map((fixture) => ({
+        fixture,
+        distanceSq: BABYLON.Vector3.DistanceSquared(camera.position, fixture.center)
+      }))
+      .sort((left, right) => left.distanceSq - right.distanceSq);
+    let activated = 0;
+
+    scored.slice(0, Math.max(0, maxCount)).forEach(({ fixture }) => {
+      softActivateRlbFixture(fixture, nightLighting);
+      fixture._softStamp = performance.now();
+      activated += 1;
+    });
+
+    return activated;
+  }
+
   function createRlbPresetTypeLights(modelState, nightLighting = {}) {
     const byType = collectAngjiLightsByPresetType(modelState);
-    const perType = Math.max(
-      1,
-      Math.floor(
-        typeof nightLighting.lightsPerType === "number" ? nightLighting.lightsPerType : 2
-      )
-    );
+    let descriptors = 0;
     const summary = [];
-    let created = 0;
 
     for (const [type, meshes] of byType.entries()) {
-      const picked = pickRandomItems(meshes, Math.min(perType, meshes.length));
-      let typeCreated = 0;
-
-      picked.forEach((mesh) => {
-        const fixture = createFixtureDescriptor(mesh, `rlb_${type}`, created);
+      meshes.forEach((mesh) => {
+        const fixture = createFixtureDescriptor(mesh, `rlb_${type}`, descriptors);
+        fixture.rlbType = type;
         downlight02Fixtures.push(fixture);
-
-        if (instantiateRlbPresetFixture(fixture, type, nightLighting)) {
-          created += 1;
-          typeCreated += 1;
-        }
+        descriptors += 1;
       });
 
-      summary.push(`${type}:${typeCreated}/${meshes.length}`);
+      summary.push(`${type}:${meshes.length}`);
     }
 
     console.info(
-      `[night] RLB preset lights perType=${perType} created=${created}`
+      `[night] RLB preset descriptors=${descriptors} lazy=on`
       + (summary.length ? ` · ${summary.join(" ")}` : " · none found")
     );
-    return { created, byType, summary };
+    return { created: 0, descriptors, byType, summary };
   }
 
   function createDown0WallWashLights(downlight0Meshes, options = {}) {
@@ -10849,21 +11178,21 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
   }
 
   function startNightSpotLightCulling() {
-    if (nightSpotCullObserver || downlightLights.length === 0) {
+    if (nightSpotCullObserver) {
       return;
     }
 
     let cullFrame = 0;
 
     nightSpotCullObserver = scene.onBeforeRenderObservable.add(() => {
-      if (!nightMode || nightAssetsSuspended || downlightLights.length === 0) {
+      if (!nightMode || nightAssetsSuspended) {
         return;
       }
 
       const nightLighting = getActiveModelState()?.config?.nightLighting || {};
       const maxActive = typeof nightLighting.maxActiveSpotLights === "number"
         ? Math.max(1, Math.floor(nightLighting.maxActiveSpotLights))
-        : downlightLights.length;
+        : Number.POSITIVE_INFINITY;
       const interval = Math.max(1, Math.floor(nightLighting.spotLightCullIntervalFrames || 3));
       const cullRadius = typeof nightLighting.spotLightCullRadius === "number"
         ? Math.max(1, nightLighting.spotLightCullRadius)
@@ -10875,9 +11204,52 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
         return;
       }
 
+      const camera = scene.activeCamera;
+
+      if (!camera?.position) {
+        return;
+      }
+
+      const radiusSq = cullRadius * cullRadius;
+      const rlbFixtures = downlight02Fixtures.filter((fixture) => (
+        fixture.group?.startsWith("rlb_") && fixture.center
+      ));
+
+      if (rlbFixtures.length) {
+        const scoredFixtures = rlbFixtures
+          .map((fixture) => ({
+            fixture,
+            distanceSq: BABYLON.Vector3.DistanceSquared(camera.position, fixture.center)
+          }))
+          .sort((left, right) => left.distanceSq - right.distanceSq);
+        let rlbEnabled = 0;
+
+        scoredFixtures.forEach((entry) => {
+          const withinRadius = entry.distanceSq <= radiusSq;
+          const shouldActivate = withinRadius && rlbEnabled < maxActive;
+
+          if (shouldActivate) {
+            softActivateRlbFixture(entry.fixture, nightLighting);
+            entry.fixture._softStamp = performance.now();
+            rlbEnabled += 1;
+            return;
+          }
+
+          softDeactivateRlbFixture(entry.fixture);
+        });
+
+        trimSoftFixtureCache(rlbFixtures, rlbEnabled);
+      }
+
+      const staticLights = downlightLights.filter((light) => !light.metadata?.rlbType);
+
+      if (!staticLights.length) {
+        return;
+      }
+
       // No budget configured -> keep whatever Babylon already has enabled.
-      if (maxActive >= downlightLights.length && !Number.isFinite(cullRadius)) {
-        downlightLights.forEach((light) => {
+      if (maxActive >= staticLights.length + downlightLights.length && !Number.isFinite(cullRadius)) {
+        staticLights.forEach((light) => {
           if (light.metadata?.nightNoReceivers) {
             light.setEnabled(false);
             return;
@@ -10888,13 +11260,7 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
         return;
       }
 
-      const camera = scene.activeCamera;
-
-      if (!camera?.position) {
-        return;
-      }
-
-      const scored = downlightLights.map((light) => {
+      const scored = staticLights.map((light) => {
         const position = light.getAbsolutePosition?.() || light.position;
         const distanceSq = BABYLON.Vector3.DistanceSquared(camera.position, position);
         return { light, distanceSq };
@@ -10902,7 +11268,6 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
 
       scored.sort((left, right) => left.distanceSq - right.distanceSq);
 
-      const radiusSq = cullRadius * cullRadius;
       let enabled = 0;
 
       // Signboard Down0 always keeps a slot when in range — real wall wash must stay on.
@@ -11315,6 +11680,10 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
 
     downlightLights.forEach((light) => {
       try {
+        if (light.metadata?.rlbType) {
+          return;
+        }
+
         if (light.metadata?.nightNoReceivers) {
           light.setEnabled(false);
           return;
@@ -11326,6 +11695,16 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
         // ignore
       }
     });
+
+    const nightLighting = getActiveModelState()?.config?.nightLighting || {};
+    const rlbFixtures = downlight02Fixtures.filter((fixture) => fixture.group?.startsWith("rlb_"));
+
+    if (rlbFixtures.length) {
+      const maxActive = typeof nightLighting.maxActiveSpotLights === "number"
+        ? Math.max(1, Math.floor(nightLighting.maxActiveSpotLights))
+        : 8;
+      activateNearestRlbFixtures(maxActive, nightLighting);
+    }
 
     downlight02Flares.forEach((flare) => {
       try {
@@ -11341,7 +11720,10 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
       startDown02FlareTwinkle();
     }
 
-    if (!nightSpotCullObserver && downlightLights.length) {
+    if (!nightSpotCullObserver && (
+      downlightLights.length
+      || downlight02Fixtures.some((fixture) => fixture.group?.startsWith("rlb_"))
+    )) {
       startNightSpotLightCulling();
     }
   }
@@ -11398,15 +11780,11 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
       console.warn("[night] Down01/02/03 requested but current build keeps them disabled for perf");
     }
 
-    let rlbResult = { created: 0, summary: [] };
+    let rlbResult = { created: 0, descriptors: 0, summary: [] };
     let seedPositions = [];
 
     if (enableRlbPresetLights) {
-      // Create 2 lights/type first so we know seed positions for receiver prep.
       rlbResult = createRlbPresetTypeLights(modelState, nightLighting);
-      seedPositions = downlightLights
-        .map((light) => light?.position?.clone?.())
-        .filter(Boolean);
     } else {
       seedPositions = downlight0Meshes.map((mesh) => {
         mesh.computeWorldMatrix(true);
@@ -11418,17 +11796,18 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
     applyNightSiteMaterials(modelState);
     refreshNightWallOccluders(modelState);
 
-    // Prep light limits for meshes near active fixtures (range-based).
+    // RLB: prep light limits for the full interior pool so any nearby fixture
+    // can bind wall/floor receivers when lazily instantiated.
     const rangePool = collectDown0RangePool(modelState);
-    const seedRange = enableRlbPresetLights
-      ? Math.max(
-        nightIncludeRadius,
-        typeof nightLighting.rlbDefaultRange === "number" ? nightLighting.rlbDefaultRange + 2 : 14
-      )
-      : Math.max(nightIncludeRadius, down0LocalRange + 2);
-    nightIncludeMeshes = seedPositions.length
-      ? collectMeshesNearPositions(rangePool, seedPositions, seedRange)
-      : rangePool;
+    nightIncludeMeshes = enableRlbPresetLights
+      ? rangePool
+      : (seedPositions.length
+        ? collectMeshesNearPositions(
+          rangePool,
+          seedPositions,
+          Math.max(nightIncludeRadius, down0LocalRange + 2)
+        )
+        : rangePool);
 
     const materialsReady = await prepareModelMaterialsForNightLightsChunked(
       nightIncludeMeshes,
@@ -11469,8 +11848,16 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
       return;
     }
 
-    if (downlightLights.length) {
+    if (enableRlbPresetLights || downlightLights.length) {
       startNightSpotLightCulling();
+
+      if (enableRlbPresetLights) {
+        const initialActive = typeof nightLighting.maxActiveSpotLights === "number"
+          ? Math.max(1, Math.floor(nightLighting.maxActiveSpotLights))
+          : 8;
+        const activated = activateNearestRlbFixtures(initialActive, nightLighting);
+        console.info(`[night] RLB lazy initial active=${activated}/${rlbResult.descriptors || 0}`);
+      }
     }
 
     nightAssetsSuspended = false;
@@ -11479,7 +11866,7 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
     console.info(
       `[night] ${modelState.config?.label || modelState.config?.overviewId || "model"}`
       + (enableRlbPresetLights
-        ? ` RLB perType=${nightLighting.lightsPerType ?? 2} created=${rlbResult.created}`
+        ? ` RLB descriptors=${rlbResult.descriptors || 0} lazy=on`
           + (rlbResult.summary?.length ? ` [${rlbResult.summary.join(", ")}]` : "")
         : ` Down01/02/03=off / Down0 wallwash=${down0SpotCount}`)
       + ` receivers=${nightIncludeMeshes.length}`
@@ -11571,12 +11958,26 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
       applyNightOrbitZoomPolicy(true);
       applyNightEnvironment();
       enableDownlights(modelState);
+
+      collectNightModelStates().forEach((state) => {
+        state.rlbProximityGlow?.notifyNightMode?.(true);
+      });
+
+      if (isAngjiProjectConfig(modelState?.config)) {
+        modelState.rlbProximityGlow?.logStatus?.("night-on");
+      } else {
+        console.log("[rlb-glow] skipped — RLB shader is Angji-only (current project is not Angji)");
+      }
     } else {
       nightMode = false;
       // Keep night assets cached — next toggle resumes instantly.
       applyNightOrbitZoomPolicy(false);
       clearNightLighting({ dispose: false });
       applyDayEnvironment();
+
+      collectNightModelStates().forEach((state) => {
+        state.rlbProximityGlow?.notifyNightMode?.(false);
+      });
 
       const modelState = getActiveModelState();
 
@@ -11616,6 +12017,9 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
       applyNightEnvironment();
       applyNightPeopleVisibility();
       enableDownlights(getActiveModelState());
+      collectNightModelStates().forEach((state) => {
+        state.rlbProximityGlow?.notifyNightMode?.(true);
+      });
     }
 
     updateButton();
@@ -12191,7 +12595,6 @@ async function loadTourModelState(BABYLON, scene, config) {
   });
 
   peopleYawMeshes.forEach((mesh) => {
-    attachTreeYawPivot(BABYLON, scene, mesh, model.root);
     mesh.checkCollisions = false;
     mesh.metadata = {
       ...(mesh.metadata || {}),
@@ -12200,8 +12603,33 @@ async function loadTourModelState(BABYLON, scene, config) {
     };
   });
 
+  const peopleYawBlockGroups = collectPeopleYawBlockGroups(peopleYawMeshes);
+  peopleYawBlockGroups.forEach((groupMeshes) => {
+    attachPeopleBlockYawPivot(BABYLON, scene, groupMeshes, model.root);
+  });
+
+  if (peopleYawBlockGroups.some((group) => group.length > 1)) {
+    console.info(
+      `[people] ${config.label}: block yaw groups=${peopleYawBlockGroups.length}`
+      + ` multi=${peopleYawBlockGroups.filter((group) => group.length > 1).length}`
+    );
+  }
+
   // Trees + People cards share the same camera-yaw update path.
   const yawFacingMeshes = [...treeMeshes, ...peopleYawMeshes];
+
+  let rlbProximityGlow = null;
+
+  if (isAngjiProjectConfig(config)) {
+    try {
+      rlbProximityGlow = setupAngjiRlbProximityGlow(BABYLON, scene, { meshes, model, config, collisionMeshes }, {
+        getCamera: () => scene.activeCamera
+      });
+      // loadTourModelState runs before orbitCamera exists; bind lazily via modelState later.
+    } catch (error) {
+      console.error("[rlb-glow] setup failed — tour continues without wall spill:", error);
+    }
+  }
 
   freezeSceneMaterials(modelMaterials);
 
@@ -12271,6 +12699,7 @@ async function loadTourModelState(BABYLON, scene, config) {
     angjiExternalFloorMeshes,
     peopleTargetMeshes,
     treeMeshes: yawFacingMeshes,
+    rlbProximityGlow,
     projectileHitMeshes: meshes.filter((mesh) => mesh.isEnabled() && !isDescendantOf(mesh, model.tourStartNode)),
     historyDisplays: []
   };
@@ -12335,6 +12764,7 @@ async function start() {
   sun.specular = BABYLON.Color3.Black();
   setupSunControls(BABYLON, sun);
   let angjiNightMode = null;
+  let rlbShaderTuningPanel = null;
   setLoadingTargetProgress(LOADING_PROGRESS.engineReady);
   await loadDefaultProjectOverviews();
   loadLocalOverviewOverrides();
@@ -12398,6 +12828,11 @@ async function start() {
 
   const orbitCamera = createOrbitCamera(BABYLON, scene);
   const walkCamera = createWalkCamera(BABYLON, scene);
+  const resolveSceneCamera = () => scene.activeCamera || orbitCamera;
+
+  allModelStates.forEach((modelState) => {
+    ensureAngjiRlbProximityGlow(BABYLON, scene, modelState, resolveSceneCamera);
+  });
   let controls = null;
 
   function updateModelSwitcherVisibility() {
@@ -12453,6 +12888,7 @@ async function start() {
     renderModelDebug(nextModelState);
     updateProjectOverviewVisibility();
     angjiNightMode?.sync();
+    rlbShaderTuningPanel?.syncVisibility?.();
   }
 
   function easeOutCubic(value) {
@@ -12555,9 +12991,28 @@ async function start() {
       updateModelSwitcherVisibility();
       updateProjectOverviewVisibility();
       angjiNightMode?.sync();
+      rlbShaderTuningPanel?.syncVisibility?.();
     },
     onActiveModelStateChange: showActiveModelState
   });
+  rlbShaderTuningPanel = null;
+  void setupLocalRlbShaderTuningPanel({
+    getGlowController: () => {
+      const modelState = controls?.getActiveModelState?.() || displayedModelState;
+      return modelState?.rlbProximityGlow || null;
+    },
+    isAvailable: () => {
+      const modelState = controls?.getActiveModelState?.() || displayedModelState;
+      return isAngjiProjectConfig(modelState?.config) && !controls?.isWalkMode?.();
+    },
+    requestRender: () => {
+      scene.render();
+    }
+  }).then((panel) => {
+    rlbShaderTuningPanel = panel;
+    panel?.syncVisibility?.();
+  });
+
   angjiNightMode = createAngjiNightModeController(BABYLON, scene, ambient, sun, {
     getActiveModelState: () => controls?.getActiveModelState?.() || displayedModelState,
     isWalkMode: () => controls?.isWalkMode?.() || false,
@@ -12572,6 +13027,8 @@ async function start() {
           || displayedModelState?.config;
         tourBgm.syncNightTourAudio?.(activeConfig, { keepBgm: false });
       }
+
+      rlbShaderTuningPanel?.syncVisibility?.();
     },
     onToggle: (isNight) => {
       setStatus(isNight

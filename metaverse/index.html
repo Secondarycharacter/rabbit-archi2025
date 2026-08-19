@@ -1,11 +1,11 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Metaverse Architecture Tour</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="./styles/main.css?v=angji-rlb-night-20260727">
+  <link rel="stylesheet" href="./styles/main.css?v=rlb-shader-proximity-20260818-group-v31">
 </head>
 <body>
   <main class="game-shell">
@@ -52,6 +52,7 @@
           <button id="orbitViewButton" type="button">Orbit View</button>
           <button id="tourModeButton" type="button">Tour Mode</button>
           <button id="nightModeButton" type="button" hidden>Night Mode</button>
+          <button class="local-dev-only" id="rlbTuningToggleButton" type="button" hidden>RLB 쉐이더</button>
         </div>
       </div>
 
@@ -68,11 +69,11 @@
 
     <aside class="sun-panel" id="sunPanel" hidden>
       <h2>Sun Position</h2>
-      <label>
+      <label for="seasonSlider">
         <span>Season <strong id="seasonValue">Spring</strong></span>
         <input id="seasonSlider" type="range" min="0" max="3" step="1" value="1">
       </label>
-      <label>
+      <label for="timeSlider">
         <span>Time <strong id="timeValue">12:00</strong></span>
         <input id="timeSlider" type="range" min="6" max="18" step="0.25" value="7">
       </label>
@@ -85,7 +86,7 @@
         <h2>건축개요 관리</h2>
         <button id="overviewAdminCloseButton" type="button" aria-label="Close">×</button>
       </header>
-      <label class="overview-admin-passcode">
+      <label class="overview-admin-passcode" for="overviewAdminPasscode">
         <span>관리자 비밀번호</span>
         <input id="overviewAdminPasscode" type="password" autocomplete="current-password">
       </label>
@@ -99,7 +100,23 @@
       <p id="overviewAdminStatus">Firebase 설정 전에는 이 브라우저에 임시 저장됩니다.</p>
     </aside>
 
-    <div class="tour-reset-fade" id="tourResetFade" aria-hidden="true"></div>
+    <aside class="rlb-tuning-panel local-dev-only" id="rlbTuningPanel" hidden>
+      <header class="rlb-tuning-panel__header">
+        <h2>RLB 쉐이더 튜닝</h2>
+        <div class="rlb-tuning-panel__actions">
+          <button id="rlbTuningSaveButton" type="button">저장</button>
+          <button id="rlbTuningResetButton" type="button">초기화</button>
+          <button id="rlbTuningCloseButton" type="button" aria-label="닫기">×</button>
+        </div>
+      </header>
+      <nav class="rlb-tuning-tabs" id="rlbTuningTabs" aria-label="조명 종류"></nav>
+      <div class="rlb-tuning-layout">
+        <section class="rlb-tuning-lights" id="rlbTuningLights" hidden></section>
+        <div class="rlb-tuning-body" id="rlbTuningBody"></div>
+      </div>
+      <p class="rlb-tuning-status" id="rlbTuningStatus"></p>
+    </aside>
+
 
     <aside class="debug-panel local-dev-only" id="debugPanel" hidden>
       <h2>Model Test</h2>
@@ -160,6 +177,6 @@
   <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
   <script src="https://cdn.babylonjs.com/addons/babylonjs.addons.min.js"></script>
   <script src="./lib/babylonjs-fbx-loader.js"></script>
-  <script type="module" src="./src/first-person-tour.js?v=jinju-indoor-guest-fix-20260806"></script>
+  <script type="module" src="./src/first-person-tour.js?v=rlb-shader-proximity-20260819-group-v46"></script>
 </body>
 </html>

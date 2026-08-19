@@ -16,9 +16,19 @@ export function applyLocalDevToolsVisibility() {
 
   if (!enabled) {
     const debugPanel = document.getElementById("debugPanel");
+    const rlbTuningPanel = document.getElementById("rlbTuningPanel");
+    const rlbTuningToggle = document.getElementById("rlbTuningToggleButton");
 
     if (debugPanel) {
       debugPanel.hidden = true;
+    }
+
+    if (rlbTuningPanel) {
+      rlbTuningPanel.hidden = true;
+    }
+
+    if (rlbTuningToggle) {
+      rlbTuningToggle.hidden = true;
     }
   }
 
