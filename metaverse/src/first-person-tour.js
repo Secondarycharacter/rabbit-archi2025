@@ -78,7 +78,7 @@ import {
 } from "./jinju-rooftop-guest-config.js?v=jinju-rooftop-marie-sit-clips-20260705";
 import { createGuestCharacterSystem, shouldSnapPatrolFloorAtTarget } from "./guest-character-system.js?v=angji-night-marie-extra-20260719";
 import { applyLocalDevToolsVisibility, isLocalDevEnvironment } from "./local-dev.js?v=local-dev-20260819";
-import { setupAngjiRlbProximityGlow, shouldSkipMaterialFreeze } from "./rlb-proximity-glow.js?v=rlb-shader-proximity-20260819-group-v47";
+import { setupAngjiRlbProximityGlow, shouldSkipMaterialFreeze } from "./rlb-proximity-glow.js?v=rlb-shader-proximity-20260820-group-v49";
 
 async function setupLocalRlbShaderTuningPanel(options = {}) {
   if (!isLocalDevEnvironment()) {
@@ -181,7 +181,7 @@ const MODEL_CONFIGS = [
   },
   {
     file: "Angji.glb",
-    modelCacheVersion: "20260807-angji-glb",
+    modelCacheVersion: "20260820-angji-trees",
     label: "앵지",
     overviewId: "angji",
     tourBgm: "angji/angji_tour_bgm.mp3",
@@ -3811,6 +3811,113 @@ function fixCutoutTextureAlphaOnMeshes(meshes, performanceSettings = DEFAULT_PER
   }
 
   return fixed;
+}
+
+function isDtvFoliageMaterial(material) {
+  return getMaterialDebugName(material).startsWith("dtv");
+}
+
+/**
+ * DTV tree cards (especially dtv.1) ship as BLEND with a lowered material alpha.
+ * Transparent texels then composite as black against the night sky. Force a
+ * real-alpha cutout so empty pixels discard instead of drawing black.
+ */
+function prepareDtvFoliageMaterials(BABYLON, meshes) {
+  const materials = collectUniqueMaterialsFromMeshes(meshes).filter(isDtvFoliageMaterial);
+
+  if (!materials.length) {
+    return 0;
+  }
+
+  const alphaTestMode = BABYLON.Material?.MATERIAL_ALPHATEST ?? 1;
+
+  materials.forEach((material) => {
+    if (typeof material.unfreeze === "function") {
+      material.unfreeze();
+    }
+
+    material.backFaceCulling = false;
+
+    if ("twoSidedLighting" in material) {
+      material.twoSidedLighting = true;
+    }
+
+    if ("disableLighting" in material) {
+      material.disableLighting = false;
+    }
+
+    if ("metallic" in material) {
+      material.metallic = 0;
+    }
+
+    if ("roughness" in material) {
+      material.roughness = 1;
+    }
+
+    if ("specularColor" in material && material.specularColor?.set) {
+      material.specularColor.set(0, 0, 0);
+    }
+
+    if ("environmentIntensity" in material) {
+      material.environmentIntensity = 0;
+    }
+
+    // SimLab writes dtv.1 baseColor alpha ~0.55; keep texture alpha only.
+    if ("alpha" in material) {
+      material.alpha = 1;
+    }
+
+    if (material.albedoColor && typeof material.albedoColor.a === "number") {
+      material.albedoColor.a = 1;
+    }
+
+    if (material.diffuseColor && typeof material.diffuseColor.a === "number") {
+      material.diffuseColor.a = 1;
+    }
+
+    enableMaterialTextureAlpha(material, { useRgbAsAlpha: false });
+
+    if ("transparencyMode" in material) {
+      material.transparencyMode = alphaTestMode;
+    }
+
+    if ("alphaCutOff" in material) {
+      const currentCutOff = typeof material.alphaCutOff === "number" ? material.alphaCutOff : 0;
+      material.alphaCutOff = Math.min(0.4, Math.max(currentCutOff, 0.12));
+    }
+
+    if ("needDepthPrePass" in material) {
+      material.needDepthPrePass = false;
+    }
+
+    if ("forceDepthWrite" in material) {
+      material.forceDepthWrite = true;
+    }
+  });
+
+  const scene = meshes.find((mesh) => mesh?.getScene?.())?.getScene?.();
+
+  if (scene?.onReadyObservable?.addOnce) {
+    scene.onReadyObservable.addOnce(() => {
+      materials.forEach((material) => {
+        if (typeof material.unfreeze === "function") {
+          material.unfreeze();
+        }
+
+        enableMaterialTextureAlpha(material, { useRgbAsAlpha: false });
+
+        if ("transparencyMode" in material) {
+          material.transparencyMode = alphaTestMode;
+        }
+
+        if (typeof material.freeze === "function") {
+          material.freeze();
+        }
+      });
+    });
+  }
+
+  return materials.length;
 }
 
 function optimizeModelBlendMaterials(BABYLON, meshes, options = {}) {
@@ -12483,6 +12590,7 @@ async function loadTourModelState(BABYLON, scene, config) {
     performanceSettings
   });
   const cutoutAlphaFixed = fixCutoutTextureAlphaOnMeshes(meshes, performanceSettings);
+  const dtvFoliagePrepared = prepareDtvFoliageMaterials(BABYLON, meshes);
 
   let usedCollisionFallback = false;
   let collisionMeshes;
@@ -12654,6 +12762,7 @@ async function loadTourModelState(BABYLON, scene, config) {
     `peopleYaw=${peopleYawMeshes.length}`,
     `blendOpt=${blendOptimized}`,
     `cutoutAlpha=${cutoutAlphaFixed}`,
+    `dtvFoliage=${dtvFoliagePrepared}`,
     `roles=${JSON.stringify(roleCounts)}`,
     `fallback=${usedCollisionFallback ? "yes" : "no"}`
   );

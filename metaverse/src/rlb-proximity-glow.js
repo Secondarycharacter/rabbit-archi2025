@@ -678,7 +678,11 @@ export function setupAngjiRlbProximityGlow(BABYLON, scene, modelState, options =
     occluderAabbCache,
     portalAabbs,
     previewActive: false,
-    nameLabels: null
+    nameLabels: null,
+    nameLabelsLoading: false,
+    nameLabelsWantedVisible: false,
+    nameLabelsFocusedId: null,
+    nameLabelsHoveredId: null
   };
 
   meshes.forEach((mesh) => {
@@ -782,10 +786,48 @@ export function setupAngjiRlbProximityGlow(BABYLON, scene, modelState, options =
   };
 
   const ensureNameLabels = () => {
+    if (lifecycle.disposed) {
+      return null;
+    }
+
+    if (lifecycle.nameLabels) {
+      return lifecycle.nameLabels;
+    }
+
+    if (lifecycle.nameLabelsLoading) {
+      return null;
+    }
+
+    lifecycle.nameLabelsLoading = true;
+    import("./rlb-light-name-labels.js?v=rlb-shader-proximity-20260820-group-v49")
+      .then((mod) => {
+        if (lifecycle.disposed || lifecycle.nameLabels || typeof mod.createRlbLightNameLabelLayer !== "function") {
+          return;
+        }
+
+        const catalog = buildRlbLightCatalog(lightEntries);
+        const namesById = new Map(catalog.map((item) => [item.id, item.name]));
+        lifecycle.nameLabels = mod.createRlbLightNameLabelLayer(
+          BABYLON,
+          scene,
+          lightEntries,
+          (entry) => namesById.get(entry.lightId)
+        );
+        lifecycle.nameLabels.setVisible(lifecycle.nameLabelsWantedVisible);
+        lifecycle.nameLabels.setFocused?.(lifecycle.nameLabelsFocusedId);
+        lifecycle.nameLabels.setHovered?.(lifecycle.nameLabelsHoveredId);
+      })
+      .catch((error) => {
+        lifecycle.nameLabelsLoading = false;
+        console.info("[rlb-glow] light name labels unavailable", error?.message || error);
+      });
+
     return lifecycle.nameLabels;
   };
 
   const setNameLabelsVisible = (visible) => {
+    lifecycle.nameLabelsWantedVisible = Boolean(visible);
+
     if (!visible && !lifecycle.nameLabels) {
       return;
     }
@@ -794,6 +836,8 @@ export function setupAngjiRlbProximityGlow(BABYLON, scene, modelState, options =
   };
 
   const setFocusedLight = (lightId) => {
+    lifecycle.nameLabelsFocusedId = lightId || null;
+
     if (!lightId && !lifecycle.nameLabels) {
       return;
     }
@@ -802,6 +846,8 @@ export function setupAngjiRlbProximityGlow(BABYLON, scene, modelState, options =
   };
 
   const setHoveredLight = (lightId) => {
+    lifecycle.nameLabelsHoveredId = lightId || null;
+
     if (!lightId && !lifecycle.nameLabels) {
       return;
     }
