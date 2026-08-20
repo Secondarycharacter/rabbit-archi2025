@@ -10,7 +10,7 @@ import {
   RLB_TUNING_TYPE_ORDER,
   resolveRlbSpillShapeCode
 } from "./rlb-fixture-types.js";
-import { RLB_ANGJI_NIGHT_PRESET } from "./rlb-angji-night-preset.js?v=rlb-shader-proximity-20260819-group-v47";
+import { RLB_ANGJI_NIGHT_PRESET } from "./rlb-angji-night-preset.js?v=rlb-shader-proximity-20260820-group-v50";
 
 export const RLB_TUNING_STORAGE_KEY = "angji-rlb-shader-tuning-v9";
 const RLB_TUNING_STORAGE_FALLBACK_KEYS = [

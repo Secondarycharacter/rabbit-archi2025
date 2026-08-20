@@ -20,7 +20,7 @@ import {
   remapRlbGroupMemberIds,
   resolveRlbLightSourceName,
   saveRlbTuningState
-} from "./rlb-shader-tuning.js?v=rlb-shader-proximity-20260819-group-v47";
+} from "./rlb-shader-tuning.js?v=rlb-shader-proximity-20260820-group-v50";
 import {
   bakeRlbOccluderAabbs,
   bakeRlbPortalAabbs,

@@ -78,7 +78,7 @@ import {
 } from "./jinju-rooftop-guest-config.js?v=jinju-rooftop-marie-sit-clips-20260705";
 import { createGuestCharacterSystem, shouldSnapPatrolFloorAtTarget } from "./guest-character-system.js?v=angji-night-marie-extra-20260719";
 import { applyLocalDevToolsVisibility, isLocalDevEnvironment } from "./local-dev.js?v=local-dev-20260819";
-import { setupAngjiRlbProximityGlow, shouldSkipMaterialFreeze } from "./rlb-proximity-glow.js?v=rlb-shader-proximity-20260820-group-v49";
+import { setupAngjiRlbProximityGlow, shouldSkipMaterialFreeze } from "./rlb-proximity-glow.js?v=rlb-shader-proximity-20260820-group-v50";
 
 async function setupLocalRlbShaderTuningPanel(options = {}) {
   if (!isLocalDevEnvironment()) {
