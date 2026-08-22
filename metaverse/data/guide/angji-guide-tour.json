@@ -3,17 +3,17 @@
   "guideSpawnId": "Angji-Guide",
   "dialogDistance": 1.2,
   "interactionDistance": 2.0,
-  "textSpeed": 0.0467,
-  "lineHoldSeconds": 0.8,
-  "lineHoldPerChar": 0.016,
-  "lineHoldMaxExtra": 2.67,
+  "textSpeed": 0.0583,
+  "lineHoldSeconds": 1.0,
+  "lineHoldPerChar": 0.02,
+  "lineHoldMaxExtra": 3.33,
   "orbitSpin": {
-    "position": { "x": -167.35, "y": 98.77, "z": 73.26 },
-    "target": { "x": -10.54, "y": 97.07, "z": 16.37 },
+    "position": { "x": -167.35, "y": 25.00, "z": 73.26 },
+    "target": { "x": -10.54, "y": 50.00, "z": 16.37 },
     "rotationY": 1.9188,
-    "durationSeconds": 10,
+    "durationSeconds": 20,
     "rotationTurns": 1,
-    "pitchOffsetDegrees": 10
+    "pitchOffsetDegrees": -20
   },
   "transitionPrompt": {
     "ko": "다음 설명으로 넘어갈까요?",

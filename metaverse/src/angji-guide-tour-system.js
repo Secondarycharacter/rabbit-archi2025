@@ -2,8 +2,8 @@
  * Angji GUIDE scripted tour — separate from generic NPC dialog (multi-line bubbles).
  */
 
-import { ANGJI_GUIDE_SPAWN, loadAngjiGuideTourData } from "./angji-guide-tour-config.js?v=angji-guide-tour-20260822-v17";
-import { getGuestHeadLocalY } from "./guest-dev-label.js?v=angji-guide-tour-20260822-v17";
+import { ANGJI_GUIDE_SPAWN, loadAngjiGuideTourData } from "./angji-guide-tour-config.js?v=angji-guide-tour-20260822-v19";
+import { getGuestHeadLocalY } from "./guest-dev-label.js?v=angji-guide-tour-20260822-v19";
 import { normalizeTourData } from "./angji-guide-tour-data.js?v=angji-guide-manager-20260822";
 
 const GUIDE_STATE = {
@@ -797,9 +797,11 @@ export function createAngjiGuideTourSystem(BABYLON, scene, options = {}) {
   }
 
   function getOrbitBeta(spin, offset, radius) {
-    const pitchOffsetRad = ((spin.pitchOffsetDegrees ?? 10) * Math.PI) / 180;
+    // Negative pitchOffsetDegrees tilts the orbit camera toward the ground.
+    const pitchOffsetRad = ((spin.pitchOffsetDegrees ?? -12) * Math.PI) / 180;
+    const baseBeta = Math.acos(clamp(offset.y / Math.max(radius, 0.001), -1, 1));
 
-    return Math.acos(clamp(offset.y / Math.max(radius, 0.001), -1, 1)) + pitchOffsetRad;
+    return clamp(baseBeta + pitchOffsetRad, 0.15, Math.PI - 0.15);
   }
 
   function getOrbitVectors(spin) {

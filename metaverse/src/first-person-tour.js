@@ -19,7 +19,7 @@ import {
 } from "./npc-guest-manager-panel.js?v=angji-npc-manager-20260820";
 import {
   createAngjiGuideTourSystem
-} from "./angji-guide-tour-system.js?v=angji-guide-tour-20260822-v17";
+} from "./angji-guide-tour-system.js?v=angji-guide-tour-20260822-v19";
 import {
   createAngjiGuideManagerPanel
 } from "./angji-guide-manager-panel.js?v=angji-guide-manager-20260822";

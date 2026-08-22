@@ -9,10 +9,10 @@ export const ANGJI_GUIDE_STORAGE_KEY = "angji-guide-tour-manager-v1";
 export const GUIDE_TOUR_GLOBAL_DEFAULTS = {
   dialogDistance: 1.2,
   interactionDistance: 2.0,
-  textSpeed: 0.0467,
-  lineHoldSeconds: 0.8,
-  lineHoldPerChar: 0.016,
-  lineHoldMaxExtra: 2.67,
+  textSpeed: 0.0583,
+  lineHoldSeconds: 1.0,
+  lineHoldPerChar: 0.02,
+  lineHoldMaxExtra: 3.33,
   cameraBlendSeconds: 0.85
 };
 
