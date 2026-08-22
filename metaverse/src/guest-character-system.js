@@ -1,13 +1,14 @@
 import {
   isAngjiDanceAnimationClip,
   shouldAngjiGuestAllowDanceRootMotion
-} from "./angji-guest-config.js?v=angji-guest-night-marie-extra-20260719";
+} from "./angji-guest-config.js?v=angji-guest-numbers-20260820";
 import {
   createGuestDevLabel,
   disposeGuestDevLabel,
+  setGuestDevLabelText,
   setGuestDevLabelVisible,
   updateGuestDevLabelHeight
-} from "./guest-dev-label.js?v=jinju-guest-label-scale-fix-20260705";
+} from "./guest-dev-label.js?v=angji-guest-numbers-20260820";
 import {
   createRootMotionNeutralizer,
   stripLocomotionRootMotion
@@ -1731,8 +1732,11 @@ async function loadGuestCharacter(BABYLON, scene, spawn, helpers) {
   updateWorldMatrices(root, meshes);
   const alignedBounds = getFullBounds(BABYLON, meshes);
   const rawHeight = Math.max(alignedBounds?.size?.y || 0, 0.001);
+  const guestTargetHeight = Number.isFinite(spawn.targetHeight)
+    ? spawn.targetHeight
+    : targetHeight;
   const scaleMultiplier = spawn.scaleMultiplier ?? 1;
-  const baseFitScale = targetHeight / rawHeight;
+  const baseFitScale = guestTargetHeight / rawHeight;
   const fitScale = baseFitScale * scaleMultiplier;
 
   console.info(
@@ -1786,6 +1790,7 @@ function applyGuestScale(guest, spawn) {
   guest.fitScale = baseFitScale * scaleMultiplier;
   guest.root.scaling.set(guest.fitScale, guest.fitScale, guest.fitScale);
   syncGuestEnergyBar(guest);
+  updateGuestDevLabelHeight(guest);
 }
 
 function serializeGuestAnimation(animation) {
@@ -1871,7 +1876,58 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
   let revealAnimStartedCount = 0;
   let revealAnimSkippedCount = 0;
   let sequenceNeutralizeFrame = 0;
-  const { resolveSpawnPosition, resolveGuestFloorY, showDevLabels = false, getPlayerPosition = null, getCollisionMeshes = null, canGuestMoveHorizontal = null, hasGuestLineOfSight = null } = helpers;
+  const {
+    resolveSpawnPosition,
+    resolveGuestFloorY,
+    showDevLabels = false,
+    resolveGuestLabelText = null,
+    shouldAttachGuestLabel = null,
+    isGuestLabelVisible = null,
+    getPlayerPosition = null,
+    getCollisionMeshes = null,
+    canGuestMoveHorizontal = null,
+    hasGuestLineOfSight = null
+  } = helpers;
+
+  function getGuestLabelText(guestOrSpawn) {
+    const spawn = guestOrSpawn?.spawn || guestOrSpawn;
+
+    if (typeof resolveGuestLabelText === "function") {
+      return resolveGuestLabelText(spawn) || "";
+    }
+
+    return spawn?.devLabel || "";
+  }
+
+  function canAttachGuestLabel(guest) {
+    const text = getGuestLabelText(guest);
+
+    if (!text) {
+      return false;
+    }
+
+    if (typeof shouldAttachGuestLabel === "function") {
+      return shouldAttachGuestLabel(guest.spawn, text);
+    }
+
+    return showDevLabels === true;
+  }
+
+  function shouldGuestLabelBeVisible(guest) {
+    if (!guest?.devLabel) {
+      return false;
+    }
+
+    if (typeof isGuestLabelVisible === "function") {
+      return isGuestLabelVisible(guest) === true;
+    }
+
+    return showDevLabels === true;
+  }
+
+  function syncGuestDevLabelVisibility(guest) {
+    setGuestDevLabelVisible(guest, shouldGuestLabelBeVisible(guest));
+  }
 
   function resetRevealDiagnostics() {
     revealAnimStartedCount = 0;
@@ -1879,12 +1935,14 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
   }
 
   function attachGuestDevLabel(guest) {
-    if (!showDevLabels || !guest.spawn?.devLabel) {
+    if (!canAttachGuestLabel(guest)) {
+      disposeGuestDevLabel(guest);
       return;
     }
 
     disposeGuestDevLabel(guest);
-    guest.devLabel = createGuestDevLabel(BABYLON, scene, guest, guest.spawn.devLabel);
+    guest.devLabel = createGuestDevLabel(BABYLON, scene, guest, getGuestLabelText(guest));
+    syncGuestDevLabelVisibility(guest);
   }
 
   function resolveGuestSpawn(spawn, guest = null) {
@@ -1894,17 +1952,13 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
       const cachedIdentity = `${guest.resolvedSpawn.file || ""}::${guest.resolvedSpawn.assetRoot || ""}`;
 
       if (cachedIdentity === incomingIdentity) {
-        // Keep floor-snapped pose, but refresh animation / behavior from the latest spawn config.
+        const latest = resolveSpawnPosition?.(spawn);
         const refreshed = {
           ...guest.resolvedSpawn,
           ...spawn,
-          position: guest.resolvedSpawn.position,
-          movement: spawn.movement
-            ? {
-              ...spawn.movement,
-              patrolTargets: guest.resolvedSpawn.movement?.patrolTargets || spawn.movement.patrolTargets
-            }
-            : spawn.movement
+          ...(latest || {}),
+          position: latest?.position || guest.resolvedSpawn.position,
+          movement: latest?.movement || guest.resolvedSpawn.movement
         };
         guest.resolvedSpawn = refreshed;
         return refreshed;
@@ -1934,27 +1988,40 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
     return [...guestsById.values()];
   }
 
-  function showGuest(guest, { force = false } = {}) {
-    const resolvedSpawn = resolveGuestSpawn(guest.spawn, guest);
-    guest.spawn = resolvedSpawn;
-    const wasVisible = guest.isVisibleShown && guest.root.isEnabled();
-
-    if (!wasVisible && guest.spawn.movement?.type === "patrol") {
-      guest.patrolTargetIndex = 0;
-      guest.patrolPhase = "moving";
-      guest.patrolArrivalPending = false;
-      guest.patrolSpeedFactor = 0;
-      initPatrolCycleSpeed(guest);
-    }
-
+  function placeGuestAtResolvedSpawn(guest, resolvedSpawn) {
     guest.root.position.set(
       resolvedSpawn.position.x,
       resolvedSpawn.position.y,
       resolvedSpawn.position.z
     );
     guest.root.rotation.set(0, resolvedSpawn.rotationY, 0);
+  }
+
+  function startGuestPatrolIfNeeded(guest, wasVisible) {
+    if (guest.spawn.movement?.type !== "patrol" || wasVisible) {
+      return;
+    }
+
+    guest.patrolTargetIndex = 0;
+    guest.patrolPhase = "moving";
+    guest.patrolArrivalPending = false;
+    guest.patrolSpeedFactor = 0;
+    initPatrolCycleSpeed(guest);
+  }
+
+  function showGuest(guest, { force = false } = {}) {
+    const resolvedSpawn = resolveGuestSpawn(guest.spawn, guest);
+    guest.spawn = resolvedSpawn;
+    const wasVisible = guest.isVisibleShown && guest.root.isEnabled();
+
+    startGuestPatrolIfNeeded(guest, wasVisible);
+
+    if (!wasVisible) {
+      placeGuestAtResolvedSpawn(guest, resolvedSpawn);
+    }
+
     guest.root.setEnabled(true);
-    setGuestDevLabelVisible(guest, true);
+    setGuestDevLabelVisible(guest, shouldGuestLabelBeVisible(guest));
 
     if (isNightDeviChaseGuest(guest) && !guest.nightChase?.engaged) {
       ensureNightDeviChaseState(guest);
@@ -1994,23 +2061,14 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
       guest.spawn = resolvedSpawn;
       const wasVisible = guest.isVisibleShown && guest.root.isEnabled();
 
-      if (!wasVisible && guest.spawn.movement?.type === "patrol") {
-        guest.patrolTargetIndex = 0;
-        guest.patrolPhase = "moving";
-        guest.patrolArrivalPending = false;
-        guest.patrolSpeedFactor = 0;
-        initPatrolCycleSpeed(guest);
-      }
+      startGuestPatrolIfNeeded(guest, wasVisible);
 
-      guest.root.position.set(
-        resolvedSpawn.position.x,
-        resolvedSpawn.position.y,
-        resolvedSpawn.position.z
-      );
-      guest.root.rotation.set(0, resolvedSpawn.rotationY, 0);
+      if (!wasVisible) {
+        placeGuestAtResolvedSpawn(guest, resolvedSpawn);
+      }
       guest.root.setEnabled(true);
       guest.isVisibleShown = true;
-      setGuestDevLabelVisible(guest, true);
+      setGuestDevLabelVisible(guest, shouldGuestLabelBeVisible(guest));
 
       if (isNightDeviChaseGuest(guest) && !guest.nightChase?.engaged) {
         ensureNightDeviChaseState(guest);
@@ -2180,13 +2238,22 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
       const previousAnimationKey = serializeGuestAnimation(existing.spawn?.animation);
       const nextAnimationKey = serializeGuestAnimation(resolvedSpawn.animation);
       existing.spawn = resolvedSpawn;
-      existing.root.position.set(
-        resolvedSpawn.position.x,
-        resolvedSpawn.position.y,
-        resolvedSpawn.position.z
-      );
       applyGuestScale(existing, resolvedSpawn);
       attachGuestDevLabel(existing);
+
+      const movementChanged = previousMovementKey !== nextMovementKey;
+      const alreadyPatrolling = existing.isVisibleShown
+        && existing.root.isEnabled()
+        && existing.spawn.movement?.type === "patrol"
+        && !movementChanged;
+
+      if (!alreadyPatrolling) {
+        existing.root.position.set(
+          resolvedSpawn.position.x,
+          resolvedSpawn.position.y,
+          resolvedSpawn.position.z
+        );
+      }
 
       if (isNightDeviChaseGuest(existing) && !existing.nightChase?.engaged) {
         captureNightDeviHome(existing);
@@ -2341,6 +2408,11 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
         return;
       }
 
+      if (guest.devLabel) {
+        updateGuestDevLabelHeight(guest);
+        syncGuestDevLabelVisibility(guest);
+      }
+
       if (isNightDeviChaseGuest(guest)) {
         updateNightDeviChase(guest, deltaScale, resolveGuestFloorY, getPlayerPosition, {
           BABYLON,
@@ -2378,6 +2450,33 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
     });
   }
 
+  function refreshDevLabels() {
+    getGuests().forEach((guest) => {
+      attachGuestDevLabel(guest);
+      updateGuestDevLabelHeight(guest);
+      syncGuestDevLabelVisibility(guest);
+    });
+  }
+
+  function applyGuestLabelTexts() {
+    getGuests().forEach((guest) => {
+      const text = getGuestLabelText(guest);
+
+      if (!text) {
+        return;
+      }
+
+      if (guest.devLabel) {
+        setGuestDevLabelText(guest, text);
+      } else if (canAttachGuestLabel(guest)) {
+        attachGuestDevLabel(guest);
+      }
+
+      updateGuestDevLabelHeight(guest);
+      syncGuestDevLabelVisibility(guest);
+    });
+  }
+
   return {
     ensureSpawned,
     preload,
@@ -2389,6 +2488,8 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
     disposeGuests,
     dispose,
     update,
+    refreshDevLabels,
+    applyGuestLabelTexts,
     getGuests,
     getGuestSceneAudit,
     resetRevealDiagnostics,

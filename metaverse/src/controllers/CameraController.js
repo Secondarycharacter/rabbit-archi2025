@@ -217,6 +217,28 @@ export function createCameraController(BABYLON, scene, camera, options = {}) {
     applyWheelDelta,
     update,
     reset,
+    captureState: () => ({
+      yaw,
+      pitch,
+      distance,
+      targetDistance,
+      lastMouseMoveAt,
+      lastMovementAt,
+      autoReturnEnabled
+    }),
+    restoreState: (state) => {
+      if (!state) {
+        return;
+      }
+
+      yaw = state.yaw;
+      pitch = clamp(state.pitch, minPitchRad, maxPitchRad);
+      distance = state.distance;
+      targetDistance = state.targetDistance ?? state.distance;
+      lastMouseMoveAt = state.lastMouseMoveAt ?? performance.now();
+      lastMovementAt = state.lastMovementAt ?? performance.now();
+      autoReturnEnabled = state.autoReturnEnabled !== false;
+    },
     getYaw,
     getFlatAxes,
     getDistance: () => distance,

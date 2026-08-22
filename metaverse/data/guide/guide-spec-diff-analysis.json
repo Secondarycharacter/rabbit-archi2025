@@ -1,0 +1,76 @@
+{
+  "summary": {
+    "doc1_name": "앙지밭골_GUIDE_투어_이벤트_구현명세서_KR_EN.docx",
+    "doc2_name": "앵지밭골_GUIDE_메타버스_이벤트_구현명세서.docx",
+    "doc1_line_count": 94,
+    "doc2_line_count": 97,
+    "implementation_line_count": 98,
+    "primary_reference": "doc2_metaverse"
+  },
+  "structural_changes": [
+    {
+      "area": "START flow",
+      "doc1": "Event 00: 5 lines then orbit; site overview in Event 01 (13 lines)",
+      "doc2": "START: intro+orbit+site overview (11 lines at spawn); Event 01 shortened to 8 lines",
+      "status": "implemented"
+    },
+    {
+      "area": "Orbit camera",
+      "doc1": "(-143.86, 53.3, 6.29) target (4.27, 8.65, 5.02)",
+      "doc2": "(-167.35, 98.77, 73.26) target (-10.54, 97.07, 16.37) rotY 1.9188",
+      "status": "implemented"
+    },
+    {
+      "area": "ESC handling",
+      "doc1": "Yes/No; Yes=reset to spawn + restart paragraph",
+      "doc2": "Continue/From Start; From Start=current stage line 1 only",
+      "status": "implemented"
+    },
+    {
+      "area": "English copy",
+      "doc1": "Angjibalgol, literal translations",
+      "doc2": "Angjibatgol, natural architectural English",
+      "status": "implemented"
+    },
+    {
+      "area": "Event 02 ending",
+      "doc1": "6 lines single last sentence",
+      "doc2": "7 lines split last KR sentence",
+      "status": "implemented"
+    },
+    {
+      "area": "Event 07",
+      "doc1": "8 lines",
+      "doc2": "10 lines split mid-paragraph",
+      "status": "implemented"
+    },
+    {
+      "area": "Guide gaze",
+      "doc1": "not specified",
+      "doc2": "Face player default; look at subject during special lines; return after",
+      "status": "implemented"
+    },
+    {
+      "area": "UI between lines",
+      "doc1": "bubble+subtitle swap per utterance",
+      "doc2": "hide at utterance end, show on next",
+      "status": "implemented"
+    },
+    {
+      "area": "Tour restart",
+      "doc1": "not specified",
+      "doc2": "After complete, re-interact asks restart",
+      "status": "implemented"
+    },
+    {
+      "area": "Line hold timing",
+      "doc1": "fixed",
+      "doc2": "longer lines get longer display time",
+      "status": "implemented"
+    }
+  ],
+  "implementation_alignment": {
+    "dialogue_count_matches_doc2": true,
+    "orbit_coordinates_match_doc2": true
+  }
+}

@@ -1,0 +1,117 @@
+{
+  "version": 1,
+  "globalDefaults": {
+    "interactionDistance": 1.5,
+    "dialogDistance": 1.2,
+    "interactionKey": " ",
+    "interactionScale": 1.5,
+    "hoverEffect": true,
+    "hoverTweenSeconds": 0.22,
+    "alignMoveSpeed": 1.35,
+    "alignRotateSpeed": 4.5,
+    "cameraBlendSeconds": 0.55,
+    "cameraMinDistance": 1.15,
+    "cameraMaxDistance": 2.8,
+    "cameraFov": null,
+    "cameraHeight": 1.55,
+    "cameraLookLift": 0.35,
+    "textSpeed": 0.05,
+    "dialogDuration": 0.8,
+    "voiceEnabled": true,
+    "voiceVolume": 1,
+    "voicePlaybackSpeed": 1,
+    "bubbleMaxLines": 2,
+    "bubbleMaxVisible": 2,
+    "bubbleFadeSeconds": 0.55,
+    "bubbleFadeRisePx": 42,
+    "bubbleMinFontPx": 12,
+    "bubbleMaxFontPx": 16,
+    "restorePlayerPositionOnCancel": false,
+    "restorePlayerPositionOnEnd": false,
+    "repeatable": true,
+    "idleAnimation": "Idle",
+    "walkingAnimation": "Walking",
+    "talkAnimation": "",
+    "greetingAnimation": ""
+  },
+  "guests": [
+    {
+      "guestId": "Mark-1",
+      "guestKey": "guest01",
+      "name": "Guest 01",
+      "displayName": "01",
+      "enabled": true,
+      "interactionEnabled": false,
+      "repeatable": true,
+      "dialogLines": []
+    },
+    {
+      "guestId": "Mark-2",
+      "guestKey": "guest02",
+      "name": "Guest 02",
+      "displayName": "02",
+      "enabled": true,
+      "interactionEnabled": true,
+      "interactionDistance": 1.5,
+      "dialogDistance": 1.2,
+      "interactionScale": 1.5,
+      "textSpeed": 0.05,
+      "voiceEnabled": true,
+      "repeatable": true,
+      "cameraMinDistance": 1.2,
+      "cameraMaxDistance": 2.6,
+      "dialogLines": [
+        {
+          "id": "guest02_01",
+          "order": 1,
+          "enabled": true,
+          "koreanText": "안녕하세요.",
+          "englishSubtitle": "Hello.",
+          "audioFile": "./assets/audio/dialog/guest02_01.mp3",
+          "textSpeed": null,
+          "dialogDuration": 0.6
+        },
+        {
+          "id": "guest02_02",
+          "order": 2,
+          "enabled": true,
+          "koreanText": "이곳에 처음 오셨나요?",
+          "englishSubtitle": "Is this your first time here?",
+          "audioFile": "",
+          "textSpeed": 0.045,
+          "dialogDuration": 0.9
+        },
+        {
+          "id": "guest02_03",
+          "order": 3,
+          "enabled": true,
+          "koreanText": "제가 이곳을 안내해 드릴게요.",
+          "englishSubtitle": "I can show you around this place.",
+          "audioFile": "",
+          "textSpeed": null,
+          "dialogDuration": 1.0
+        }
+      ]
+    },
+    {
+      "guestId": "Mark-3",
+      "guestKey": "guest03",
+      "name": "Guest 03",
+      "displayName": "03",
+      "enabled": true,
+      "interactionEnabled": false,
+      "repeatable": true,
+      "dialogLines": []
+    },
+    {
+      "guestId": "Mark-4",
+      "guestKey": "guest04",
+      "name": "Guest 04",
+      "displayName": "04",
+      "enabled": true,
+      "interactionEnabled": false,
+      "repeatable": true,
+      "dialogLines": []
+    }
+  ]
+}

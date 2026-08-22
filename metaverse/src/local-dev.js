@@ -18,6 +18,10 @@ export function applyLocalDevToolsVisibility() {
     const debugPanel = document.getElementById("debugPanel");
     const rlbTuningPanel = document.getElementById("rlbTuningPanel");
     const rlbTuningToggle = document.getElementById("rlbTuningToggleButton");
+    const npcGuestManagerPanel = document.getElementById("npcGuestManagerPanel");
+    const npcGuestManagerButton = document.getElementById("npcGuestManagerButton");
+    const guideManagerPanel = document.getElementById("guideManagerPanel");
+    const guideManagerButton = document.getElementById("guideManagerButton");
 
     if (debugPanel) {
       debugPanel.hidden = true;
@@ -29,6 +33,22 @@ export function applyLocalDevToolsVisibility() {
 
     if (rlbTuningToggle) {
       rlbTuningToggle.hidden = true;
+    }
+
+    if (npcGuestManagerPanel) {
+      npcGuestManagerPanel.hidden = true;
+    }
+
+    if (npcGuestManagerButton) {
+      npcGuestManagerButton.hidden = true;
+    }
+
+    if (guideManagerPanel) {
+      guideManagerPanel.hidden = true;
+    }
+
+    if (guideManagerButton) {
+      guideManagerButton.hidden = true;
     }
   }
 

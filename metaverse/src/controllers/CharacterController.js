@@ -170,6 +170,11 @@ export function createCharacterController(BABYLON, asset, options = {}) {
     return facingYaw;
   }
 
+  function setFacingYaw(yaw) {
+    facingYaw = yaw;
+    asset.root.rotation.y = facingYaw;
+  }
+
   function getRoot() {
     return asset.root;
   }
@@ -190,6 +195,7 @@ export function createCharacterController(BABYLON, asset, options = {}) {
     updateVisual,
     updateRotation,
     getFacingYaw,
+    setFacingYaw,
     getRoot,
     getVisualHeight,
     getVisualPosition

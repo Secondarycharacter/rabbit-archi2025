@@ -1,0 +1,244 @@
+{
+  "version": 2,
+  "guideSpawnId": "Angji-Guide",
+  "dialogDistance": 1.2,
+  "interactionDistance": 2.0,
+  "textSpeed": 0.0467,
+  "lineHoldSeconds": 0.8,
+  "lineHoldPerChar": 0.016,
+  "lineHoldMaxExtra": 2.67,
+  "orbitSpin": {
+    "position": { "x": -167.35, "y": 98.77, "z": 73.26 },
+    "target": { "x": -10.54, "y": 97.07, "z": 16.37 },
+    "rotationY": 1.9188,
+    "durationSeconds": 10,
+    "rotationTurns": 1,
+    "pitchOffsetDegrees": 10
+  },
+  "transitionPrompt": {
+    "ko": "다음 설명으로 넘어갈까요?",
+    "en": "Shall we move on to the next explanation?"
+  },
+  "declineMessage": {
+    "ko": "설명이 필요하시면 저를 다시 찾아주세요.",
+    "en": "Please find me again if you would like a guided explanation."
+  },
+  "escPrompt": {
+    "ko": "건물 소개는 다음에 들으시겠어요?",
+    "en": "Would you like to hear the building introduction later?"
+  },
+  "escChoiceLabels": {
+    "stop": "중지 / Stop",
+    "continue": "계속 / Continue"
+  },
+  "restartTourPrompt": {
+    "ko": "GUIDE 투어를 다시 시작하시겠습니까?",
+    "en": "Would you like to start the GUIDE tour again?"
+  },
+  "talkingClips": ["Talking01", "Talking02"],
+  "talkingSwitchSeconds": { "min": 3, "max": 6 },
+  "talkingBlendSpeed": 0.045,
+  "talkingCrossfadeSeconds": 0.45,
+  "events": [
+    {
+      "id": "00",
+      "title": "GUIDE 등장 및 사이트 현황",
+      "guidePosition": { "x": -44.89, "y": 21.95, "z": 29.8 },
+      "guideRotationY": 4.6915,
+      "cameraEffect": "default",
+      "dialogues": [
+        { "id": "00_01", "ko": "안녕하세요. 앵지밭골 시니어형 체육관에 오신 것을 환영합니다.", "en": "Hello. Welcome to the Angjibatgol Senior Sports Center." },
+        { "id": "00_02", "ko": "저와 함께 이 건물을 둘러보시겠습니까?", "en": "Would you like to take a tour of this building with me?", "startTourChoice": true },
+        { "id": "00_03", "ko": "저와 함께 이 건물을 둘러보면서, 이곳이 어떤 의도로 계획되었는지 살펴보겠습니다.", "en": "As we tour the building, let me show you the ideas behind its design." },
+        { "id": "00_04", "ko": "그런데 건물부터 보기 전에 먼저 이 장소를 살펴볼 필요가 있습니다.", "en": "Before we look at the building, we should first understand this place." },
+        { "id": "00_05", "ko": "잠시 주변을 둘러볼까요?", "en": "Shall we take a look around?", "orbitAfter": true },
+        { "id": "00_06", "ko": "이곳에는 무학산에서 봉화산으로 이어지는 녹지의 흐름이 있고, 그 사이로 회현천의 물길이 흐르고 있습니다.", "en": "Here, the green corridor runs from Muhaksan to Bonghwasan, while the Hoehyeoncheon stream flows through it." },
+        { "id": "00_07", "ko": "그리고 이미 이곳에는 주차장, 외부 체육시설 그리고 휴게정원이 자리하고 있었습니다.", "en": "The site already had a parking area, outdoor sports facilities, and a landscaped rest garden." },
+        { "id": "00_08", "ko": "새로운 체육관은 이 기존 시설 사이의 유휴공간에 들어서게 됩니다.", "en": "The new sports center is inserted into the unused space between these existing facilities." },
+        { "id": "00_09", "ko": "따라서 이 프로젝트는 빈 터에 새로운 건물을 만드는 것이 아니었습니다.", "en": "This was not a project to build on an empty site." },
+        { "id": "00_10", "ko": "이미 존재하는 자연과 시설, 그리고 사람들의 움직임 사이에 새로운 건물을 더하는 일이었습니다.", "en": "It was about adding a new building between the existing landscape, facilities, and patterns of movement." },
+        { "id": "00_11", "ko": "그럼, 이 조건에서 우리는 어떻게 계획을 했을까요?", "en": "So, how did we design the building within these conditions?" }
+      ]
+    },
+    {
+      "id": "01",
+      "title": "정해진 자리에서 시작된 고민",
+      "guidePosition": { "x": -83.07, "y": 70.14, "z": -206.53 },
+      "guideRotationY": 9.75,
+      "cameraEffect": "default",
+      "dialogues": [
+        { "id": "01_01", "ko": "사실 체육관이 들어설 위치는 크게 고민할 수 있는 조건이 아니었습니다.", "en": "In fact, there was little freedom in choosing the location of the sports center." },
+        { "id": "01_02", "ko": "주차장과 외부 체육시설 사이의 유휴공간.", "en": "The site was essentially fixed between the parking area and the outdoor sports facilities." },
+        { "id": "01_03", "ko": "필요한 체육시설 및 프로그램의 규모도 유휴공간에 딱 맞게 정해져 있었습니다.", "en": "The required scale and program were also largely fixed to fit the available space." },
+        { "id": "01_04", "ko": "결국 비슷한 조건이라면, 비슷한 건물이 만들어질 가능성이 높았습니다.", "en": "With similar conditions, similar buildings could easily emerge." },
+        { "id": "01_05", "ko": "그래서 우리가 고민한 것은 '어디에 지을 것인가'가 아니라,", "en": "So the question was not, “Where should we place the building?”" },
+        { "id": "01_06", "ko": "정해진 자리에서 어떻게 다른 건축을 만들 것인가였습니다.", "en": "It was, “How can we create something distinctive within a fixed site?”" },
+        { "id": "01_07", "ko": "답은 건물 하나의 모양보다, 주변과의 관계에서 찾았습니다.", "en": "We found the answer not in the building alone, but in its relationships with the surroundings." },
+        { "id": "01_08", "ko": "이제 그 관계를 하나씩 살펴보겠습니다.", "en": "Let's look at those relationships one by one." }
+      ]
+    },
+    {
+      "id": "02",
+      "title": "주변과 연결하는 배치",
+      "guidePosition": { "x": -64.94, "y": 79.62, "z": -206.8 },
+      "guideRotationY": 3.0694,
+      "keepConfiguredY": true,
+      "cameraEffect": "landscape",
+      "dialogues": [
+        { "id": "02_01", "ko": "체육관을 이곳에 넣으면서 가장 중요하게 생각한 것은 주변의 풍경을 막지 않는 것이었습니다.", "en": "The most important consideration was to avoid blocking the surrounding landscape." },
+        { "id": "02_02", "ko": "체육관의 큰 매스는 회현천 방향으로 배치하고,", "en": "The main sports hall mass is placed toward Hoehyeoncheon," },
+        { "id": "02_03", "ko": "옹벽 쪽에는 낮은 매스를 두었습니다.", "en": "while a lower mass is placed along the retaining wall." },
+        { "id": "02_04", "ko": "덕분에 무학산과 봉화산으로 이어지는 녹지축을 바라볼 수 있는 통경축을 확보했습니다.", "en": "This preserves a clear view toward the green corridor connecting Muhaksan and Bonghwasan." },
+        { "id": "02_05", "ko": "도로와 산책로에서도 건물이 주는 부담을 줄였습니다.", "en": "It also reduces the perceived scale of the building from the road and walking paths." },
+        { "id": "02_06", "ko": "새로운 건물이 기존 풍경을 차지하는 것이 아니라,", "en": "Rather than allowing the new building to dominate the landscape," },
+        { "id": "02_07", "ko": "기존의 풍경을 바라볼 수 있도록 자리를 잡은 것입니다.", "en": "we positioned it so the existing landscape remains visible." }
+      ]
+    },
+    {
+      "id": "03",
+      "title": "사람을 연결하는 동선",
+      "guidePosition": { "x": -30.57, "y": 21.87, "z": 12.63 },
+      "guideRotationY": -7.0046,
+      "cameraEffect": "default",
+      "dialogues": [
+        { "id": "03_01", "ko": "이번에는 동선에 대한 이야기를 해볼게요.", "en": "Now, let's look at the circulation." },
+        { "id": "03_02", "ko": "기존에는 보행과 차량의 동선이 섞여 있었고, 산책로도 일부 단절되어 있었습니다.", "en": "Previously, pedestrian and vehicle routes were mixed, and parts of the walking path were disconnected." },
+        { "id": "03_03", "ko": "새로운 체육관은 이 흐름을 정리하고 연결하는 역할을 합니다.", "en": "The new sports center reorganizes and reconnects these flows." },
+        { "id": "03_04", "ko": "차량과 보행동선을 분리하고,", "en": "Pedestrian and vehicle circulation are separated," },
+        { "id": "03_05", "ko": "주차장에서 체육관까지 안전하게 접근할 수 있도록 했습니다.", "en": "allowing safe access from the parking area to the building." },
+        { "id": "03_06", "ko": "장애인 주차공간에서는 단차 없이 건물로 연결됩니다.", "en": "Accessible parking connects to the building without level changes." },
+        { "id": "03_07", "ko": "그리고 외부 체육시설과도 직접 연결됩니다.", "en": "It also connects directly to the outdoor sports facilities." },
+        { "id": "03_08", "ko": "건물을 추가한 것이 아니라, 기존 시설 사이의 흐름을 연결한 것입니다.", "en": "We did not simply add a building; we connected the flows between the existing facilities." }
+      ]
+    },
+    {
+      "id": "04",
+      "title": "커뮤니티 홀, 건물의 중심",
+      "guidePosition": { "x": -5.57, "y": 22.17, "z": 5.84 },
+      "guideRotationY": -7.3763,
+      "cameraEffect": "hall",
+      "dialogues": [
+        { "id": "04_01", "ko": "이제 건물 안으로 들어왔습니다.", "en": "Now we are inside the building." },
+        { "id": "04_02", "ko": "이곳이 건물의 중심인 커뮤니티 홀입니다.", "en": "This is the central community hall." },
+        { "id": "04_03", "ko": "주요 공간은 이곳을 중심으로 연결됩니다.", "en": "The main spaces are connected around this hall." },
+        { "id": "04_04", "ko": "그래서 처음 방문한 사람도 어디에 무엇이 있는지 쉽게 파악할 수 있습니다.", "en": "This makes it easy for first-time visitors to understand where they are and where to go." },
+        { "id": "04_05", "ko": "특히 시니어 이용자에게는 복잡한 공간보다 직관적인 공간구성이 중요합니다.", "en": "For senior users, intuitive spatial organization is especially important." },
+        { "id": "04_06", "ko": "그리고 이곳은 단순한 통로가 아닙니다.", "en": "This is more than a circulation space." },
+        { "id": "04_07", "ko": "잠시 쉬거나 사람을 만나고, 전시나 소모임을 열 수도 있습니다.", "en": "It can be used for resting, meeting people, exhibitions, or small gatherings." },
+        { "id": "04_08", "ko": "운동하지 않는 시간에도 건물이 살아 있도록 만든 공간입니다.", "en": "It keeps the building active even when no sports program is taking place." }
+      ]
+    },
+    {
+      "id": "05",
+      "title": "실내와 외부를 하나로",
+      "guidePosition": { "x": 10.77, "y": 22.17, "z": -4.31 },
+      "guideRotationY": -7.3241,
+      "cameraEffect": "outdoor",
+      "dialogues": [
+        { "id": "05_01", "ko": "여기에서 밖을 바라보세요.", "en": "Look outside from here.", "cameraEffect": "outdoor" },
+        { "id": "05_02", "ko": "실내 체육관과 야외 다목적구장이 직접 연결되어 있습니다.", "en": "The indoor sports hall is directly connected to the outdoor multi-purpose court." },
+        { "id": "05_03", "ko": "기존 외부 체육시설을 그대로 두고 새로운 체육관만 추가한 것이 아닙니다.", "en": "We did not simply add a new building beside the existing outdoor facilities." },
+        { "id": "05_04", "ko": "실내와 외부를 하나의 체육시설처럼 사용할 수 있도록 연결했습니다.", "en": "We connected them so indoor and outdoor spaces can function as one sports facility." },
+        { "id": "05_05", "ko": "운동의 종류에 따라 안과 밖을 자유롭게 오갈 수 있습니다.", "en": "Users can move freely between inside and outside depending on the activity." },
+        { "id": "05_06", "ko": "그리고 앞으로 증축 등으로 인해 시설이 확장될 경우에도 이 연결부가 새로운 공간을 이어주는 역할을 할 수 있습니다.", "en": "If the facility is expanded in the future, this connection can also link to new spaces." },
+        { "id": "05_07", "ko": "새로운 건물이 기존 시설을 대체하는 것이 아니라, 기존 시설의 기능을 확장합니다.", "en": "The new building does not replace the existing facilities; it expands their function." }
+      ]
+    },
+    {
+      "id": "06",
+      "title": "하나의 공간, 다양한 활동",
+      "guidePosition": { "x": -4.27, "y": 22.17, "z": -13.56 },
+      "guideRotationY": 2.5037,
+      "cameraEffect": "default",
+      "dialogues": [
+        { "id": "06_01", "ko": "이 체육관은 운동만을 위한 공간이 아닙니다.", "en": "This sports center is not only for exercise." },
+        { "id": "06_02", "ko": "구역별 출입구를 두어 여러 프로그램을 동시에 운영할 수 있도록 했습니다.", "en": "Separate entrances allow different programs to operate simultaneously." },
+        { "id": "06_03", "ko": "그리고 리프트형 무대를 이용하면 체육뿐만 아니라 행사와 공연도 가능합니다.", "en": "A lift stage allows the space to host events and performances as well as sports." },
+        { "id": "06_04", "ko": "프로그램실 역시 이용 규모에 따라 유연하게 사용할 수 있습니다.", "en": "The program rooms can also be adapted to different group sizes." },
+        { "id": "06_05", "ko": "운동이 없는 시간에는 다른 활동이 이 공간을 채울 수 있습니다.", "en": "When sports activities are not taking place, other activities can fill the space." },
+        { "id": "06_06", "ko": "하나의 기능을 위한 건물이 아니라, 다양한 활동을 담는 건물입니다.", "en": "It is not a building for a single function, but a place for many kinds of activities." }
+      ]
+    },
+    {
+      "id": "07",
+      "title": "그루터기, 건축의 모습이 되다",
+      "guidePosition": { "x": -23.13, "y": 22.02, "z": -9.58 },
+      "guideRotationY": -7.8475,
+      "cameraEffect": "building",
+      "dialogues": [
+        { "id": "07_01", "ko": "지금부터는 이 건물의 모습을 살펴보겠습니다.", "en": "Now, let's look at the character of the building itself." },
+        { "id": "07_02", "ko": "이 건물에는 하나의 특별한 이야기가 담겨 있습니다.", "en": "There is a special story behind its design." },
+        { "id": "07_03", "ko": "그루터기입니다.", "en": "It is the idea of a tree stump.", "cameraEffect": "building" },
+        { "id": "07_04", "ko": "그루터기는 오랜 시간 한곳에 뿌리내리고 성장한 나무의 흔적입니다.", "en": "A tree stump is the trace of a tree that has taken root and grown in one place over time." },
+        { "id": "07_05", "ko": "그리고 사람들에게 쉼터가 되어주기도 합니다.", "en": "It can also become a place where people pause and rest." },
+        { "id": "07_06", "ko": "우리도 이 건물이 지역과 함께 성장하고,", "en": "We wanted this building to grow with the community," },
+        { "id": "07_07", "ko": "사람들이 만나고 쉬어가는 건강한 쉼터가 되기를 바랬습니다.", "en": "and to become a healthy place where people meet and rest." },
+        { "id": "07_08", "ko": "그래서 건물의 중심에는 주요 프로그램을 담고,", "en": "The main programs are placed at the center," },
+        { "id": "07_09", "ko": "그 주변에는 사람과 자연을 연결하는 공간을 만들었습니다.", "en": "with spaces around them that connect people and nature." },
+        { "id": "07_10", "ko": "형태만 그루터기를 닮은 것이 아니라, 그루터기가 가진 역할까지 담고자 했습니다.", "en": "We wanted to capture not only the form of a stump, but also its role as a rooted place of gathering and rest." }
+      ]
+    },
+    {
+      "id": "08",
+      "title": "빛과 바람을 담은 건축",
+      "guidePosition": { "x": 7.74, "y": 26.22, "z": 1.99 },
+      "guideRotationY": 7.3733,
+      "keepConfiguredY": true,
+      "cameraEffect": "default",
+      "dialogues": [
+        { "id": "08_01", "ko": "이번에는 건물 안으로 들어오는 자연을 살펴보겠습니다.", "en": "Now, let's see how nature enters the building." },
+        { "id": "08_02", "ko": "건물의 높이 차이와 천창을 이용해 자연광을 끌어들였습니다.", "en": "Differences in building height and skylights bring natural light inside.", "cameraEffect": "lookUp" },
+        { "id": "08_03", "ko": "체육관은 맞통풍이 가능하도록 계획했습니다.", "en": "The sports hall is designed for cross ventilation." },
+        { "id": "08_04", "ko": "즉, 빛과 바람을 건축의 일부로 사용한 것입니다.", "en": "In other words, light and wind are part of the architecture." },
+        { "id": "08_05", "ko": "외부의 자연을 차단하는 건물이 아니라,", "en": "Rather than blocking the natural environment outside," },
+        { "id": "08_06", "ko": "자연을 내부로 끌어들이는 건축입니다.", "en": "the building brings nature into the interior." }
+      ]
+    },
+    {
+      "id": "09",
+      "title": "형태가 환경이 되다",
+      "guidePosition": { "x": -6.25, "y": 22.02, "z": 26.07 },
+      "guideRotationY": 5.905,
+      "cameraEffect": "building",
+      "dialogues": [
+        { "id": "09_01", "ko": "이 건물의 역경사 형태를 자세히 살펴보세요.", "en": "Take a closer look at the building's reverse-sloped form." },
+        { "id": "09_02", "ko": "이 형태는 단순한 디자인이 아닙니다.", "en": "This form is more than a visual design choice." },
+        { "id": "09_03", "ko": "외벽을 비와 먼지로부터 보호하고,", "en": "It helps protect the exterior walls from rain and dirt," },
+        { "id": "09_04", "ko": "깊은 차양을 만들어 햇빛을 조절합니다.", "en": "and creates deep overhangs that control sunlight." },
+        { "id": "09_05", "ko": "여기에 역전지붕과 자연채광, 맞통풍을 더해 에너지 사용도 줄였습니다.", "en": "Together with an inverted roof, natural lighting, and cross ventilation, it also helps reduce energy use." },
+        { "id": "09_06", "ko": "즉, 건물의 형태가 환경을 조절하고,", "en": "The form of the building helps regulate its environment," },
+        { "id": "09_07", "ko": "환경을 고려한 설계가 다시 건물의 형태를 만들어냅니다.", "en": "while environmental considerations shape the form in return." },
+        { "id": "09_08", "ko": "디자인과 친환경을 따로 생각하지 않은 것입니다.", "en": "Design and sustainability were conceived as one." }
+      ]
+    },
+    {
+      "id": "10",
+      "title": "정해진 조건에서 새로운 관계로",
+      "guidePosition": { "x": -44.89, "y": 21.95, "z": 29.8 },
+      "guideRotationY": 4.6915,
+      "cameraEffect": "building",
+      "closingAnimations": ["Greeting_bow", "Greeting_Hand", "Idle"],
+      "dialogues": [
+        { "id": "10_01", "ko": "처음 이곳에서 무엇부터 살펴봤는지 기억하시나요?", "en": "Do you remember what we looked at first?" },
+        { "id": "10_02", "ko": "이곳에는 이미 주차장과 외부 체육시설, 휴게정원이 있었습니다.", "en": "The site already had a parking area, outdoor sports facilities, and a rest garden." },
+        { "id": "10_03", "ko": "그리고 체육관이 들어설 위치와 규모 역시 크게 달라질 수 없는 조건이었습니다.", "en": "The location and scale of the sports center were also largely fixed." },
+        { "id": "10_04", "ko": "그래서 우리는 새로운 건물의 모양만 고민하지 않았습니다.", "en": "So we did not focus only on the shape of a new building." },
+        { "id": "10_05", "ko": "기존 시설과 연결하고,", "en": "We connected the existing facilities," },
+        { "id": "10_06", "ko": "사람의 동선을 연결하고,", "en": "connected people's movement," },
+        { "id": "10_07", "ko": "실내와 외부를 연결하고,", "en": "connected indoor and outdoor activities," },
+        { "id": "10_08", "ko": "자연과 건축을 연결했습니다.", "en": "and connected architecture with nature." },
+        { "id": "10_09", "ko": "그리고 그 모든 관계를 커뮤니티 홀을 중심으로 다시 연결했습니다.", "en": "We brought all of these relationships together around the community hall." },
+        { "id": "10_10", "ko": "이렇게 사람들이 운동하고,", "en": "A place where people can exercise," },
+        { "id": "10_11", "ko": "만나고,", "en": "meet," },
+        { "id": "10_12", "ko": "쉬고,", "en": "rest," },
+        { "id": "10_13", "ko": "다시 새로운 활동을 시작하는 공간을 만들었습니다.", "en": "and start new activities again." },
+        { "id": "10_14", "ko": "처음에 이야기했던 '그루터기'는 바로 이런 의미입니다.", "en": "This is what the “tree stump” idea means." },
+        { "id": "10_15", "ko": "한곳에 뿌리내리고, 사람들에게 쉼터가 되고, 지역과 함께 성장하는 공간.", "en": "A place rooted in one location, offering rest, and growing with the community." },
+        { "id": "10_16", "ko": "결국 우리가 만들고자 한 것은 단순한 체육관이 아니었습니다.", "en": "Ultimately, we were not simply creating a sports center." },
+        { "id": "10_17", "ko": "정해진 조건 속에서 새로운 관계를 만들어내는 건축.", "en": "We were creating architecture that forms new relationships within fixed conditions." },
+        { "id": "10_18", "ko": "그것이 앵지밭골 시니어형 체육관입니다.", "en": "That is the Angjibatgol Senior Sports Center." },
+        { "id": "10_19", "ko": "이상으로 투어를 마치겠습니다. 함께해 주셔서 감사합니다.", "en": "This concludes the tour. Thank you for joining me." }
+      ]
+    }
+  ]
+}

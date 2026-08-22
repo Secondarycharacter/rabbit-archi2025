@@ -1,11 +1,11 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Metaverse Architecture Tour</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="./styles/main.css?v=rlb-shader-proximity-20260818-group-v31">
+  <link rel="stylesheet" href="./styles/main.css?v=angji-guide-tour-20260822-v13">
 </head>
 <body>
   <main class="game-shell">
@@ -52,6 +52,8 @@
           <button id="orbitViewButton" type="button">Orbit View</button>
           <button id="tourModeButton" type="button">Tour Mode</button>
           <button id="nightModeButton" type="button" hidden>Night Mode</button>
+          <button class="local-dev-only" id="npcGuestManagerButton" type="button">게스트 관리</button>
+          <button class="local-dev-only" id="guideManagerButton" type="button">가이드 관리</button>
           <button class="local-dev-only" id="rlbTuningToggleButton" type="button" hidden>RLB 쉐이더</button>
         </div>
       </div>
@@ -177,6 +179,6 @@
   <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
   <script src="https://cdn.babylonjs.com/addons/babylonjs.addons.min.js"></script>
   <script src="./lib/babylonjs-fbx-loader.js"></script>
-  <script type="module" src="./src/first-person-tour.js?v=rlb-shader-proximity-20260820-group-v50"></script>
+  <script type="module" src="./src/first-person-tour.js?v=angji-guide-tour-20260822-v17"></script>
 </body>
 </html>

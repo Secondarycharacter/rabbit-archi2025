@@ -1,40 +1,81 @@
-/** Minimum label height from feet in world space. */
-export const GUEST_NUMBER_LABEL_HEIGHT = 1.26;
+/** Extra world-space gap above the live mesh top (head). */
+export const GUEST_NUMBER_LABEL_HEAD_CLEARANCE = 0.25;
 
-/** Extra clearance above the scaled mesh top. */
-export const GUEST_NUMBER_LABEL_HEAD_CLEARANCE = 0.12;
+/** Billboard width/height in world meters. */
+export const GUEST_NUMBER_LABEL_WORLD_SIZE = 0.55;
 
-/** Billboard size in world space (meters). */
-export const GUEST_NUMBER_LABEL_WORLD_SIZE = 0.9;
+function getGuestFitScale(guest) {
+  return Math.max(guest?.fitScale ?? guest?.root?.scaling?.y ?? 1, 0.001);
+}
 
-const GUEST_NUMBER_LABEL_BASE_PLANE_SIZE = 0.9;
+function isGuestLabelMesh(mesh) {
+  const name = String(mesh?.name || "");
+  return name.includes("guest-label") || name.includes("guest-energy");
+}
+
+/** Live head height in guest-root local units (feet at y=0). */
+export function getGuestHeadLocalY(guest) {
+  const root = guest?.root;
+  const fitScale = getGuestFitScale(guest);
+
+  if (!root) {
+    return 1.75 / fitScale;
+  }
+
+  const rootY = root.getAbsolutePosition?.()?.y;
+  const meshes = guest?.meshes || [];
+  let maxWorldY = Number.isFinite(rootY) ? rootY : 0;
+  let found = false;
+
+  meshes.forEach((mesh) => {
+    if (!mesh || mesh.isDisposed?.() || isGuestLabelMesh(mesh)) {
+      return;
+    }
+
+    if (mesh.isEnabled?.() === false) {
+      return;
+    }
+
+    const box = mesh.getBoundingInfo?.()?.boundingBox;
+
+    if (!box || !Number.isFinite(box.maximumWorld?.y)) {
+      return;
+    }
+
+    if (!found || box.maximumWorld.y > maxWorldY) {
+      maxWorldY = box.maximumWorld.y;
+      found = true;
+    }
+  });
+
+  const worldHeight = found && Number.isFinite(rootY)
+    ? maxWorldY - rootY
+    : (typeof guest?.rawHeight === "number" && guest.rawHeight > 0
+      ? guest.rawHeight * fitScale
+      : 1.75);
+
+  return Math.max(worldHeight, 0.4) / fitScale;
+}
 
 export function getGuestDevLabelFitScale(guest) {
-  return guest?.fitScale ?? guest?.root?.scaling?.y ?? 1;
+  return getGuestFitScale(guest);
 }
 
 export function getGuestDevLabelMetrics(guest) {
-  const fitScale = getGuestDevLabelFitScale(guest);
-  const safeFitScale = Math.max(fitScale, 0.001);
-  const rawHeight = guest?.rawHeight;
-  const scaledHeight = typeof rawHeight === "number" && rawHeight > 0
-    ? rawHeight * safeFitScale
-    : GUEST_NUMBER_LABEL_HEIGHT;
-  const worldY = Math.max(
-    GUEST_NUMBER_LABEL_HEIGHT,
-    scaledHeight + GUEST_NUMBER_LABEL_HEAD_CLEARANCE
-  );
+  const fitScale = getGuestFitScale(guest);
+  const headLocalY = getGuestHeadLocalY(guest);
+  const localY = headLocalY + GUEST_NUMBER_LABEL_HEAD_CLEARANCE / fitScale;
 
   return {
-    fitScale: safeFitScale,
-    worldY,
-    localY: worldY / safeFitScale,
-    planeScale: 1 / safeFitScale
+    fitScale,
+    localY,
+    planeScale: 1 / fitScale,
+    worldY: localY * fitScale
   };
 }
 
 export function createGuestDevLabel(BABYLON, scene, guest, labelText) {
-  if (!labelText) {
+  if (!labelText || !guest?.root) {
     return null;
   }
 
@@ -45,48 +86,101 @@ export function createGuestDevLabel(BABYLON, scene, guest, labelText) {
     false
   );
   texture.hasAlpha = true;
-  texture.drawText(labelText, null, 56, "bold 28px sans-serif", "#ffffff", "transparent", true);
+  texture.drawText(String(labelText), null, 64, "bold 48px sans-serif", "#ffffff", "transparent", true);
 
   const material = new BABYLON.StandardMaterial(`guest-label-mat-${guest.spawn.id}`, scene);
   material.diffuseTexture = texture;
+  material.emissiveTexture = texture;
   material.emissiveColor = new BABYLON.Color3(1, 1, 1);
+  material.specularColor = new BABYLON.Color3(0, 0, 0);
   material.disableLighting = true;
   material.backFaceCulling = false;
+  material.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
   material.useAlphaFromDiffuseTexture = true;
+  material.disableDepthWrite = true;
+
+  const root = new BABYLON.TransformNode(`guest-label-root-${guest.spawn.id}`, scene);
+  root.parent = guest.root;
+  root.isPickable = false;
 
   const plane = BABYLON.MeshBuilder.CreatePlane(
     `guest-label-${guest.spawn.id}`,
-    { size: GUEST_NUMBER_LABEL_BASE_PLANE_SIZE },
+    { size: GUEST_NUMBER_LABEL_WORLD_SIZE },
     scene
   );
   plane.material = material;
-  plane.parent = guest.root;
+  plane.parent = root;
   plane.isPickable = false;
+  plane.checkCollisions = false;
+  plane.applyFog = false;
   plane.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
-  updateGuestDevLabelHeight(guest, plane);
+  plane.renderingGroupId = 1;
+  plane.alwaysSelectAsActiveMesh = true;
 
+  const label = { root, plane, texture, material };
+  guest.devLabel = label;
+  updateGuestDevLabelHeight(guest, label);
+  root.setEnabled(false);
   plane.setEnabled(false);
 
-  return { plane, texture, material };
+  return label;
 }
 
-export function updateGuestDevLabelHeight(guest, plane = guest.devLabel?.plane) {
-  if (!plane || !guest) {
+export function updateGuestDevLabelHeight(guest, label = guest.devLabel) {
+  const root = label?.root || guest?.devLabel?.root;
+  const plane = label?.plane || guest?.devLabel?.plane;
+
+  if (!root || !guest) {
     return;
   }
 
   const { localY, planeScale } = getGuestDevLabelMetrics(guest);
-  plane.position.set(0, localY, 0);
-  plane.scaling.set(planeScale, planeScale, 1);
+  const hoverScale = Number.isFinite(label?.interactionHoverScale)
+    ? label.interactionHoverScale
+    : (Number.isFinite(guest?.devLabel?.interactionHoverScale)
+      ? guest.devLabel.interactionHoverScale
+      : 1);
+  const scale = planeScale * Math.max(hoverScale, 0.01);
+
+  root.position.set(0, localY, 0);
+  root.scaling.set(planeScale, planeScale, planeScale);
+
+  // Hover scale applies on the billboard plane so parent fitScale stays stable.
+  if (plane) {
+    plane.scaling.set(hoverScale, hoverScale, hoverScale);
+  } else {
+    root.scaling.set(scale, scale, scale);
+  }
+}
+
+export function setGuestDevLabelText(guest, labelText) {
+  const label = guest?.devLabel;
+  const text = String(labelText || "").trim();
+
+  if (!label?.texture || !text) {
+    return false;
+  }
+
+  label.texture.clear();
+  label.texture.drawText(text, null, 64, "bold 48px sans-serif", "#ffffff", "transparent", true);
+  label.labelText = text;
+  return true;
 }
 
 export function setGuestDevLabelVisible(guest, enabled) {
-  guest.devLabel?.plane?.setEnabled(Boolean(enabled && guest.spawn?.devLabel));
+  const visible = Boolean(enabled && guest?.devLabel);
+  guest?.devLabel?.root?.setEnabled(visible);
+  guest?.devLabel?.plane?.setEnabled(visible);
 }
 
 export function disposeGuestDevLabel(guest) {
+  if (!guest) {
+    return;
+  }
+
   guest.devLabel?.plane?.dispose();
   guest.devLabel?.material?.dispose();
   guest.devLabel?.texture?.dispose();
+  guest.devLabel?.root?.dispose();
   guest.devLabel = null;
 }

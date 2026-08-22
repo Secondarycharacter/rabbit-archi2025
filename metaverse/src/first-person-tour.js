@@ -1,4 +1,4 @@
-﻿import { FIREBASE_CONFIG, OVERVIEW_ADMIN_PASSCODE } from "./firebase-config.js?v=tps-jump-nocol-20260629";
+import { FIREBASE_CONFIG, OVERVIEW_ADMIN_PASSCODE } from "./firebase-config.js?v=tps-jump-nocol-20260629";
 import { createTpsSystem } from "./controllers/createTpsSystem.js?v=jump-nocol-windup-20260725";
 import {
   CONTROLLER_SETTINGS,
@@ -11,6 +11,24 @@ import {
 import {
   applyCharacterTpsKeyDown
 } from "./character-tps-bindings.js?v=tps-jump-nocol-20260629";
+import {
+  createNpcInteractionSystem
+} from "./npc-interaction-system.js?v=angji-npc-manager-20260820";
+import {
+  createNpcGuestManagerPanel
+} from "./npc-guest-manager-panel.js?v=angji-npc-manager-20260820";
+import {
+  createAngjiGuideTourSystem
+} from "./angji-guide-tour-system.js?v=angji-guide-tour-20260822-v17";
+import {
+  createAngjiGuideManagerPanel
+} from "./angji-guide-manager-panel.js?v=angji-guide-manager-20260822";
+import {
+  getDisplayNameMap,
+  loadEffectiveGuestBundle,
+  resolveInteractionConfigs,
+  loadConversationProgress
+} from "./npc-guest-data.js?v=angji-npc-manager-20260820";
 import { createGuestPlacementTool } from "./guest-placement-tool.js?v=orbit-cam-capture-20260725";
 import {
   attachHistoryDisplayBoards,
@@ -34,9 +52,13 @@ import {
   ANGJI_NIGHT_MARIE_GUEST_ID,
   ANGJI_GUEST_CONFIG_VERSION,
   getAngjiGuestPositionYOffset,
+  getAngjiGuestNumberLabel,
+  getAngjiModelGuestEntriesSorted,
+  isAngjiGuestId,
+  isAngjiOutdoorGuestId,
   mapAngjiGuestSpawnsForMode,
   toAngjiNightGuestSpawn
-} from "./angji-guest-config.js?v=angji-guest-night-marie-extra-20260719";
+} from "./angji-guest-config.js?v=angji-mark13-patrol-20260820";
 import {
   getJinjuOutdoorBackgroundGuestSpawns,
   getJinjuFixedGuestSpawns,
@@ -76,7 +98,7 @@ import {
   getJinjuRooftopGuestRevealDelayMs,
   getJinjuRooftopSequentialGuestSpawns
 } from "./jinju-rooftop-guest-config.js?v=jinju-rooftop-marie-sit-clips-20260705";
-import { createGuestCharacterSystem, shouldSnapPatrolFloorAtTarget } from "./guest-character-system.js?v=angji-night-marie-extra-20260719";
+import { createGuestCharacterSystem, shouldSnapPatrolFloorAtTarget } from "./guest-character-system.js?v=angji-mark13-patrol-20260820";
 import { applyLocalDevToolsVisibility, isLocalDevEnvironment } from "./local-dev.js?v=local-dev-20260819";
 import { setupAngjiRlbProximityGlow, shouldSkipMaterialFreeze } from "./rlb-proximity-glow.js?v=rlb-shader-proximity-20260820-group-v50";
 
@@ -4186,40 +4208,59 @@ function getJinjuGuestFloorMeshesForLevel(guestModelState, floorLevel) {
   return [];
 }
 
-function pickAngjiGuestFloorY(BABYLON, scene, x, z, floor1Meshes, externalFloorMeshes) {
+function pickAngjiGuestFloorY(BABYLON, scene, x, z, floor1Meshes, externalFloorMeshes, options = {}) {
   const floor1Set = new Set(floor1Meshes || []);
   const externalSet = new Set(externalFloorMeshes || []);
+  const fallbackY = options.fallbackY;
+  const maxDelta = typeof options.maxDelta === "number" ? options.maxDelta : 3;
+  const preferExternal = options.preferExternal === true;
   const rayOrigin = new BABYLON.Vector3(x, GROUND_RAY_UP + 120, z);
   const ray = new BABYLON.Ray(rayOrigin, new BABYLON.Vector3(0, -1, 0), GROUND_RAY_UP + GROUND_RAY_DOWN + 120);
 
-  const pickTopFloorY = (meshSet) => {
+  const collectHits = (meshSet) => {
     if (!meshSet.size) {
+      return [];
+    }
+
+    const hits = getRayHits(scene, ray, (mesh) => meshSet.has(mesh) && mesh.isEnabled());
+
+    return hits.filter((hit) => {
+      const normal = hit.getNormal?.(true);
+      return Number.isFinite(hit.pickedPoint?.y)
+        && (!normal || normal.y >= CLASSIFIED_GROUND_NORMAL_MIN_Y);
+    });
+  };
+
+  const rankHits = (hits) => {
+    if (!hits.length) {
       return null;
     }
 
-    const hits = getRayHits(scene, ray, (mesh) => (
-      meshSet.has(mesh)
-      && mesh.isEnabled()
-      && mesh.isPickable !== false
+    if (!Number.isFinite(fallbackY)) {
+      return [...hits].sort((left, right) => right.pickedPoint.y - left.pickedPoint.y)[0].pickedPoint.y;
+    }
+
+    const near = hits.filter((hit) => Math.abs(hit.pickedPoint.y - fallbackY) <= maxDelta);
+    const pool = near.length ? near : [];
+
+    if (!pool.length) {
+      return null;
+    }
+
+    pool.sort((left, right) => (
+      Math.abs(left.pickedPoint.y - fallbackY) - Math.abs(right.pickedPoint.y - fallbackY)
     ));
-
-    const topHit = hits
-      .filter((hit) => {
-        const normal = hit.getNormal?.(true);
-        return !normal || normal.y >= CLASSIFIED_GROUND_NORMAL_MIN_Y;
-      })
-      .sort((a, b) => b.pickedPoint.y - a.pickedPoint.y)[0];
-
-    return topHit?.pickedPoint?.y ?? null;
+    return pool[0].pickedPoint.y;
   };
 
-  const floor1Y = pickTopFloorY(floor1Set);
+  const externalHits = collectHits(externalSet);
+  const floor1Hits = collectHits(floor1Set);
 
-  if (floor1Y !== null) {
-    return floor1Y;
+  if (preferExternal) {
+    return rankHits(externalHits) ?? rankHits(floor1Hits);
   }
 
-  return pickTopFloorY(externalSet);
+  return rankHits(floor1Hits) ?? rankHits(externalHits);
 }
 
 function pickJinjuIndoorFloorY(BABYLON, scene, x, z, floor2Meshes, fallbackY) {
@@ -4227,8 +4268,17 @@ function pickJinjuIndoorFloorY(BABYLON, scene, x, z, floor2Meshes, fallbackY) {
 }
 
 function resolveAngjiGuestSpawn(BABYLON, scene, spawn, floor1Meshes, externalFloorMeshes) {
+  const preferExternal = isAngjiOutdoorGuestId(spawn.id);
   const snapFloorY = (x, z, fallbackY) => {
-    const groundY = pickAngjiGuestFloorY(BABYLON, scene, x, z, floor1Meshes, externalFloorMeshes);
+    const groundY = pickAngjiGuestFloorY(
+      BABYLON,
+      scene,
+      x,
+      z,
+      floor1Meshes,
+      externalFloorMeshes,
+      { fallbackY, preferExternal }
+    );
     return groundY ?? fallbackY;
   };
   const sitYOffset = getAngjiGuestPositionYOffset(spawn);
@@ -6464,9 +6514,17 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
   let pendingMouseDeltaX = 0;
   let pendingMouseDeltaY = 0;
   let pendingWheelDelta = 0;
+  let guideLookPointerId = null;
+  let guideLookPrevX = 0;
+  let guideLookPrevY = 0;
   let lastTpsRuntimeState = null;
   let guestPlacementTool = null;
   let guestCharacterSystem = null;
+  let npcInteractionSystem = null;
+  let angjiGuideTourSystem = null;
+  let guideManagerPanel = null;
+  let npcGuestManagerPanel = null;
+  let npcDisplayNameByGuestId = new Map();
   let jinjuOutdoorGuestSpawnToken = 0;
   let jinjuIndoorGuestSpawnToken = 0;
   let angjiOutdoorGuestSpawnToken = 0;
@@ -6550,6 +6608,27 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
 
   guestCharacterSystem = createGuestCharacterSystem(BABYLON, scene, {
     showDevLabels: isLocalDevEnvironment(),
+    resolveGuestLabelText: (spawn) => {
+      if (isAngjiGuestId(spawn?.id)) {
+        return npcDisplayNameByGuestId.get(spawn.id) || getAngjiGuestNumberLabel(spawn.id);
+      }
+
+      return spawn?.devLabel || "";
+    },
+    shouldAttachGuestLabel: (spawn) => {
+      if (isAngjiGuestId(spawn?.id)) {
+        return true;
+      }
+
+      return isLocalDevEnvironment() && Boolean(spawn?.devLabel);
+    },
+    isGuestLabelVisible: (guest) => {
+      if (isAngjiGuestId(guest?.spawn?.id)) {
+        return !isAngjiNightGuestMode();
+      }
+
+      return isLocalDevEnvironment();
+    },
     getGeometryMeshes,
     getRootNodes,
     updateWorldMatrices,
@@ -6694,7 +6773,8 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
         x,
         z,
         floorMeshState.angjiBuildingFloor1Meshes,
-        floorMeshState.angjiExternalFloorMeshes
+        floorMeshState.angjiExternalFloorMeshes,
+        { fallbackY }
       ) ?? fallbackY;
     }
   });
@@ -6702,6 +6782,378 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
   console.info(`[jinju-guests] outdoor config ${JINJU_GUEST_CONFIG_VERSION}`);
   console.info(`[jinju-guests] indoor config ${JINJU_INDOOR_GUEST_CONFIG_VERSION}`);
   console.info(`[jinju-guests] rooftop config ${JINJU_ROOFTOP_GUEST_CONFIG_VERSION}`);
+
+  function applyNpcDisplayNames(displayNameMap) {
+    npcDisplayNameByGuestId = displayNameMap instanceof Map
+      ? displayNameMap
+      : new Map(displayNameMap || []);
+    guestCharacterSystem?.applyGuestLabelTexts?.();
+  }
+
+  npcInteractionSystem = createNpcInteractionSystem(BABYLON, scene, {
+    configs: [],
+    eyeHeight: EYE_HEIGHT,
+    getWalkMode: () => (
+      walkMode
+      && isAngjiProjectConfig(activeModelState.config)
+      && !isAngjiNightGuestMode()
+    ),
+    getPlayerEyePosition: () => {
+      if (!walkMode) {
+        return null;
+      }
+
+      const visualPosition = tpsSystem?.getCharacter?.()?.getVisualPosition?.();
+
+      if (visualPosition) {
+        return new BABYLON.Vector3(
+          visualPosition.x,
+          visualPosition.y + EYE_HEIGHT,
+          visualPosition.z
+        );
+      }
+
+      return walkCamera.position;
+    },
+    getPlayerBody: () => (walkMode ? walkCamera : null),
+    getPlayerCharacter: () => tpsSystem?.getCharacter?.() || null,
+    getTpsSystem: () => tpsSystem,
+    getGuestById: (guestId) => (
+      guestCharacterSystem?.getGuests?.()?.find((guest) => guest?.spawn?.id === guestId) || null
+    ),
+    getCollisionMeshes: () => (
+      localCollisionMeshSet.size > 0 ? localCollisionMeshSet : collisionMeshSet
+    ),
+    resolveGroundEyeY: (position) => {
+      const groundPose = getLandingGroundPoseAtPosition(
+        BABYLON,
+        scene,
+        position,
+        localGroundMeshSet,
+        position.y,
+        { compactProbes: true }
+      );
+
+      return groundPose?.eyeY ?? position.y;
+    },
+    getActiveCamera: () => (walkMode ? walkCamera : scene.activeCamera),
+    onStatus: (message) => {
+      if (typeof message === "string" && message) {
+        setStatus(message);
+      }
+    }
+  });
+
+  angjiGuideTourSystem = createAngjiGuideTourSystem(BABYLON, scene, {
+    eyeHeight: EYE_HEIGHT,
+    getWalkMode: () => (
+      walkMode
+      && isAngjiProjectConfig(activeModelState.config)
+      && !isAngjiNightGuestMode()
+    ),
+    getPlayerBody: () => (walkMode ? walkCamera : null),
+    getPlayerCharacter: () => tpsSystem?.getCharacter?.() || null,
+    getTpsSystem: () => tpsSystem,
+    getGuestCharacterSystem: () => guestCharacterSystem,
+    getActiveCamera: () => (walkMode ? tpsCamera : scene.activeCamera),
+    getWalkCamera: () => (walkMode ? tpsCamera : walkCamera),
+    getOrbitCamera: () => orbitCamera,
+    getGuideFloorY: (x, z, fallbackY) => {
+      const floorMeshState = getAngjiGuestFloorMeshState();
+
+      return pickAngjiGuestFloorY(
+        BABYLON,
+        scene,
+        x,
+        z,
+        floorMeshState.angjiBuildingFloor1Meshes,
+        floorMeshState.angjiExternalFloorMeshes,
+        { fallbackY, preferExternal: true, maxDelta: 6 }
+      ) ?? fallbackY;
+    },
+    resolveGroundEyeY: (position) => {
+      const floorMeshState = getAngjiGuestFloorMeshState();
+      const fallbackGroundY = position.y - EYE_HEIGHT;
+      const groundY = pickAngjiGuestFloorY(
+        BABYLON,
+        scene,
+        position.x,
+        position.z,
+        floorMeshState.angjiBuildingFloor1Meshes,
+        floorMeshState.angjiExternalFloorMeshes,
+        { fallbackY: fallbackGroundY, preferExternal: true, maxDelta: 6 }
+      );
+
+      if (Number.isFinite(groundY)) {
+        return groundY + EYE_HEIGHT;
+      }
+
+      const groundPose = getLandingGroundPoseAtPosition(
+        BABYLON,
+        scene,
+        position,
+        localGroundMeshSet,
+        position.y,
+        { compactProbes: true }
+      );
+
+      return groundPose?.eyeY ?? position.y;
+    },
+    snapPlayerGroundAt: (eyePosition, options = {}) => {
+      if (!walkMode || !walkCamera || !eyePosition) {
+        return;
+      }
+
+      let eyeY = eyePosition.y;
+
+      if (options.lockConfiguredEyeY === true) {
+        eyeY = eyePosition.y;
+      } else {
+        const floorMeshState = getAngjiGuestFloorMeshState();
+        const fallbackGroundY = eyePosition.y - EYE_HEIGHT;
+        const groundY = pickAngjiGuestFloorY(
+          BABYLON,
+          scene,
+          eyePosition.x,
+          eyePosition.z,
+          floorMeshState.angjiBuildingFloor1Meshes,
+          floorMeshState.angjiExternalFloorMeshes,
+          { fallbackY: fallbackGroundY, preferExternal: true, maxDelta: 6 }
+        );
+        eyeY = Number.isFinite(groundY) ? groundY + EYE_HEIGHT : eyePosition.y;
+      }
+
+      walkCamera.position.x = eyePosition.x;
+      walkCamera.position.y = eyeY;
+      walkCamera.position.z = eyePosition.z;
+      verticalVelocity = 0;
+      isGrounded = true;
+
+      const character = tpsSystem?.getCharacter?.();
+      character?.syncFromPlayerEye?.(walkCamera.position);
+      character?.updateVisual?.(0, false);
+
+      const groundPose = getLandingGroundPoseAtPosition(
+        BABYLON,
+        scene,
+        walkCamera.position,
+        localGroundMeshSet,
+        eyeY,
+        { compactProbes: true }
+      );
+
+      if (groundPose?.hit) {
+        rememberStableGround(groundPose.hit, eyeY);
+      }
+    },
+    restoreTourEntryState: () => {
+      if (!walkMode) {
+        return;
+      }
+
+      orbitCamera.detachControl?.();
+      scene.activeCamera = tpsCamera;
+      resetWalkCameraToTourStart();
+    },
+    onStatus: (message) => {
+      if (typeof message === "string" && message) {
+        setStatus(message);
+      }
+    },
+    onTourActiveChange: () => {
+      updateModeSwitchButtons();
+    }
+  });
+
+  if (isAngjiProjectConfig(activeModelState.config)) {
+    void angjiGuideTourSystem.init().catch((error) => {
+      console.error("[angji-guide-tour] init failed", error);
+    });
+  }
+
+  void loadEffectiveGuestBundle(undefined, getAngjiModelGuestEntriesSorted())
+    .then((bundle) => {
+      applyNpcDisplayNames(getDisplayNameMap(bundle));
+      const configs = resolveInteractionConfigs(bundle, loadConversationProgress());
+      npcInteractionSystem?.setConfigs?.(configs);
+      console.info(`[npc-interaction] loaded ${configs.length} guest configs`);
+    })
+    .catch((error) => {
+      console.error("[npc-interaction] config load failed", error);
+    });
+
+  if (isLocalDevEnvironment()) {
+    npcGuestManagerPanel = createNpcGuestManagerPanel({
+      getInteractionSystem: () => npcInteractionSystem,
+      getModelGuestEntries: () => getAngjiModelGuestEntriesSorted(),
+      canTestDialog: () => (
+        walkMode
+        && isAngjiProjectConfig(activeModelState.config)
+        && !isAngjiNightGuestMode()
+      ),
+      onDisplayNamesChanged: (displayNameMap) => {
+        applyNpcDisplayNames(displayNameMap);
+      },
+      onOpenChange: (isOpen) => {
+        clearMovementKeys();
+        tpsSystem?.getInputController?.()?.clear?.();
+        pendingMouseDeltaX = 0;
+        pendingMouseDeltaY = 0;
+        pendingWheelDelta = 0;
+
+        if (isOpen && document.pointerLockElement === canvas) {
+          document.exitPointerLock?.();
+        }
+      },
+      onStatus: (message) => {
+        if (typeof message === "string" && message) {
+          setStatus(message);
+        }
+      }
+    });
+    void npcGuestManagerPanel.load().catch((error) => {
+      console.error("[npc-manager] load failed", error);
+    });
+
+    const npcManagerToggle = document.getElementById("npcGuestManagerButton");
+    npcManagerToggle?.addEventListener("click", () => {
+      npcGuestManagerPanel?.toggle?.();
+    });
+
+    guideManagerPanel = createAngjiGuideManagerPanel({
+      getGuideTourSystem: () => angjiGuideTourSystem,
+      canPreview: () => (
+        walkMode
+        && isAngjiProjectConfig(activeModelState.config)
+        && !isAngjiNightGuestMode()
+      ),
+      onOpenChange: (isOpen) => {
+        clearMovementKeys();
+        tpsSystem?.getInputController?.()?.clear?.();
+        pendingMouseDeltaX = 0;
+        pendingMouseDeltaY = 0;
+        pendingWheelDelta = 0;
+
+        if (isOpen && document.pointerLockElement === canvas) {
+          document.exitPointerLock?.();
+        }
+      },
+      onStatus: (message) => {
+        if (typeof message === "string" && message) {
+          setStatus(message);
+        }
+      }
+    });
+    void guideManagerPanel.load().catch((error) => {
+      console.error("[guide-manager] load failed", error);
+    });
+
+    const guideManagerToggle = document.getElementById("guideManagerButton");
+    guideManagerToggle?.addEventListener("click", () => {
+      guideManagerPanel?.toggle?.();
+    });
+  }
+
+  function isGuideManagerBlockingInput() {
+    return Boolean(guideManagerPanel?.isOpen?.());
+  }
+
+  function isNpcGuestManagerBlockingInput() {
+    return Boolean(npcGuestManagerPanel?.isOpen?.());
+  }
+
+  function isLocalDevPanelBlockingInput() {
+    return isNpcGuestManagerBlockingInput() || isGuideManagerBlockingInput();
+  }
+
+  function isGuideFreeLookActive() {
+    return (
+      walkMode
+      && !isLocalDevPanelBlockingInput()
+      && angjiGuideTourSystem?.allowsFreeLook?.()
+    );
+  }
+
+  function resetGuideLookDrag() {
+    if (guideLookPointerId !== null) {
+      canvas.releasePointerCapture?.(guideLookPointerId);
+    }
+
+    guideLookPointerId = null;
+  }
+
+  function preventGuideMiddleMouseDefault(event) {
+    if (event.button !== 1 || !isGuideFreeLookActive()) {
+      return;
+    }
+
+    event.preventDefault();
+  }
+
+  function startGuideLookDrag(event) {
+    if (!isGuideFreeLookActive() || event.button !== 1) {
+      return;
+    }
+
+    if (document.pointerLockElement === canvas) {
+      document.exitPointerLock?.();
+    }
+
+    guideLookPointerId = event.pointerId;
+    guideLookPrevX = event.clientX;
+    guideLookPrevY = event.clientY;
+    canvas.setPointerCapture?.(event.pointerId);
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  function moveGuideLookDrag(event) {
+    if (guideLookPointerId === null || event.pointerId !== guideLookPointerId) {
+      return;
+    }
+
+    if (!isGuideFreeLookActive()) {
+      stopGuideLookDrag(event);
+      return;
+    }
+
+    const deltaX = event.clientX - guideLookPrevX;
+    const deltaY = event.clientY - guideLookPrevY;
+    guideLookPrevX = event.clientX;
+    guideLookPrevY = event.clientY;
+
+    if (deltaX !== 0 || deltaY !== 0) {
+      angjiGuideTourSystem?.applyLookInput?.(deltaX, deltaY);
+    }
+
+    event.preventDefault();
+  }
+
+  function stopGuideLookDrag(event) {
+    if (guideLookPointerId === null) {
+      return;
+    }
+
+    if (event?.pointerId != null && event.pointerId !== guideLookPointerId) {
+      return;
+    }
+
+    canvas.releasePointerCapture?.(event.pointerId);
+    guideLookPointerId = null;
+
+    if (event) {
+      event.preventDefault();
+    }
+  }
+
+  function isGuideTourBlockingInput() {
+    return Boolean(angjiGuideTourSystem?.blocksPlayerControl?.());
+  }
+
+  function isDialogSystemBlockingInput() {
+    return isGuideTourBlockingInput() || Boolean(npcInteractionSystem?.blocksPlayerControl?.());
+  }
+
   preloadProjectGuests();
 
   function getActiveGuestModelState() {
@@ -7336,10 +7788,12 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     if (walkMode) {
       await scheduleOutdoorGuestSpawn();
       await scheduleIndoorGuestSpawn();
+      guestCharacterSystem?.refreshDevLabels?.();
       return;
     }
 
     await scheduleOutdoorGuestSpawn();
+    guestCharacterSystem?.refreshDevLabels?.();
   }
 
   function canUseJinjuOutdoorGuests() {
@@ -9064,7 +9518,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     }
 
     floorLabel.textContent = "Walk Mode (TPS)";
-    setStatus("Third-person walk mode active. WASD moves, Shift runs, Space jumps, J jump-over test, E throws, P dances, mouse looks, wheel zooms. Use Orbit View to return.");
+    setStatus("Third-person walk mode active. WASD moves, Shift runs, Space jumps (near GUIDE or Guest: talk), J jump-over test, E throws, P dances, mouse looks, wheel zooms. Use Orbit View to return.");
     updateModeSwitchButtons();
     updateDebug();
 
@@ -9080,6 +9534,8 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
   function enterOrbitMode() {
     walkMode = false;
     document.body.classList.remove("walk-mode-active");
+    npcInteractionSystem?.handleEscape?.();
+    angjiGuideTourSystem?.dispose?.();
     setColMeshesPickableForMode(false);
     clearFireballs();
     resetEnemy();
@@ -9140,13 +9596,13 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
   updateModeSwitchButtons();
 
   canvas.addEventListener("click", () => {
-    if (walkMode) {
+    if (walkMode && !isLocalDevPanelBlockingInput() && !isGuideTourBlockingInput()) {
       requestPointerLockSafe();
     }
   });
 
   canvas.addEventListener("wheel", (event) => {
-    if (!walkMode) {
+    if (!walkMode || isLocalDevPanelBlockingInput() || isGuideTourBlockingInput()) {
       return;
     }
 
@@ -9154,12 +9610,26 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     pendingWheelDelta += event.deltaY;
   }, { passive: false });
 
+  canvas.addEventListener("pointerdown", preventGuideMiddleMouseDefault, true);
+  canvas.addEventListener("mousedown", preventGuideMiddleMouseDefault, true);
+  canvas.addEventListener("auxclick", preventGuideMiddleMouseDefault, true);
+  canvas.addEventListener("pointerdown", startGuideLookDrag, true);
+  canvas.addEventListener("pointermove", moveGuideLookDrag, true);
+  canvas.addEventListener("pointerup", stopGuideLookDrag, true);
+  canvas.addEventListener("pointercancel", stopGuideLookDrag, true);
+  window.addEventListener("blur", resetGuideLookDrag);
+
   window.addEventListener("mousemove", (event) => {
     inputDiagnostics.mouseMoveCount += 1;
     inputDiagnostics.lastMouseMove = walkMode ? "walk" : "orbit";
     inputDiagnostics.lastMouseDelta = `x ${event.movementX || 0}, y ${event.movementY || 0}`;
 
-    if (walkMode && document.pointerLockElement === canvas) {
+    if (
+      walkMode
+      && document.pointerLockElement === canvas
+      && !isLocalDevPanelBlockingInput()
+      && !isGuideTourBlockingInput()
+    ) {
       pendingMouseDeltaX += event.movementX || 0;
       pendingMouseDeltaY += event.movementY || 0;
     }
@@ -9168,7 +9638,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
   });
 
   window.addEventListener("keydown", (event) => {
-    if (isOverviewAdminEditing(event)) {
+    if (isOverviewAdminEditing(event) || isLocalDevPanelBlockingInput()) {
       clearMovementKeys();
       return;
     }
@@ -9194,7 +9664,53 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
       return;
     }
 
-    const inputBlocked = walkMode && tpsSystem?.isPlayerInputBlocked?.();
+    const inputBlocked = walkMode && (
+      tpsSystem?.isPlayerInputBlocked?.()
+      || isDialogSystemBlockingInput()
+    );
+
+    if (
+      walkMode
+      && !event.repeat
+      && (event.code === "Escape" || event.key === "Escape")
+      && angjiGuideTourSystem?.handleEscape?.()
+    ) {
+      event.preventDefault();
+      clearMovementKeys();
+      return;
+    }
+
+    if (
+      walkMode
+      && !event.repeat
+      && (event.code === "Escape" || event.key === "Escape")
+      && npcInteractionSystem?.handleEscape?.()
+    ) {
+      event.preventDefault();
+      clearMovementKeys();
+      return;
+    }
+
+    if (
+      walkMode
+      && !event.repeat
+      && (event.code === "Space" || event.key === " ")
+      && angjiGuideTourSystem?.handleSpacePress?.()
+    ) {
+      event.preventDefault();
+      return;
+    }
+
+    if (
+      walkMode
+      && !event.repeat
+      && (event.code === "Space" || event.key === " ")
+      && npcInteractionSystem?.handleSpacePress?.()
+    ) {
+      event.preventDefault();
+      return;
+    }
+
     applyCharacterTpsKeyDown(event, {
       walkMode,
       keys,
@@ -9209,7 +9725,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
   });
 
   window.addEventListener("keyup", (event) => {
-    if (isOverviewAdminEditing(event)) {
+    if (isOverviewAdminEditing(event) || isLocalDevPanelBlockingInput()) {
       clearMovementKeys();
       return;
     }
@@ -9217,6 +9733,12 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     const key = getInputKey(event);
     inputDiagnostics.keyUpCount += 1;
     inputDiagnostics.lastKeyUp = `${key || "unknown"} (${event.code || event.key || "?"})`;
+
+    if (key === " " || event.code === "Space") {
+      angjiGuideTourSystem?.handleSpaceRelease?.();
+      npcInteractionSystem?.handleSpaceRelease?.();
+    }
+
     keys.delete(key);
     updateInputDebug();
   });
@@ -9264,6 +9786,33 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     refreshLocalMeshSets();
     walkFrameLocomotion = null;
     const modelSpeedMultiplier = ANGJI_MOVE_SPEED_MULTIPLIER;
+
+    if (isDialogSystemBlockingInput() || isLocalDevPanelBlockingInput()) {
+      keys.clear();
+
+      pendingMouseDeltaX = 0;
+      pendingMouseDeltaY = 0;
+      pendingWheelDelta = 0;
+
+      angjiGuideTourSystem?.update?.(deltaSeconds);
+      npcInteractionSystem?.update?.(deltaSeconds);
+
+      guestCharacterSystem?.update(deltaScale);
+      updateJinjuGuestFloorLifecycle();
+
+      if (isWalkCameraOutsideTourBounds()) {
+        resetTourWithFade("out of bounds");
+      }
+
+      if (treeFacingFrameCounter % 3 === 0) {
+        updateDebug();
+      }
+
+      return;
+    }
+
+    angjiGuideTourSystem?.update?.(deltaSeconds);
+    npcInteractionSystem?.update?.(deltaSeconds);
 
     const applyHorizontalMove = (direction, moveSpeed, options = {}) => {
       if (options.ignoreCollision) {

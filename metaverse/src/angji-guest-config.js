@@ -123,6 +123,31 @@ function getGuestMarkNumber(spawnId) {
   return Number(String(spawnId).replace("Mark-", ""));
 }
 
+export function getAngjiGuestNumberLabel(spawnId) {
+  const markNumber = getGuestMarkNumber(spawnId);
+
+  if (!Number.isFinite(markNumber)) {
+    return "";
+  }
+
+  return String(markNumber).padStart(2, "0");
+}
+
+/** Model guests (Mark-1 … Mark-22) sorted by mark number for manager lists. */
+export function getAngjiModelGuestEntriesSorted() {
+  return [...ANGJI_GUEST_MARKS]
+    .map((spawn) => {
+      const label = getAngjiGuestNumberLabel(spawn.id);
+      return {
+        guestId: spawn.id,
+        guestKey: `guest${label}`,
+        name: `Guest ${label}`,
+        displayName: label
+      };
+    })
+    .sort((a, b) => getGuestMarkNumber(a.guestId) - getGuestMarkNumber(b.guestId));
+}
+
 export function isAngjiOutdoorGuestId(spawnId) {
   if (ANGJI_INDOOR_GUEST_OVERRIDE_IDS.includes(spawnId)) {
     return false;
