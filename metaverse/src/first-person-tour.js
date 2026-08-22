@@ -13,23 +13,23 @@ import {
 } from "./character-tps-bindings.js?v=tps-jump-nocol-20260629";
 import {
   createNpcInteractionSystem
-} from "./npc-interaction-system.js?v=angji-npc-manager-20260820";
+} from "./npc-interaction-system.js?v=angji-npc-manager-20260823";
 import {
   createNpcGuestManagerPanel
-} from "./npc-guest-manager-panel.js?v=angji-npc-manager-20260820";
+} from "./npc-guest-manager-panel.js?v=angji-npc-manager-20260823";
 import {
   createAngjiGuideTourSystem
-} from "./angji-guide-tour-system.js?v=angji-guide-tour-20260822-v20";
+} from "./angji-guide-tour-system.js?v=angji-guide-tour-20260822-v22";
 import {
   createAngjiGuideManagerPanel
 } from "./angji-guide-manager-panel.js?v=angji-guide-manager-20260822";
-import { ANGJI_GUIDE_SPAWN } from "./angji-guide-tour-config.js?v=angji-guide-tour-20260822-v20";
+import { ANGJI_GUIDE_SPAWN } from "./angji-guide-tour-config.js?v=angji-guide-tour-20260822-v22";
 import {
   getDisplayNameMap,
   loadEffectiveGuestBundle,
   resolveInteractionConfigs,
   loadConversationProgress
-} from "./npc-guest-data.js?v=angji-npc-manager-20260820";
+} from "./npc-guest-data.js?v=angji-npc-manager-20260823";
 import { createGuestPlacementTool } from "./guest-placement-tool.js?v=orbit-cam-capture-20260725";
 import {
   attachHistoryDisplayBoards,
@@ -101,7 +101,7 @@ import {
 } from "./jinju-rooftop-guest-config.js?v=jinju-rooftop-marie-sit-clips-20260705";
 import { createGuestCharacterSystem, shouldSnapPatrolFloorAtTarget } from "./guest-character-system.js?v=angji-mark13-patrol-20260820";
 import { applyLocalDevToolsVisibility, isLocalDevEnvironment } from "./local-dev.js?v=local-dev-20260819";
-import { isGuestDevLabelOccluded } from "./guest-dev-label.js?v=angji-guest-labels-20260822";
+import { isGuestDevLabelOccluded } from "./guest-dev-label.js?v=angji-guest-labels-20260823";
 import { setupAngjiRlbProximityGlow, shouldSkipMaterialFreeze } from "./rlb-proximity-glow.js?v=rlb-shader-proximity-20260820-group-v50";
 
 async function setupLocalRlbShaderTuningPanel(options = {}) {
@@ -6634,7 +6634,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     },
     isGuestLabelVisible: (guest) => {
       if (guest?.spawn?.id === ANGJI_GUIDE_SPAWN.id) {
-        return guest.root?.isEnabled?.() !== false;
+        return !isAngjiNightGuestMode() && guest.root?.isEnabled?.() !== false;
       }
 
       if (isAngjiGuestId(guest?.spawn?.id)) {
@@ -6644,14 +6644,20 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
       return isLocalDevEnvironment();
     },
     isGuestLabelOccluded: (guest) => {
-      const collisionSet = localCollisionMeshSet.size > 0 ? localCollisionMeshSet : collisionMeshSet;
-
-      if (!collisionSet.size || guest?.spawn?.id === ANGJI_GUIDE_SPAWN.id) {
+      if (guest?.spawn?.id === ANGJI_GUIDE_SPAWN.id) {
         return false;
       }
 
       const camera = walkMode ? tpsCamera : scene.activeCamera;
-      return isGuestDevLabelOccluded(BABYLON, scene, guest, camera, collisionSet);
+
+      return isGuestDevLabelOccluded(
+        BABYLON,
+        scene,
+        guest,
+        camera,
+        collisionMeshSet,
+        activeCollisionMeshes
+      );
     },
     getGeometryMeshes,
     getRootNodes,
@@ -6979,6 +6985,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
       scene.activeCamera = tpsCamera;
       resetWalkCameraToTourStart();
     },
+    getIsNightMode: () => isAngjiNightGuestMode(),
     onStatus: (message) => {
       if (typeof message === "string" && message) {
         setStatus(message);
@@ -10039,6 +10046,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     setModelState,
     getActiveModelState: () => activeModelState,
     isWalkMode: () => walkMode,
+    getGuideTourSystem: () => angjiGuideTourSystem,
     refreshAngjiGuestsForNightMode,
     preloadCharacter: () => tpsSystem?.ensureLoaded?.()
   };
@@ -13700,6 +13708,8 @@ async function start() {
     isWalkMode: () => controls?.isWalkMode?.() || false,
     getOrbitCamera: () => orbitCamera,
     onNightModeChange: (isNight) => {
+      controls?.getGuideTourSystem?.()?.syncGuideNightVisibility?.(isNight);
+
       void controls?.refreshAngjiGuestsForNightMode?.().catch((error) => {
         console.error("[angji-night] guest refresh failed", error);
       });
@@ -13720,6 +13730,7 @@ async function start() {
   });
   controls.setModelState(modelStates[activeModelIndex]);
   angjiNightMode.sync();
+  controls.getGuideTourSystem?.()?.syncGuideNightVisibility?.(angjiNightMode?.isNightMode?.() || false);
   void controls.preloadCharacter?.().catch((error) => {
     console.warn("Character preload failed", error);
   });

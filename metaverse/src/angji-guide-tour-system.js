@@ -2,8 +2,8 @@
  * Angji GUIDE scripted tour — separate from generic NPC dialog (multi-line bubbles).
  */
 
-import { ANGJI_GUIDE_SPAWN, loadAngjiGuideTourData } from "./angji-guide-tour-config.js?v=angji-guide-tour-20260822-v19";
-import { getGuestHeadLocalY, projectWorldPointToScreen, getGuestDialogAnchorWorldPosition, setGuestDevLabelVisible } from "./guest-dev-label.js?v=angji-guest-labels-20260822";
+import { ANGJI_GUIDE_SPAWN, loadAngjiGuideTourData } from "./angji-guide-tour-config.js?v=angji-guide-tour-20260822-v22";
+import { getGuestHeadLocalY, projectWorldPointToScreen, getGuestDialogAnchorWorldPosition, setGuestDevLabelVisible } from "./guest-dev-label.js?v=angji-guest-labels-20260823";
 import { normalizeTourData } from "./angji-guide-tour-data.js?v=angji-guide-manager-20260822";
 
 const GUIDE_STATE = {
@@ -106,6 +106,7 @@ export function createAngjiGuideTourSystem(BABYLON, scene, options = {}) {
     getGuideFloorY = null,
     snapPlayerGroundAt = null,
     restoreTourEntryState = null,
+    getIsNightMode = () => false,
     onStatus = null,
     onTourActiveChange = null
   } = options;
@@ -151,9 +152,159 @@ export function createAngjiGuideTourSystem(BABYLON, scene, options = {}) {
   let talkingFadeOutT = 0;
   let dialogViewYaw = 0;
   let dialogViewPitch = 0;
+  let idleDanceIdleT = 0;
+  let idleDancePlaying = false;
+  let idleDanceEndObserver = null;
 
   const DIALOG_LOOK_MIN_PITCH = -Math.PI * 0.45;
   const DIALOG_LOOK_MAX_PITCH = Math.PI * 0.45;
+
+  function clearIdleDanceObserver() {
+    idleDanceEndObserver?.remove?.();
+    idleDanceEndObserver = null;
+  }
+
+  function resetIdleDanceTimer() {
+    idleDanceIdleT = 0;
+  }
+
+  function clearIdleDanceState() {
+    clearIdleDanceObserver();
+    idleDancePlaying = false;
+    resetIdleDanceTimer();
+  }
+
+  function getIdleDanceClips() {
+    return tourData?.idleDanceClips?.length
+      ? tourData.idleDanceClips
+      : [
+        "Dance_Samba01",
+        "Dance_Samba02",
+        "Dance_Samba03",
+        "Dance_Samba04",
+        "Dance_Samba05",
+        "Dance_Samba06",
+        "Dance_Samba07"
+      ];
+  }
+
+  function getResolvedIdleDanceClips() {
+    const groups = guideGuest?.animationGroups || [];
+    const configured = getIdleDanceClips();
+    const resolved = configured.filter((clipName) => resolveGuideClipGroup(groups, clipName));
+
+    if (resolved.length) {
+      return resolved;
+    }
+
+    return groups
+      .map((group) => group.name)
+      .filter((name) => /dance/i.test(String(name || "")));
+  }
+
+  function pickRandomIdleDanceClip(exclude = null) {
+    const clips = getResolvedIdleDanceClips();
+
+    if (!clips.length) {
+      return null;
+    }
+
+    const pool = exclude
+      ? clips.filter((clipName) => normalizeGuideClipName(clipName) !== normalizeGuideClipName(exclude))
+      : clips;
+
+    const choices = pool.length ? pool : clips;
+    return choices[Math.floor(Math.random() * choices.length)];
+  }
+
+  function finishIdleDance() {
+    clearIdleDanceObserver();
+    idleDancePlaying = false;
+    resetIdleDanceTimer();
+
+    if (state === GUIDE_STATE.IDLE) {
+      playGuideClip("Idle", true);
+    }
+  }
+
+  function attachIdleDanceEndHandler() {
+    clearIdleDanceObserver();
+
+    const group = guideGuest?.activeAnimationGroup;
+
+    if (!group) {
+      finishIdleDance();
+      return;
+    }
+
+    idleDanceEndObserver = group.onAnimationGroupEndObservable.add(() => {
+      if (state !== GUIDE_STATE.IDLE || !idleDancePlaying) {
+        return;
+      }
+
+      finishIdleDance();
+    });
+  }
+
+  function startIdleDance() {
+    if (state !== GUIDE_STATE.IDLE || !guideGuest || idleDancePlaying) {
+      return;
+    }
+
+    const clipName = pickRandomIdleDanceClip();
+
+    if (!clipName) {
+      resetIdleDanceTimer();
+      return;
+    }
+
+    idleDancePlaying = true;
+    resetIdleDanceTimer();
+
+    if (!playGuideClip(clipName, false)) {
+      idleDancePlaying = false;
+      resetIdleDanceTimer();
+      return;
+    }
+
+    attachIdleDanceEndHandler();
+  }
+
+  function updateIdleDancePlayback() {
+    if (!idleDancePlaying || state !== GUIDE_STATE.IDLE) {
+      return;
+    }
+
+    const group = guideGuest?.activeAnimationGroup;
+
+    if (!group?.isPlaying) {
+      finishIdleDance();
+    }
+  }
+
+  function updateGuideIdleDance(dt) {
+    if (state !== GUIDE_STATE.IDLE || !guideGuest?.root?.isEnabled?.()) {
+      if (idleDancePlaying) {
+        finishIdleDance();
+      } else {
+        resetIdleDanceTimer();
+      }
+
+      return;
+    }
+
+    if (idleDancePlaying) {
+      updateIdleDancePlayback();
+      return;
+    }
+
+    idleDanceIdleT += dt;
+    const delaySeconds = Math.max(tourData?.idleDanceDelaySeconds ?? 300, 1);
+
+    if (idleDanceIdleT >= delaySeconds) {
+      startIdleDance();
+    }
+  }
 
   function clearPendingTimers() {
     if (advanceLineTimer !== null) {
@@ -491,6 +642,14 @@ export function createAngjiGuideTourSystem(BABYLON, scene, options = {}) {
   }
 
   function setState(next) {
+    if (next !== GUIDE_STATE.IDLE && state === GUIDE_STATE.IDLE) {
+      clearIdleDanceState();
+    }
+
+    if (next === GUIDE_STATE.IDLE && state !== GUIDE_STATE.IDLE) {
+      clearIdleDanceState();
+    }
+
     state = next;
     onTourActiveChange?.(isActive());
   }
@@ -1069,6 +1228,7 @@ export function createAngjiGuideTourSystem(BABYLON, scene, options = {}) {
 
     clearPendingTimers();
     clearClosingAnimObserver();
+    clearIdleDanceState();
     stopGuideTalkingAnimation();
     hideUi();
     tourStarted = false;
@@ -1095,6 +1255,7 @@ export function createAngjiGuideTourSystem(BABYLON, scene, options = {}) {
     const keepTourCompleted = options.keepTourCompleted === true;
 
     clearPendingTimers();
+    clearIdleDanceState();
     stopGuideTalkingAnimation();
     hideUi();
     tourStarted = false;
@@ -1448,9 +1609,50 @@ export function createAngjiGuideTourSystem(BABYLON, scene, options = {}) {
     }
   }
 
+  function syncGuideNightVisibility(isNight = getIsNightMode()) {
+    if (isNight) {
+      clearIdleDanceState();
+      hideUi();
+      stopGuideTalkingAnimation();
+
+      if (isActive()) {
+        if (getWalkMode()) {
+          exitGuideTourToTourEntry({ keepTourCompleted: tourCompleted });
+        } else {
+          clearPendingTimers();
+          clearClosingAnimObserver();
+          tourStarted = false;
+          dialogPaused = false;
+          setState(GUIDE_STATE.IDLE);
+        }
+      }
+
+      if (guideGuest?.root) {
+        guideGuest.root.setEnabled(false);
+        setGuestDevLabelVisible(guideGuest, false);
+      }
+
+      return;
+    }
+
+    if (!guideGuest?.root) {
+      void ensureGuideSpawned().then(() => syncGuideNightVisibility(false));
+      return;
+    }
+
+    guideGuest.root.setEnabled(true);
+    getGuestCharacterSystem()?.revealGuest?.(ANGJI_GUIDE_SPAWN.id);
+    positionGuideNpcOnly(getGuideSpawnEvent());
+    playGuideClip("Idle", true);
+    setState(GUIDE_STATE.IDLE);
+    syncGuideHeadLabel();
+    getGuestCharacterSystem()?.refreshDevLabels?.();
+  }
+
   async function init() {
     tourData = await loadAngjiGuideTourData();
     await ensureGuideSpawned();
+    syncGuideNightVisibility(getIsNightMode());
   }
 
   function update(dt) {
@@ -1505,6 +1707,8 @@ export function createAngjiGuideTourSystem(BABYLON, scene, options = {}) {
           updateClosingAnim(dt);
         }
       }
+    } else if (state === GUIDE_STATE.IDLE) {
+      updateGuideIdleDance(dt);
     }
   }
 
@@ -1731,6 +1935,7 @@ export function createAngjiGuideTourSystem(BABYLON, scene, options = {}) {
     handleSpaceRelease,
     handleEscape,
     dispose,
-    ensureGuideSpawned
+    ensureGuideSpawned,
+    syncGuideNightVisibility
   };
 }

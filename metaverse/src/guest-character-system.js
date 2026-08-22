@@ -9,7 +9,7 @@ import {
   setGuestDevLabelVisible,
   updateGuestDevLabelHeight,
   isGuestDevLabelOccluded
-} from "./guest-dev-label.js?v=angji-guest-labels-20260822";
+} from "./guest-dev-label.js?v=angji-guest-labels-20260823";
 import {
   createRootMotionNeutralizer,
   stripLocomotionRootMotion

@@ -7,6 +7,16 @@
   "lineHoldSeconds": 1.0,
   "lineHoldPerChar": 0.02,
   "lineHoldMaxExtra": 3.33,
+  "idleDanceDelaySeconds": 300,
+  "idleDanceClips": [
+    "Dance_Samba01",
+    "Dance_Samba02",
+    "Dance_Samba03",
+    "Dance_Samba04",
+    "Dance_Samba05",
+    "Dance_Samba06",
+    "Dance_Samba07"
+  ],
   "orbitSpin": {
     "position": { "x": -167.35, "y": 25.00, "z": 73.26 },
     "target": { "x": -10.54, "y": 50.00, "z": 16.37 },

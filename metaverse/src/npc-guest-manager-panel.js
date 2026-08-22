@@ -17,7 +17,7 @@ import {
   saveGuestBundle,
   loadConversationProgress,
   clearConversationCompleted
-} from "./npc-guest-data.js?v=angji-npc-manager-20260820";
+} from "./npc-guest-data.js?v=angji-npc-manager-20260823";
 
 function el(tag, className, attrs = {}) {
   const node = document.createElement(tag);

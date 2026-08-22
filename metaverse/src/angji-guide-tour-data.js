@@ -13,7 +13,17 @@ export const GUIDE_TOUR_GLOBAL_DEFAULTS = {
   lineHoldSeconds: 1.0,
   lineHoldPerChar: 0.02,
   lineHoldMaxExtra: 3.33,
-  cameraBlendSeconds: 0.85
+  cameraBlendSeconds: 0.85,
+  idleDanceDelaySeconds: 300,
+  idleDanceClips: [
+    "Dance_Samba01",
+    "Dance_Samba02",
+    "Dance_Samba03",
+    "Dance_Samba04",
+    "Dance_Samba05",
+    "Dance_Samba06",
+    "Dance_Samba07"
+  ]
 };
 
 export const GUIDE_POST_EVENT_TYPES = ["none", "yes_no", "other"];
@@ -115,6 +125,10 @@ export function normalizeTourData(raw = {}) {
     lineHoldPerChar: asNumber(raw.lineHoldPerChar, GUIDE_TOUR_GLOBAL_DEFAULTS.lineHoldPerChar),
     lineHoldMaxExtra: asNumber(raw.lineHoldMaxExtra, GUIDE_TOUR_GLOBAL_DEFAULTS.lineHoldMaxExtra),
     cameraBlendSeconds: asNumber(raw.cameraBlendSeconds, GUIDE_TOUR_GLOBAL_DEFAULTS.cameraBlendSeconds),
+    idleDanceDelaySeconds: asNumber(raw.idleDanceDelaySeconds, GUIDE_TOUR_GLOBAL_DEFAULTS.idleDanceDelaySeconds),
+    idleDanceClips: Array.isArray(raw.idleDanceClips)
+      ? raw.idleDanceClips.map(String)
+      : [...GUIDE_TOUR_GLOBAL_DEFAULTS.idleDanceClips],
     orbitSpin: raw.orbitSpin ? deepClone(raw.orbitSpin) : undefined,
     transitionPrompt: raw.transitionPrompt ? deepClone(raw.transitionPrompt) : undefined,
     declineMessage: raw.declineMessage ? deepClone(raw.declineMessage) : undefined,

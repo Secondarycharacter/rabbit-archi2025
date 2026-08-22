@@ -140,25 +140,59 @@ export function getGuestDialogAnchorWorldPosition(guest, clearance = 0.35) {
   };
 }
 
-function isGuestBodyMeshForOcclusion(mesh, guest) {
-  if (!mesh || isGuestLabelMesh(mesh)) {
+function isGuestAncestorMesh(mesh, guest) {
+  if (!mesh || !guest?.root) {
     return false;
   }
 
-  if (guest?.meshes?.includes(mesh)) {
+  let current = mesh;
+
+  while (current) {
+    if (current === guest.root) {
+      return true;
+    }
+
+    if (guest.meshes?.includes(current)) {
+      return true;
+    }
+
+    current = current.parent;
+  }
+
+  return false;
+}
+
+function isLabelViewOccluderMesh(mesh) {
+  if (!mesh || mesh.isDisposed?.() || mesh.isEnabled?.() === false) {
     return false;
   }
 
-  if (mesh.metadata?.tourGuest) {
+  if (mesh.metadata?.passThrough || isGuestLabelMesh(mesh)) {
     return false;
   }
 
-  return true;
+  if (mesh.metadata?.tourGuest || mesh.metadata?.guestId) {
+    return false;
+  }
+
+  return Boolean(
+    mesh.metadata?.angjiWallSurface
+    || mesh.metadata?.angjiFurnitureSurface
+    || mesh.metadata?.angjiCollisionLayer
+    || String(mesh.name || "").includes("0_COL_")
+  );
 }
 
 /** Hide guest name labels when collision geometry (COL) blocks the camera view. */
-export function isGuestDevLabelOccluded(BABYLON, scene, guest, camera, collisionMeshSet) {
-  if (!collisionMeshSet?.size || !guest?.root || !camera?.position) {
+export function isGuestDevLabelOccluded(
+  BABYLON,
+  scene,
+  guest,
+  camera,
+  collisionMeshSet,
+  collisionMeshes = null
+) {
+  if (!guest?.root || !camera?.position) {
     return false;
   }
 
@@ -168,26 +202,39 @@ export function isGuestDevLabelOccluded(BABYLON, scene, guest, camera, collision
     return false;
   }
 
-  const origin = camera.position;
+  const origin = camera.globalPosition?.clone?.() || camera.position.clone();
   const target = new BABYLON.Vector3(labelWorld.x, labelWorld.y, labelWorld.z);
   const delta = target.subtract(origin);
   const distance = delta.length();
 
-  if (distance <= 0.05) {
+  if (distance <= 0.08) {
     return false;
   }
 
-  const direction = delta.normalize();
-  const ray = new BABYLON.Ray(origin, direction, Math.max(0.05, distance - 0.2));
-  const hit = scene.pickWithRay(ray, (mesh) => (
-    collisionMeshSet.has(mesh)
-    && mesh.isEnabled?.()
-    && mesh.isPickable
-    && !mesh.metadata?.passThrough
-    && isGuestBodyMeshForOcclusion(mesh, guest)
-  ));
+  const direction = delta.scale(1 / distance);
+  const ray = new BABYLON.Ray(origin, direction, Math.max(0.05, distance - 0.08));
+  const maxHitDistance = distance - 0.05;
+  const meshes = Array.isArray(collisionMeshes)
+    ? collisionMeshes
+    : collisionMeshSet
+      ? Array.from(collisionMeshSet)
+      : [];
 
-  return Boolean(hit?.hit);
+  for (let index = 0; index < meshes.length; index += 1) {
+    const mesh = meshes[index];
+
+    if (!isLabelViewOccluderMesh(mesh) || isGuestAncestorMesh(mesh, guest)) {
+      continue;
+    }
+
+    const hit = ray.intersectsMesh(mesh, true);
+
+    if (hit?.hit && hit.distance < maxHitDistance) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 export function createGuestDevLabel(BABYLON, scene, guest, labelText) {

@@ -2,7 +2,7 @@
 
 import { loadEffectiveTourData } from "./angji-guide-tour-data.js?v=angji-guide-manager-20260822";
 
-export const ANGJI_GUIDE_TOUR_VERSION = "angji-guide-tour-20260822-v20";
+export const ANGJI_GUIDE_TOUR_VERSION = "angji-guide-tour-20260822-v22";
 export { ANGJI_GUIDE_TOUR_DATA_URL } from "./angji-guide-tour-data.js?v=angji-guide-manager-20260822";
 
 export const ANGJI_GUIDE_SPAWN = {
@@ -26,6 +26,13 @@ export const ANGJI_GUIDE_SPAWN = {
       "Greeting_Bow",
       "Greeting_Hand",
       "Greeting_hand",
+      "Dance_Samba01",
+      "Dance_Samba02",
+      "Dance_Samba03",
+      "Dance_Samba04",
+      "Dance_Samba05",
+      "Dance_Samba06",
+      "Dance_Samba07",
       "Armature|Idle",
       "mixamo.com"
     ]

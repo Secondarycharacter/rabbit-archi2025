@@ -3,7 +3,7 @@
  * Base JSON → localStorage overlay. Global → Guest → Dialog override order.
  */
 
-export const NPC_GUEST_DATA_VERSION = "angji-npc-manager-20260820";
+export const NPC_GUEST_DATA_VERSION = "angji-npc-manager-20260823";
 export const NPC_GUEST_STORAGE_KEY = "angji-npc-guest-manager-v1";
 export const NPC_GUEST_PROGRESS_KEY = "angji-npc-conversation-progress-v1";
 export const NPC_GUEST_DATA_URL = "./data/npc/guests.json";

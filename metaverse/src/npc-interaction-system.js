@@ -8,7 +8,7 @@ import {
   projectWorldPointToScreen,
   updateGuestDevLabelHeight
 } from "./guest-dev-label.js?v=angji-guest-labels-20260822";
-import { markConversationCompleted } from "./npc-guest-data.js?v=angji-npc-manager-20260820";
+import { markConversationCompleted } from "./npc-guest-data.js?v=angji-npc-manager-20260823";
 
 export const NPC_INTERACTION_STATE = {
   IDLE: "IDLE",
