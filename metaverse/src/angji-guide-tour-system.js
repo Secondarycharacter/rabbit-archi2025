@@ -299,7 +299,7 @@ export function createAngjiGuideTourSystem(BABYLON, scene, options = {}) {
     }
 
     idleDanceIdleT += dt;
-    const delaySeconds = Math.max(tourData?.idleDanceDelaySeconds ?? 300, 1);
+    const delaySeconds = Math.max(tourData?.idleDanceDelaySeconds ?? 180, 1);
 
     if (idleDanceIdleT >= delaySeconds) {
       startIdleDance();

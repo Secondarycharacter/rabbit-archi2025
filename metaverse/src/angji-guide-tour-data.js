@@ -14,7 +14,7 @@ export const GUIDE_TOUR_GLOBAL_DEFAULTS = {
   lineHoldPerChar: 0.02,
   lineHoldMaxExtra: 3.33,
   cameraBlendSeconds: 0.85,
-  idleDanceDelaySeconds: 300,
+  idleDanceDelaySeconds: 180,
   idleDanceClips: [
     "Dance_Samba01",
     "Dance_Samba02",

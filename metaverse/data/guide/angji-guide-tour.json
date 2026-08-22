@@ -7,7 +7,7 @@
   "lineHoldSeconds": 1.0,
   "lineHoldPerChar": 0.02,
   "lineHoldMaxExtra": 3.33,
-  "idleDanceDelaySeconds": 300,
+  "idleDanceDelaySeconds": 180,
   "idleDanceClips": [
     "Dance_Samba01",
     "Dance_Samba02",
