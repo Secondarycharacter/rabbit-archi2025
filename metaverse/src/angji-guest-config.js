@@ -133,6 +133,38 @@ export function getAngjiGuestNumberLabel(spawnId) {
   return String(markNumber).padStart(2, "0");
 }
 
+/** Shipped Korean display names for Mark-1 … Mark-22 (matches data/npc/guests.json). */
+export const ANGJI_GUEST_DISPLAY_NAMES = {
+  "Mark-1": "카이",
+  "Mark-2": "엘리아",
+  "Mark-3": "루카",
+  "Mark-4": "노아",
+  "Mark-5": "리안",
+  "Mark-6": "아린",
+  "Mark-7": "레오",
+  "Mark-8": "니아",
+  "Mark-9": "세라",
+  "Mark-10": "루나",
+  "Mark-11": "미아",
+  "Mark-12": "이안",
+  "Mark-13": "리오",
+  "Mark-14": "아론",
+  "Mark-15": "엘린",
+  "Mark-16": "테오",
+  "Mark-17": "노엘",
+  "Mark-18": "리아",
+  "Mark-19": "에단",
+  "Mark-20": "루이",
+  "Mark-21": "유나",
+  "Mark-22": "에이든"
+};
+
+export function getAngjiGuestDisplayName(spawnId) {
+  return ANGJI_GUEST_DISPLAY_NAMES[spawnId]
+    || ANGJI_GUEST_MARKS.find((spawn) => spawn.id === spawnId)?.devLabel
+    || getAngjiGuestNumberLabel(spawnId);
+}
+
 /** Model guests (Mark-1 … Mark-22) sorted by mark number for manager lists. */
 export function getAngjiModelGuestEntriesSorted() {
   return [...ANGJI_GUEST_MARKS]
@@ -142,7 +174,7 @@ export function getAngjiModelGuestEntriesSorted() {
         guestId: spawn.id,
         guestKey: `guest${label}`,
         name: `Guest ${label}`,
-        displayName: label
+        displayName: getAngjiGuestDisplayName(spawn.id)
       };
     })
     .sort((a, b) => getGuestMarkNumber(a.guestId) - getGuestMarkNumber(b.guestId));
