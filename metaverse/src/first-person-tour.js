@@ -19,10 +19,11 @@ import {
 } from "./npc-guest-manager-panel.js?v=angji-npc-manager-20260820";
 import {
   createAngjiGuideTourSystem
-} from "./angji-guide-tour-system.js?v=angji-guide-tour-20260822-v19";
+} from "./angji-guide-tour-system.js?v=angji-guide-tour-20260822-v20";
 import {
   createAngjiGuideManagerPanel
 } from "./angji-guide-manager-panel.js?v=angji-guide-manager-20260822";
+import { ANGJI_GUIDE_SPAWN } from "./angji-guide-tour-config.js?v=angji-guide-tour-20260822-v20";
 import {
   getDisplayNameMap,
   loadEffectiveGuestBundle,
@@ -100,6 +101,7 @@ import {
 } from "./jinju-rooftop-guest-config.js?v=jinju-rooftop-marie-sit-clips-20260705";
 import { createGuestCharacterSystem, shouldSnapPatrolFloorAtTarget } from "./guest-character-system.js?v=angji-mark13-patrol-20260820";
 import { applyLocalDevToolsVisibility, isLocalDevEnvironment } from "./local-dev.js?v=local-dev-20260819";
+import { isGuestDevLabelOccluded } from "./guest-dev-label.js?v=angji-guest-labels-20260822";
 import { setupAngjiRlbProximityGlow, shouldSkipMaterialFreeze } from "./rlb-proximity-glow.js?v=rlb-shader-proximity-20260820-group-v50";
 
 async function setupLocalRlbShaderTuningPanel(options = {}) {
@@ -6609,6 +6611,10 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
   guestCharacterSystem = createGuestCharacterSystem(BABYLON, scene, {
     showDevLabels: isLocalDevEnvironment(),
     resolveGuestLabelText: (spawn) => {
+      if (spawn?.id === ANGJI_GUIDE_SPAWN.id) {
+        return spawn.devLabel || "GUIDE";
+      }
+
       if (isAngjiGuestId(spawn?.id)) {
         return npcDisplayNameByGuestId.get(spawn.id) || getAngjiGuestNumberLabel(spawn.id);
       }
@@ -6616,6 +6622,10 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
       return spawn?.devLabel || "";
     },
     shouldAttachGuestLabel: (spawn) => {
+      if (spawn?.id === ANGJI_GUIDE_SPAWN.id) {
+        return true;
+      }
+
       if (isAngjiGuestId(spawn?.id)) {
         return true;
       }
@@ -6623,11 +6633,25 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
       return isLocalDevEnvironment() && Boolean(spawn?.devLabel);
     },
     isGuestLabelVisible: (guest) => {
+      if (guest?.spawn?.id === ANGJI_GUIDE_SPAWN.id) {
+        return guest.root?.isEnabled?.() !== false;
+      }
+
       if (isAngjiGuestId(guest?.spawn?.id)) {
         return !isAngjiNightGuestMode();
       }
 
       return isLocalDevEnvironment();
+    },
+    isGuestLabelOccluded: (guest) => {
+      const collisionSet = localCollisionMeshSet.size > 0 ? localCollisionMeshSet : collisionMeshSet;
+
+      if (!collisionSet.size || guest?.spawn?.id === ANGJI_GUIDE_SPAWN.id) {
+        return false;
+      }
+
+      const camera = walkMode ? tpsCamera : scene.activeCamera;
+      return isGuestDevLabelOccluded(BABYLON, scene, guest, camera, collisionSet);
     },
     getGeometryMeshes,
     getRootNodes,

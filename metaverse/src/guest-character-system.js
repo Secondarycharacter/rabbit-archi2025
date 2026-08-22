@@ -7,8 +7,9 @@ import {
   disposeGuestDevLabel,
   setGuestDevLabelText,
   setGuestDevLabelVisible,
-  updateGuestDevLabelHeight
-} from "./guest-dev-label.js?v=angji-guest-numbers-20260820";
+  updateGuestDevLabelHeight,
+  isGuestDevLabelOccluded
+} from "./guest-dev-label.js?v=angji-guest-labels-20260822";
 import {
   createRootMotionNeutralizer,
   stripLocomotionRootMotion
@@ -1883,6 +1884,7 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
     resolveGuestLabelText = null,
     shouldAttachGuestLabel = null,
     isGuestLabelVisible = null,
+    isGuestLabelOccluded = null,
     getPlayerPosition = null,
     getCollisionMeshes = null,
     canGuestMoveHorizontal = null,
@@ -1918,11 +1920,23 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
       return false;
     }
 
+    let visible = false;
+
     if (typeof isGuestLabelVisible === "function") {
-      return isGuestLabelVisible(guest) === true;
+      visible = isGuestLabelVisible(guest) === true;
+    } else {
+      visible = showDevLabels === true;
     }
 
-    return showDevLabels === true;
+    if (!visible) {
+      return false;
+    }
+
+    if (typeof isGuestLabelOccluded === "function" && isGuestLabelOccluded(guest)) {
+      return false;
+    }
+
+    return true;
   }
 
   function syncGuestDevLabelVisibility(guest) {

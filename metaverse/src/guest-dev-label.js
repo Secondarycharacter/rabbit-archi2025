@@ -74,6 +74,122 @@ export function getGuestDevLabelMetrics(guest) {
   };
 }
 
+export function getGuestLabelWorldPosition(guest) {
+  if (!guest?.root) {
+    return null;
+  }
+
+  guest.root.computeWorldMatrix(true);
+  const guestPos = guest.root.getAbsolutePosition();
+  const { worldY } = getGuestDevLabelMetrics(guest);
+
+  return {
+    x: guestPos.x,
+    y: guestPos.y + worldY,
+    z: guestPos.z
+  };
+}
+
+/** Screen pixels for a fixed-position HTML overlay aligned to the WebGL canvas. */
+export function projectWorldPointToScreen(BABYLON, scene, camera, worldPosition) {
+  const engine = scene.getEngine?.();
+  const canvas = engine?.getRenderingCanvas?.();
+
+  if (!engine || !canvas || !camera || !worldPosition) {
+    return null;
+  }
+
+  const world = worldPosition.clone?.()
+    || new BABYLON.Vector3(worldPosition.x, worldPosition.y, worldPosition.z);
+
+  const projected = BABYLON.Vector3.Project(
+    world,
+    BABYLON.Matrix.Identity(),
+    scene.getTransformMatrix(),
+    camera.viewport.toGlobal(engine.getRenderWidth(), engine.getRenderHeight())
+  );
+
+  const rect = canvas.getBoundingClientRect();
+  const renderWidth = Math.max(engine.getRenderWidth(), 1);
+  const renderHeight = Math.max(engine.getRenderHeight(), 1);
+  const scaleX = rect.width / renderWidth;
+  const scaleY = rect.height / renderHeight;
+
+  return {
+    x: rect.left + projected.x * scaleX,
+    y: rect.top + projected.y * scaleY,
+    depth: projected.z,
+    visible: projected.z >= 0 && projected.z <= 1
+  };
+}
+
+export function getGuestDialogAnchorWorldPosition(guest, clearance = 0.35) {
+  if (!guest?.root) {
+    return null;
+  }
+
+  guest.root.computeWorldMatrix(true);
+  const guestPos = guest.root.getAbsolutePosition();
+  const fitScale = Math.max(guest.fitScale || 1, 0.001);
+  const headLocalY = getGuestHeadLocalY(guest);
+
+  return {
+    x: guestPos.x,
+    y: guestPos.y + headLocalY * fitScale + clearance,
+    z: guestPos.z
+  };
+}
+
+function isGuestBodyMeshForOcclusion(mesh, guest) {
+  if (!mesh || isGuestLabelMesh(mesh)) {
+    return false;
+  }
+
+  if (guest?.meshes?.includes(mesh)) {
+    return false;
+  }
+
+  if (mesh.metadata?.tourGuest) {
+    return false;
+  }
+
+  return true;
+}
+
+/** Hide guest name labels when collision geometry (COL) blocks the camera view. */
+export function isGuestDevLabelOccluded(BABYLON, scene, guest, camera, collisionMeshSet) {
+  if (!collisionMeshSet?.size || !guest?.root || !camera?.position) {
+    return false;
+  }
+
+  const labelWorld = getGuestLabelWorldPosition(guest);
+
+  if (!labelWorld) {
+    return false;
+  }
+
+  const origin = camera.position;
+  const target = new BABYLON.Vector3(labelWorld.x, labelWorld.y, labelWorld.z);
+  const delta = target.subtract(origin);
+  const distance = delta.length();
+
+  if (distance <= 0.05) {
+    return false;
+  }
+
+  const direction = delta.normalize();
+  const ray = new BABYLON.Ray(origin, direction, Math.max(0.05, distance - 0.2));
+  const hit = scene.pickWithRay(ray, (mesh) => (
+    collisionMeshSet.has(mesh)
+    && mesh.isEnabled?.()
+    && mesh.isPickable
+    && !mesh.metadata?.passThrough
+    && isGuestBodyMeshForOcclusion(mesh, guest)
+  ));
+
+  return Boolean(hit?.hit);
+}
+
 export function createGuestDevLabel(BABYLON, scene, guest, labelText) {
   if (!labelText || !guest?.root) {
     return null;

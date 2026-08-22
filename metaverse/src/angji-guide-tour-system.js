@@ -3,7 +3,7 @@
  */
 
 import { ANGJI_GUIDE_SPAWN, loadAngjiGuideTourData } from "./angji-guide-tour-config.js?v=angji-guide-tour-20260822-v19";
-import { getGuestHeadLocalY } from "./guest-dev-label.js?v=angji-guide-tour-20260822-v19";
+import { getGuestHeadLocalY, projectWorldPointToScreen, getGuestDialogAnchorWorldPosition, setGuestDevLabelVisible } from "./guest-dev-label.js?v=angji-guest-labels-20260822";
 import { normalizeTourData } from "./angji-guide-tour-data.js?v=angji-guide-manager-20260822";
 
 const GUIDE_STATE = {
@@ -68,6 +68,7 @@ function ensureGuideDom() {
 
   return {
     bubble: stack,
+    nameEl: stack.querySelector(".guide-dialog-bubble__name"),
     textEl: document.getElementById("guideDialogBubbleText"),
     subtitle,
     choices
@@ -551,6 +552,10 @@ export function createAngjiGuideTourSystem(BABYLON, scene, options = {}) {
     ui.bubble.hidden = false;
     ui.subtitle.hidden = false;
 
+    if (ui.nameEl) {
+      ui.nameEl.textContent = tourData?.guideDisplayName || ANGJI_GUIDE_SPAWN.devLabel || "GUIDE";
+    }
+
     if (ui.textEl) {
       ui.textEl.textContent = "";
     }
@@ -1024,8 +1029,10 @@ export function createAngjiGuideTourSystem(BABYLON, scene, options = {}) {
     if (guideGuest) {
       tintGuideMeshes(BABYLON, guideGuest);
       gcs.revealGuest?.(ANGJI_GUIDE_SPAWN.id);
+      gcs.refreshDevLabels?.();
       positionGuideNpcOnly(getGuideSpawnEvent());
       playGuideClip("Idle", true);
+      syncGuideHeadLabel();
     }
 
     return guideGuest;
@@ -1282,26 +1289,48 @@ export function createAngjiGuideTourSystem(BABYLON, scene, options = {}) {
   function updateBubblePosition() {
     const guest = guideGuest;
     const camera = getActiveCamera();
-    const engine = scene.getEngine?.();
 
-    if (!guest?.root || !camera || !engine) {
+    if (!guest?.root || !camera) {
       return;
     }
 
-    const fitScale = Math.max(guest.fitScale || 1, 0.001);
-    const headLocalY = getGuestHeadLocalY(guest);
-    const world = guest.root.getAbsolutePosition().clone();
-    world.y += headLocalY * fitScale + 0.45;
+    const anchor = getGuestDialogAnchorWorldPosition(guest, 0.35);
 
-    const projected = BABYLON.Vector3.Project(
-      world,
-      BABYLON.Matrix.Identity(),
-      scene.getTransformMatrix(),
-      camera.viewport.toGlobal(engine.getRenderWidth(), engine.getRenderHeight())
-    );
+    if (!anchor) {
+      return;
+    }
+
+    const projected = projectWorldPointToScreen(BABYLON, scene, camera, anchor);
+
+    if (!projected?.visible) {
+      ui.bubble.hidden = true;
+      return;
+    }
+
+    if (state === GUIDE_STATE.DIALOG && !dialogPaused && getCurrentLine()) {
+      ui.bubble.hidden = false;
+    }
 
     ui.bubble.style.left = `${projected.x}px`;
     ui.bubble.style.top = `${projected.y}px`;
+    syncGuideHeadLabel();
+  }
+
+  function syncGuideHeadLabel() {
+    const guest = guideGuest;
+    const gcs = getGuestCharacterSystem();
+
+    if (!guest || !gcs) {
+      return;
+    }
+
+    const showLabel = isActive()
+      && state !== GUIDE_STATE.ORBIT_SPIN
+      && state !== GUIDE_STATE.IDLE
+      && state !== GUIDE_STATE.COMPLETE
+      && !dialogPaused;
+
+    setGuestDevLabelVisible(guest, showLabel && guest.root?.isEnabled?.() !== false);
   }
 
   function updateDialogCamera(dt) {

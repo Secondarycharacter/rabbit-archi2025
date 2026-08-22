@@ -2,7 +2,7 @@
 
 import { loadEffectiveTourData } from "./angji-guide-tour-data.js?v=angji-guide-manager-20260822";
 
-export const ANGJI_GUIDE_TOUR_VERSION = "angji-guide-tour-20260822-v19";
+export const ANGJI_GUIDE_TOUR_VERSION = "angji-guide-tour-20260822-v20";
 export { ANGJI_GUIDE_TOUR_DATA_URL } from "./angji-guide-tour-data.js?v=angji-guide-manager-20260822";
 
 export const ANGJI_GUIDE_SPAWN = {

@@ -4,9 +4,10 @@
  */
 
 import {
-  getGuestHeadLocalY,
+  getGuestDialogAnchorWorldPosition,
+  projectWorldPointToScreen,
   updateGuestDevLabelHeight
-} from "./guest-dev-label.js?v=angji-npc-interaction-20260820";
+} from "./guest-dev-label.js?v=angji-guest-labels-20260822";
 import { markConversationCompleted } from "./npc-guest-data.js?v=angji-npc-manager-20260820";
 
 export const NPC_INTERACTION_STATE = {
@@ -553,24 +554,25 @@ export function createNpcInteractionSystem(BABYLON, scene, options = {}) {
 
   function updateBubbleScreenPosition(guest) {
     const camera = getActiveCamera();
-    const engine = scene.getEngine?.();
 
-    if (!camera || !engine || !guest?.root || !ui.stack) {
+    if (!camera || !guest?.root || !ui.stack) {
       return;
     }
 
-    const fitScale = Math.max(guest.fitScale || 1, 0.001);
-    const headLocalY = getGuestHeadLocalY(guest);
-    const world = guest.root.getAbsolutePosition().clone();
-    world.y += headLocalY * fitScale + 0.35;
+    const anchor = getGuestDialogAnchorWorldPosition(guest, 0.35);
 
-    const projected = BABYLON.Vector3.Project(
-      world,
-      BABYLON.Matrix.Identity(),
-      scene.getTransformMatrix(),
-      camera.viewport.toGlobal(engine.getRenderWidth(), engine.getRenderHeight())
-    );
+    if (!anchor) {
+      return;
+    }
 
+    const projected = projectWorldPointToScreen(BABYLON, scene, camera, anchor);
+
+    if (!projected?.visible) {
+      ui.stack.hidden = true;
+      return;
+    }
+
+    ui.stack.hidden = false;
     stackAnchor.x = projected.x;
     stackAnchor.y = projected.y;
     ui.stack.style.left = `${projected.x}px`;
