@@ -5,10 +5,11 @@
 
 import {
   getGuestDialogAnchorWorldPosition,
+  getGuestHeadLocalY,
   projectWorldPointToScreen,
   updateGuestDevLabelHeight
-} from "./guest-dev-label.js?v=angji-guest-labels-20260822";
-import { markConversationCompleted } from "./npc-guest-data.js?v=angji-npc-manager-20260823";
+} from "./guest-dev-label.js?v=angji-guest-labels-20260823";
+import { markConversationCompleted } from "./npc-guest-data.js?v=angji-npc-manager-20260825";
 
 export const NPC_INTERACTION_STATE = {
   IDLE: "IDLE",
@@ -61,55 +62,44 @@ function horizontalDistance(a, b) {
 }
 
 function ensureDialogDom() {
-  let stack = document.getElementById("npcDialogBubbleStack");
+  let bubble = document.getElementById("npcDialogBubble");
   let subtitle = document.getElementById("npcDialogSubtitle");
 
-  if (!stack) {
-    stack = document.createElement("div");
-    stack.id = "npcDialogBubbleStack";
-    stack.className = "npc-dialog-bubble-stack";
-    stack.hidden = true;
-    document.body.appendChild(stack);
+  if (!bubble) {
+    bubble = document.createElement("div");
+    bubble.id = "npcDialogBubble";
+    bubble.className = "guide-dialog-bubble";
+    bubble.hidden = true;
+    bubble.innerHTML = [
+      '<div class="guide-dialog-bubble__name"></div>',
+      '<div class="guide-dialog-bubble__text"></div>'
+    ].join("");
+    document.body.appendChild(bubble);
   }
 
   if (!subtitle) {
     subtitle = document.createElement("div");
     subtitle.id = "npcDialogSubtitle";
-    subtitle.className = "npc-dialog-subtitle";
+    subtitle.className = "guide-dialog-subtitle";
     subtitle.hidden = true;
     document.body.appendChild(subtitle);
   }
 
-  return { stack, subtitle };
+  return {
+    bubble,
+    nameEl: bubble.querySelector(".guide-dialog-bubble__name"),
+    textEl: bubble.querySelector(".guide-dialog-bubble__text"),
+    subtitle
+  };
 }
 
-function fitBubbleText(textEl, fullText, minPx, maxPx) {
-  if (!textEl) {
-    return;
-  }
+function getLineHoldSeconds(line, config) {
+  const base = config?.lineHoldSeconds ?? 1.0;
+  const perChar = config?.lineHoldPerChar ?? 0.02;
+  const maxExtra = config?.lineHoldMaxExtra ?? 3.33;
+  const extra = Math.min(maxExtra, (line?.koreanText?.length || 0) * perChar);
 
-  textEl.textContent = fullText;
-  textEl.style.fontSize = `${maxPx}px`;
-
-  let low = minPx;
-  let high = maxPx;
-  let best = minPx;
-
-  for (let i = 0; i < 8; i += 1) {
-    const mid = (low + high) / 2;
-    textEl.style.fontSize = `${mid}px`;
-    const lineHeight = Number.parseFloat(getComputedStyle(textEl).lineHeight) || mid * 1.4;
-    const maxHeight = lineHeight * 2.15;
-
-    if (textEl.scrollHeight <= maxHeight + 1 && textEl.scrollWidth <= textEl.clientWidth + 1) {
-      best = mid;
-      low = mid;
-    } else {
-      high = mid;
-    }
-  }
-
-  textEl.style.fontSize = `${best}px`;
+  return base + extra;
 }
 
 export function createNpcInteractionSystem(BABYLON, scene, options = {}) {
@@ -131,7 +121,6 @@ export function createNpcInteractionSystem(BABYLON, scene, options = {}) {
 
   let configByGuestId = new Map();
   const ui = ensureDialogDom();
-  const bubbleEntries = [];
 
   let state = NPC_INTERACTION_STATE.IDLE;
   let activeGuestId = null;
@@ -159,8 +148,6 @@ export function createNpcInteractionSystem(BABYLON, scene, options = {}) {
   let dialogLookTarget = new BABYLON.Vector3();
   let dialogCameraPos = new BABYLON.Vector3();
   let savedInputBlocked = false;
-  let currentBubbleEl = null;
-  let stackAnchor = { x: 0, y: 0 };
 
   function setConfigs(nextConfigs = []) {
     configByGuestId = new Map(
@@ -336,20 +323,14 @@ export function createNpcInteractionSystem(BABYLON, scene, options = {}) {
     return target;
   }
 
-  function clearBubbles() {
-    bubbleEntries.length = 0;
-    currentBubbleEl = null;
-
-    if (ui.stack) {
-      ui.stack.innerHTML = "";
-      ui.stack.hidden = true;
-    }
-  }
-
   function hideDialogUi() {
-    clearBubbles();
+    ui.bubble.hidden = true;
     ui.subtitle.hidden = true;
     ui.subtitle.textContent = "";
+
+    if (ui.textEl) {
+      ui.textEl.textContent = "";
+    }
   }
 
   function stopAudio() {
@@ -398,88 +379,26 @@ export function createNpcInteractionSystem(BABYLON, scene, options = {}) {
     }
   }
 
-  function pruneBubbles(maxVisible) {
-    while (bubbleEntries.length > maxVisible) {
-      const oldest = bubbleEntries.shift();
-      oldest?.el?.remove();
+  function showLine(line) {
+    if (!line) {
+      return;
     }
-  }
 
-  function fadePreviousBubbles() {
-    const fadeSeconds = Math.max(activeConfig?.bubbleFadeSeconds ?? 0.55, 0.05);
-    const risePx = activeConfig?.bubbleFadeRisePx ?? 42;
+    ui.bubble.hidden = false;
+    ui.subtitle.hidden = false;
 
-    bubbleEntries.forEach((entry) => {
-      if (entry.el === currentBubbleEl || entry.fading) {
-        return;
-      }
-
-      entry.fading = true;
-      entry.fadeT = 0;
-      entry.fadeSeconds = fadeSeconds;
-      entry.risePx = risePx;
-      entry.el.classList.add("is-fading");
-    });
-  }
-
-  function updateBubbleFades(dt) {
-    for (let i = bubbleEntries.length - 1; i >= 0; i -= 1) {
-      const entry = bubbleEntries[i];
-
-      if (!entry.fading) {
-        continue;
-      }
-
-      entry.fadeT = Math.min(1, (entry.fadeT || 0) + dt / entry.fadeSeconds);
-      const t = entry.fadeT;
-      entry.el.style.opacity = String(1 - t);
-      entry.el.style.transform = `translate(-50%, calc(-100% - ${18 + entry.risePx * t}px))`;
-
-      if (t >= 1) {
-        entry.el.remove();
-        bubbleEntries.splice(i, 1);
-
-        if (currentBubbleEl === entry.el) {
-          currentBubbleEl = null;
-        }
-      }
+    if (ui.nameEl) {
+      ui.nameEl.textContent = activeConfig?.labelId || activeConfig?.displayName || "NPC";
     }
-  }
 
-  function beginDialogLine(line) {
+    if (ui.textEl) {
+      ui.textEl.textContent = "";
+    }
+
+    ui.subtitle.textContent = line.englishSubtitle || "";
     typedChars = 0;
     typeAccum = 0;
     holdAccum = 0;
-    ui.stack.hidden = false;
-    ui.subtitle.hidden = false;
-    ui.subtitle.textContent = line?.englishSubtitle || "";
-
-    fadePreviousBubbles();
-
-    const bubble = document.createElement("div");
-    bubble.className = "npc-dialog-bubble is-current";
-    bubble.innerHTML = [
-      `<div class="npc-dialog-bubble__name"></div>`,
-      `<div class="npc-dialog-bubble__text"></div>`
-    ].join("");
-
-    const nameEl = bubble.querySelector(".npc-dialog-bubble__name");
-    const textEl = bubble.querySelector(".npc-dialog-bubble__text");
-
-    if (nameEl) {
-      nameEl.textContent = activeConfig?.labelId || activeConfig?.displayName || "NPC";
-    }
-
-    if (textEl) {
-      textEl.textContent = "";
-      textEl.style.fontSize = `${activeConfig?.bubbleMaxFontPx ?? 16}px`;
-    }
-
-    ui.stack.appendChild(bubble);
-    currentBubbleEl = bubble;
-    bubbleEntries.push({ el: bubble, fading: false, textEl });
-
-    pruneBubbles(Math.max(1, activeConfig?.bubbleMaxVisible ?? 2));
     playLineAudio(line);
   }
 
@@ -552,10 +471,10 @@ export function createNpcInteractionSystem(BABYLON, scene, options = {}) {
     restoreGameplayPose();
   }
 
-  function updateBubbleScreenPosition(guest) {
+  function updateBubblePosition(guest) {
     const camera = getActiveCamera();
 
-    if (!camera || !guest?.root || !ui.stack) {
+    if (!guest?.root || !camera) {
       return;
     }
 
@@ -568,15 +487,16 @@ export function createNpcInteractionSystem(BABYLON, scene, options = {}) {
     const projected = projectWorldPointToScreen(BABYLON, scene, camera, anchor);
 
     if (!projected?.visible) {
-      ui.stack.hidden = true;
+      ui.bubble.hidden = true;
       return;
     }
 
-    ui.stack.hidden = false;
-    stackAnchor.x = projected.x;
-    stackAnchor.y = projected.y;
-    ui.stack.style.left = `${projected.x}px`;
-    ui.stack.style.top = `${projected.y}px`;
+    if (state === NPC_INTERACTION_STATE.DIALOG_PLAYING && activeConfig?.dialogLines?.[lineIndex]) {
+      ui.bubble.hidden = false;
+    }
+
+    ui.bubble.style.left = `${projected.x}px`;
+    ui.bubble.style.top = `${projected.y}px`;
   }
 
   function startDialog(guestId, startOptions = {}) {
@@ -861,7 +781,7 @@ export function createNpcInteractionSystem(BABYLON, scene, options = {}) {
     if (cameraBlend >= 0.999) {
       camera.position.copyFrom(dialogCameraPos);
       camera.setTarget?.(dialogLookTarget);
-      beginDialogLine(activeConfig.dialogLines[lineIndex]);
+      showLine(activeConfig.dialogLines[lineIndex]);
       setState(NPC_INTERACTION_STATE.DIALOG_PLAYING);
     }
   }
@@ -877,8 +797,7 @@ export function createNpcInteractionSystem(BABYLON, scene, options = {}) {
       return;
     }
 
-    updateBubbleScreenPosition(guest);
-    updateBubbleFades(dt);
+    updateBubblePosition(guest);
 
     const camera = getActiveCamera();
     const playerPos = getPlayerEyePosition();
@@ -890,8 +809,7 @@ export function createNpcInteractionSystem(BABYLON, scene, options = {}) {
     }
 
     const fullText = line.koreanText || "";
-    const speed = Math.max(line.textSpeed || activeConfig.textSpeed || 0.05, 0.01);
-    const textEl = currentBubbleEl?.querySelector?.(".npc-dialog-bubble__text");
+    const speed = line.textSpeed ?? activeConfig.textSpeed ?? 0.0583;
 
     if (typedChars < fullText.length) {
       typeAccum += dt;
@@ -901,43 +819,26 @@ export function createNpcInteractionSystem(BABYLON, scene, options = {}) {
         typedChars += 1;
       }
 
-      if (textEl) {
-        const slice = fullText.slice(0, typedChars);
-        fitBubbleText(
-          textEl,
-          slice,
-          activeConfig.bubbleMinFontPx ?? 12,
-          activeConfig.bubbleMaxFontPx ?? 16
-        );
+      if (ui.textEl) {
+        ui.textEl.textContent = fullText.slice(0, typedChars);
       }
-    } else if (textEl && typedChars === fullText.length) {
-      fitBubbleText(
-        textEl,
-        fullText,
-        activeConfig.bubbleMinFontPx ?? 12,
-        activeConfig.bubbleMaxFontPx ?? 16
-      );
-    }
+    } else {
+      const hasVoice = Boolean(line.voiceEnabled && line.audioFile);
+      const audioDone = !hasVoice || audioEnded;
 
-    const textDone = typedChars >= fullText.length;
-    const hasVoice = Boolean(line.voiceEnabled && line.audioFile);
-    const audioDone = !hasVoice || audioEnded;
-    const holdTarget = hasVoice
-      ? 0.2
-      : Math.max(0.2, line.dialogDuration ?? activeConfig.dialogDuration ?? 0.8);
+      if (audioDone) {
+        holdAccum += dt;
 
-    if (textDone && audioDone) {
-      holdAccum += dt;
+        if (holdAccum >= getLineHoldSeconds(line, activeConfig)) {
+          lineIndex += 1;
 
-      if (holdAccum >= holdTarget) {
-        lineIndex += 1;
-
-        if (lineIndex >= (activeConfig.dialogLines?.length || 0)) {
-          endedNormally = true;
-          cameraBlend = 0;
-          setState(NPC_INTERACTION_STATE.DIALOG_END);
-        } else {
-          beginDialogLine(activeConfig.dialogLines[lineIndex]);
+          if (lineIndex >= (activeConfig.dialogLines?.length || 0)) {
+            endedNormally = true;
+            cameraBlend = 0;
+            setState(NPC_INTERACTION_STATE.DIALOG_END);
+          } else {
+            showLine(activeConfig.dialogLines[lineIndex]);
+          }
         }
       }
     }
@@ -945,7 +846,6 @@ export function createNpcInteractionSystem(BABYLON, scene, options = {}) {
 
   function updateDialogEnd(dt) {
     void dt;
-    updateBubbleFades(dt);
     hideDialogUi();
     stopAudio();
 

@@ -8,7 +8,7 @@ import {
   loadEffectiveGuestBundle,
   resolveInteractionConfigs,
   loadConversationProgress
-} from "./npc-guest-data.js?v=angji-npc-manager-20260823";
+} from "./npc-guest-data.js?v=angji-npc-manager-20260825";
 
 export const NPC_INTERACTION_CONFIG_VERSION = NPC_GUEST_DATA_VERSION;
 export const NPC_INTERACTION_DEFAULTS = { ...NPC_GLOBAL_DEFAULTS };

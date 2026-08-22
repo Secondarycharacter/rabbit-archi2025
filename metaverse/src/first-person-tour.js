@@ -13,10 +13,10 @@ import {
 } from "./character-tps-bindings.js?v=tps-jump-nocol-20260629";
 import {
   createNpcInteractionSystem
-} from "./npc-interaction-system.js?v=angji-npc-manager-20260823";
+} from "./npc-interaction-system.js?v=angji-npc-guide-bubble-20260823";
 import {
   createNpcGuestManagerPanel
-} from "./npc-guest-manager-panel.js?v=angji-npc-manager-20260823";
+} from "./npc-guest-manager-panel.js?v=angji-npc-manager-20260825";
 import {
   createAngjiGuideTourSystem
 } from "./angji-guide-tour-system.js?v=angji-guide-tour-20260822-v22";
@@ -29,7 +29,7 @@ import {
   loadEffectiveGuestBundle,
   resolveInteractionConfigs,
   loadConversationProgress
-} from "./npc-guest-data.js?v=angji-npc-manager-20260823";
+} from "./npc-guest-data.js?v=angji-npc-manager-20260825";
 import { createGuestPlacementTool } from "./guest-placement-tool.js?v=orbit-cam-capture-20260725";
 import {
   attachHistoryDisplayBoards,
@@ -6866,7 +6866,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
 
       return groundPose?.eyeY ?? position.y;
     },
-    getActiveCamera: () => (walkMode ? walkCamera : scene.activeCamera),
+    getActiveCamera: () => (walkMode ? tpsCamera : scene.activeCamera),
     onStatus: (message) => {
       if (typeof message === "string" && message) {
         setStatus(message);

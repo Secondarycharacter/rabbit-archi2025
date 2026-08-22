@@ -3,6 +3,9 @@ node_modules/
 npm-debug.log*
 package-lock.json
 
+# Local guest manager overlay (merge into guests.json before commit)
+metaverse/data/npc/guests.local-overlay.json
+
 # ESLint
 .eslintcache
 

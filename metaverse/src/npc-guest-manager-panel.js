@@ -17,7 +17,7 @@ import {
   saveGuestBundle,
   loadConversationProgress,
   clearConversationCompleted
-} from "./npc-guest-data.js?v=angji-npc-manager-20260823";
+} from "./npc-guest-data.js?v=angji-npc-manager-20260825";
 
 function el(tag, className, attrs = {}) {
   const node = document.createElement(tag);
@@ -534,14 +534,23 @@ export function createNpcGuestManagerPanel(options = {}) {
 
     if (action === "export") {
       syncEditorBeforeAction();
-      const blob = new Blob([exportGuestBundleJson(bundle)], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const link = el("a", null, { href: url, download: "guests.json" });
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
-      setStatus("guests.json을 내보냈습니다.");
+      saveGuestBundle(bundle);
+      const modelEntries = getModelGuestEntries() || [];
+
+      void loadEffectiveGuestBundle(undefined, modelEntries).then((effective) => {
+        const blob = new Blob([exportGuestBundleJson(effective)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const link = el("a", null, { href: url, download: "guests.json" });
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+        setStatus("배포용 guests.json을 내보냈습니다. metaverse/data/npc/guests.json에 덮어쓴 뒤 커밋하세요.");
+      }).catch((error) => {
+        console.error("[npc-manager] export failed", error);
+        setStatus("guests.json 내보내기에 실패했습니다.");
+      });
+
       return;
     }
 

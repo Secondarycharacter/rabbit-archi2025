@@ -3,7 +3,7 @@
  * Base JSON → localStorage overlay. Global → Guest → Dialog override order.
  */
 
-export const NPC_GUEST_DATA_VERSION = "angji-npc-manager-20260823";
+export const NPC_GUEST_DATA_VERSION = "angji-npc-manager-20260825";
 export const NPC_GUEST_STORAGE_KEY = "angji-npc-guest-manager-v1";
 export const NPC_GUEST_PROGRESS_KEY = "angji-npc-conversation-progress-v1";
 export const NPC_GUEST_DATA_URL = "./data/npc/guests.json";
@@ -23,7 +23,10 @@ export const NPC_GLOBAL_DEFAULTS = {
   cameraFov: null,
   cameraHeight: 1.55,
   cameraLookLift: 0.35,
-  textSpeed: 0.05,
+  textSpeed: 0.0583,
+  lineHoldSeconds: 1.0,
+  lineHoldPerChar: 0.02,
+  lineHoldMaxExtra: 3.33,
   dialogDuration: 0.8,
   voiceEnabled: true,
   voiceVolume: 1,
@@ -258,13 +261,83 @@ export async function loadBaseGuestBundle(url = NPC_GUEST_DATA_URL) {
   return normalizeGuestBundle(await response.json());
 }
 
+function guestHasDialogContent(guest) {
+  return (guest?.dialogLines || []).some((line) => String(line.koreanText || "").trim());
+}
+
+function mergeGuestRecords(jsonGuest, storedGuest, globalDefaults) {
+  if (!jsonGuest) {
+    return normalizeGuest(storedGuest, globalDefaults);
+  }
+
+  if (!storedGuest) {
+    return normalizeGuest(jsonGuest, globalDefaults);
+  }
+
+  const dialogLines = guestHasDialogContent(storedGuest)
+    ? storedGuest.dialogLines
+    : jsonGuest.dialogLines;
+
+  return normalizeGuest({
+    ...jsonGuest,
+    ...storedGuest,
+    guestKey: storedGuest.guestKey || jsonGuest.guestKey,
+    name: storedGuest.name || jsonGuest.name,
+    displayName: storedGuest.displayName || jsonGuest.displayName,
+    dialogLines,
+    interactionEnabled: storedGuest.interactionEnabled ?? jsonGuest.interactionEnabled
+  }, globalDefaults);
+}
+
+/** Merge shipped guests.json with localStorage edits (names/settings) without dropping JSON dialog. */
+export function mergeGuestBundleWithJson(jsonBundle, storedBundle) {
+  if (!jsonBundle && !storedBundle) {
+    return normalizeGuestBundle({});
+  }
+
+  if (!storedBundle) {
+    return normalizeGuestBundle(jsonBundle);
+  }
+
+  if (!jsonBundle) {
+    return normalizeGuestBundle(storedBundle);
+  }
+
+  const jsonNorm = normalizeGuestBundle(jsonBundle);
+  const storedNorm = normalizeGuestBundle(storedBundle);
+  const jsonById = new Map(jsonNorm.guests.map((guest) => [guest.guestId, guest]));
+  const storedById = new Map(storedNorm.guests.map((guest) => [guest.guestId, guest]));
+  const guestIds = new Set([...jsonById.keys(), ...storedById.keys()]);
+  const globalDefaults = {
+    ...jsonNorm.globalDefaults,
+    ...storedNorm.globalDefaults
+  };
+
+  return {
+    version: Math.max(jsonNorm.version, storedNorm.version),
+    globalDefaults,
+    guests: [...guestIds].map((guestId) => mergeGuestRecords(
+      jsonById.get(guestId),
+      storedById.get(guestId),
+      globalDefaults
+    ))
+  };
+}
+
 /**
- * Prefer localStorage overlay when present; otherwise base JSON.
- * Always merge/expand with model guest entries so manager lists every Mark guest.
+ * Merge guests.json with localStorage overlay, then expand to every model guest.
  */
 export async function loadEffectiveGuestBundle(url = NPC_GUEST_DATA_URL, modelGuestEntries = null) {
   const stored = loadStoredGuestBundle();
-  const base = stored || await loadBaseGuestBundle(url);
+  let jsonBundle = null;
+
+  try {
+    jsonBundle = await loadBaseGuestBundle(url);
+  } catch (error) {
+    console.warn("[npc-guest-data] failed to load base JSON", error);
+  }
+
+  const base = mergeGuestBundleWithJson(jsonBundle, stored);
   return mergeModelGuestsIntoBundle(base, modelGuestEntries);
 }
 
