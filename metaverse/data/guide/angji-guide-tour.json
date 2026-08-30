@@ -60,13 +60,13 @@
         { "id": "00_01", "ko": "안녕하세요. 앵지밭골 시니어형 체육관에 오신 것을 환영합니다.", "en": "Hello. Welcome to the Angjibatgol Senior Sports Center." },
         { "id": "00_02", "ko": "저와 함께 이 건물을 둘러보시겠습니까?", "en": "Would you like to take a tour of this building with me?", "startTourChoice": true },
         { "id": "00_03", "ko": "저와 함께 이 건물을 둘러보면서, 이곳이 어떤 의도로 계획되었는지 살펴보겠습니다.", "en": "As we tour the building, let me show you the ideas behind its design." },
-        { "id": "00_04", "ko": "그런데 건물부터 보기 전에 먼저 이 장소를 살펴볼 필요가 있습니다.", "en": "Before we look at the building, we should first understand this place." },
+        { "id": "00_04", "ko": "건물을 둘러보기 전에 먼저 사이트를 살펴볼 필요가 있습니다.", "en": "Before we look at the building, we should first understand this place." },
         { "id": "00_05", "ko": "잠시 주변을 둘러볼까요?", "en": "Shall we take a look around?", "orbitAfter": true },
         { "id": "00_06", "ko": "이곳에는 무학산에서 봉화산으로 이어지는 녹지의 흐름이 있고, 그 사이로 회현천의 물길이 흐르고 있습니다.", "en": "Here, the green corridor runs from Muhaksan to Bonghwasan, while the Hoehyeoncheon stream flows through it." },
-        { "id": "00_07", "ko": "그리고 이미 이곳에는 주차장, 외부 체육시설 그리고 휴게정원이 자리하고 있었습니다.", "en": "The site already had a parking area, outdoor sports facilities, and a landscaped rest garden." },
+        { "id": "00_07", "ko": "그리고 이미 이곳에는 주차장, 외부 체육시설 그리고 휴게정원이 이미 자리하고 있었습니다.", "en": "The site already had a parking area, outdoor sports facilities, and a landscaped rest garden." },
         { "id": "00_08", "ko": "새로운 체육관은 이 기존 시설 사이의 유휴공간에 들어서게 됩니다.", "en": "The new sports center is inserted into the unused space between these existing facilities." },
-        { "id": "00_09", "ko": "따라서 이 프로젝트는 빈 터에 새로운 건물을 만드는 것이 아니었습니다.", "en": "This was not a project to build on an empty site." },
-        { "id": "00_10", "ko": "이미 존재하는 자연과 시설, 그리고 사람들의 움직임 사이에 새로운 건물을 더하는 일이었습니다.", "en": "It was about adding a new building between the existing landscape, facilities, and patterns of movement." },
+        { "id": "00_09", "ko": "따라서 이 프로젝트는 빈 터에 새로운 건물을 계획하는 것이 아니었습니다.", "en": "This was not a project to build on an empty site." },
+        { "id": "00_10", "ko": "이미 존재하는 지형과 시설, 그리고 사람들의 움직임 사이에 새로운 건물을 더하는 일이었습니다.", "en": "It was about adding a new building between the existing landscape, facilities, and patterns of movement." },
         { "id": "00_11", "ko": "그럼, 이 조건에서 우리는 어떻게 계획을 했을까요?", "en": "So, how did we design the building within these conditions?" }
       ]
     },
@@ -82,8 +82,8 @@
         { "id": "01_03", "ko": "필요한 체육시설 및 프로그램의 규모도 유휴공간에 딱 맞게 정해져 있었습니다.", "en": "The required scale and program were also largely fixed to fit the available space." },
         { "id": "01_04", "ko": "결국 비슷한 조건이라면, 비슷한 건물이 만들어질 가능성이 높았습니다.", "en": "With similar conditions, similar buildings could easily emerge." },
         { "id": "01_05", "ko": "그래서 우리가 고민한 것은 '어디에 지을 것인가'가 아니라,", "en": "So the question was not, “Where should we place the building?”" },
-        { "id": "01_06", "ko": "정해진 자리에서 어떻게 다른 건축을 만들 것인가였습니다.", "en": "It was, “How can we create something distinctive within a fixed site?”" },
-        { "id": "01_07", "ko": "답은 건물 하나의 모양보다, 주변과의 관계에서 찾았습니다.", "en": "We found the answer not in the building alone, but in its relationships with the surroundings." },
+        { "id": "01_06", "ko": "정해진 자리에서 어떻게 다른 계획을 할 것인가였습니다.", "en": "It was, “How can we create something distinctive within a fixed site?”" },
+        { "id": "01_07", "ko": "답은 건물 그 자체가 아닌, 주변과의 관계에서 찾았습니다.", "en": "We found the answer not in the building alone, but in its relationships with the surroundings." },
         { "id": "01_08", "ko": "이제 그 관계를 하나씩 살펴보겠습니다.", "en": "Let's look at those relationships one by one." }
       ]
     },

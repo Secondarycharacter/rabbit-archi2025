@@ -7,5 +7,5 @@ export const FIREBASE_CONFIG = {
   appId: "1:577448559589:web:5b984b45bff89303dd650c"
 };
 
-// Prototype-only passcode. For production, replace this with Firebase Authentication.
-export const OVERVIEW_ADMIN_PASSCODE = "0000";
+// Shared admin passcode used by metaverse overview, history admin, and homepage chat.
+export const OVERVIEW_ADMIN_PASSCODE = "1031!@";

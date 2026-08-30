@@ -28,15 +28,6 @@
 
     <canvas id="gameCanvas" tabindex="0" aria-label="3D architecture tour canvas"></canvas>
 
-    <nav class="model-switcher is-hidden" id="modelSwitcher" aria-label="Building model navigation">
-      <button class="model-switcher__button model-switcher__button--left" id="previousModelButton" type="button" aria-label="Previous model">
-        ‹
-      </button>
-      <button class="model-switcher__button model-switcher__button--right" id="nextModelButton" type="button" aria-label="Next model">
-        ›
-      </button>
-    </nav>
-
     <section class="hud" aria-live="polite">
       <div class="hud__top">
         <div class="hud__title-block">
@@ -180,5 +171,19 @@
   <script src="https://cdn.babylonjs.com/addons/babylonjs.addons.min.js"></script>
   <script src="./lib/babylonjs-fbx-loader.js"></script>
   <script type="module" src="./src/first-person-tour.js?v=angji-npc-korean-names-20260822"></script>
+  <script>
+    (function () {
+      const isEmbedded = new URLSearchParams(window.location.search).get('embed') === '1';
+      const adminButton = document.getElementById('overviewAdminButton');
+      if (isEmbedded && adminButton) {
+        adminButton.style.display = 'none';
+      }
+      window.addEventListener('message', function (event) {
+        if (event.data && event.data.type === 'rabbit-admin-open') {
+          adminButton?.click();
+        }
+      });
+    })();
+  </script>
 </body>
 </html>

@@ -45,11 +45,12 @@ export function applyCharacterTpsKeyDown(event, {
   keys,
   tpsSystem = null,
   inputBlocked = false,
+  throwEnabled = true,
   onThrowExtra = null
 } = {}) {
   const key = getCharacterInputKey(event);
 
-  if (key === "e" && !event.repeat && walkMode && !inputBlocked) {
+  if (key === "e" && throwEnabled && !event.repeat && walkMode && !inputBlocked) {
     event.preventDefault();
     tpsSystem?.getInputController?.()?.queueThrow();
     onThrowExtra?.();

@@ -697,9 +697,6 @@ const captureGuestPlacementButton = document.getElementById("captureGuestPlaceme
 const copyGuestPlacementsButton = document.getElementById("copyGuestPlacementsButton");
 const undoGuestPlacementButton = document.getElementById("undoGuestPlacementButton");
 const clearGuestPlacementsButton = document.getElementById("clearGuestPlacementsButton");
-const modelSwitcher = document.getElementById("modelSwitcher");
-const previousModelButton = document.getElementById("previousModelButton");
-const nextModelButton = document.getElementById("nextModelButton");
 const tourResetFade = document.getElementById("tourResetFade");
 const projectOverview = document.getElementById("projectOverview");
 const overviewAdminButton = document.getElementById("overviewAdminButton");
@@ -735,8 +732,8 @@ const LOADING_PROGRESS = {
   sceneReady: 0.94
 };
 
-function countModelLoadSteps() {
-  return MODEL_CONFIGS.reduce((total, config) => total + (config.tourFile ? 2 : 1), 0);
+function countModelLoadSteps(configs) {
+  return configs.reduce((total, config) => total + (config.tourFile ? 2 : 1), 0);
 }
 
 function updateLoadingProgressBar() {
@@ -836,7 +833,7 @@ projectTitle.textContent = "First Person Architecture Tour";
 floorLabel.textContent = "Orbit View";
 healthLabel.textContent = "Human scale";
 monsterLabel.textContent = "Object collision";
-statusMessage.textContent = `Loading ${MODEL_CONFIGS.map((model) => model.file).join(", ")}...`;
+statusMessage.textContent = "Loading architecture tour...";
 
 function isPlacementToolEnabled() {
   return localDevToolsEnabled && (!debugPanel.hidden || booleanParam("placement", false));
@@ -1242,6 +1239,29 @@ function resolveInitialModelIndex(modelStates) {
   }
 
   return Math.max(0, MODEL_CONFIGS.findIndex((config) => config.file === DEFAULT_MODEL_FILE));
+}
+
+function resolveActiveModelConfigs() {
+  const params = new URLSearchParams(window.location.search);
+  const project = params.get("project");
+  const modelFile = params.get("model");
+
+  if (project) {
+    const matched = MODEL_CONFIGS.filter((config) => config.overviewId === project);
+    if (matched.length) {
+      return matched;
+    }
+  }
+
+  if (modelFile) {
+    const matched = MODEL_CONFIGS.filter((config) => config.file === modelFile);
+    if (matched.length) {
+      return matched;
+    }
+  }
+
+  const fallback = MODEL_CONFIGS.find((config) => config.file === DEFAULT_MODEL_FILE) || MODEL_CONFIGS[0];
+  return fallback ? [fallback] : [];
 }
 
 function normalizeName(name) {
@@ -9549,7 +9569,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     }
 
     floorLabel.textContent = "Walk Mode (TPS)";
-    setStatus("Third-person walk mode active. WASD moves, Shift runs, Space jumps (near GUIDE or Guest: talk), J jump-over test, E throws, P dances, mouse looks, wheel zooms. Use Orbit View to return.");
+    setStatus("Third-person walk mode active. WASD moves, Shift runs, Space jumps (near GUIDE or Guest: talk), J jump-over test, P dances, mouse looks, wheel zooms. Use Orbit View to return.");
     updateModeSwitchButtons();
     updateDebug();
 
@@ -9747,7 +9767,8 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
       keys,
       tpsSystem,
       inputBlocked,
-      onThrowExtra: tryShootFireball
+      throwEnabled: false,
+      onThrowExtra: null
     });
 
     if (!event.repeat) {
@@ -13463,12 +13484,19 @@ async function start() {
   const tourBgm = createTourBgmController({
     getIsAngjiNightMode: () => angjiNightMode?.isNightMode?.() || false
   });
-  const bgmReady = Promise.all(MODEL_CONFIGS.map((config) => tourBgm.preload(config)));
+  const activeModelConfigs = resolveActiveModelConfigs();
+  if (!activeModelConfigs.length) {
+    setStatus("Requested project was not found.");
+    return;
+  }
 
-  const modelLoadSteps = countModelLoadSteps();
+  statusMessage.textContent = `Loading ${activeModelConfigs.map((model) => model.label || model.file).join(", ")}...`;
+  const bgmReady = Promise.all(activeModelConfigs.map((config) => tourBgm.preload(config)));
+
+  const modelLoadSteps = countModelLoadSteps(activeModelConfigs);
   let completedModelLoadSteps = 0;
 
-  const modelStates = await Promise.all(MODEL_CONFIGS.map(async (config) => {
+  const modelStates = await Promise.all(activeModelConfigs.map(async (config) => {
     const orbitModelState = await loadTourModelState(BABYLON, scene, config);
     completedModelLoadSteps += 1;
     reportModelLoadProgress(completedModelLoadSteps, modelLoadSteps);
@@ -13499,14 +13527,11 @@ async function start() {
   const allModelStates = modelStates.flatMap((modelState) => (
     modelState.tourModelState ? [modelState, modelState.tourModelState] : [modelState]
   ));
-  const slideDistance = getSlideDistance(modelStates);
   let activeModelIndex = resolveInitialModelIndex(modelStates);
   let displayedModelState = modelStates[activeModelIndex];
-  let transitionState = null;
-  let isTransitioning = false;
 
   modelStates.forEach((modelState, index) => {
-    setModelSlideOffset(BABYLON, modelState, index === activeModelIndex ? 0 : slideDistance);
+    setModelSlideOffset(BABYLON, modelState, 0);
     setModelStateEnabled(modelState, index === activeModelIndex);
   });
   allModelStates
@@ -13525,17 +13550,10 @@ async function start() {
   });
   let controls = null;
 
-  function updateModelSwitcherVisibility() {
-    const shouldShow = Boolean(controls && !controls.isWalkMode() && !isTransitioning && modelStates.length > 1);
-    modelSwitcher.classList.toggle("is-hidden", !shouldShow);
-    previousModelButton.disabled = isTransitioning;
-    nextModelButton.disabled = isTransitioning;
-  }
-
   function updateProjectOverviewVisibility() {
     const isOrbitMode = !controls || !controls.isWalkMode();
     const overviewModelState = modelStates[activeModelIndex];
-    const overview = !isTransitioning && isOrbitMode
+    const overview = isOrbitMode
       ? getProjectOverview(overviewModelState.config)
       : null;
 
@@ -13581,104 +13599,10 @@ async function start() {
     rlbShaderTuningPanel?.syncVisibility?.();
   }
 
-  function easeOutCubic(value) {
-    return 1 - ((1 - value) ** 3);
-  }
-
-  function startModelTransition(direction) {
-    if (isTransitioning || controls?.isWalkMode() || modelStates.length < 2) {
-      return;
-    }
-
-    const nextModelIndex = (activeModelIndex + direction + modelStates.length) % modelStates.length;
-
-    if (nextModelIndex === activeModelIndex) {
-      return;
-    }
-
-    const currentModelState = modelStates[activeModelIndex];
-    const nextModelState = modelStates[nextModelIndex];
-    const nextStartOffset = direction > 0 ? slideDistance : -slideDistance;
-    const currentEndOffset = direction > 0 ? -slideDistance : slideDistance;
-    const fromEnvironmentTime = Number(timeSlider.value);
-
-    isTransitioning = true;
-    setModelStateEnabled(nextModelState, true);
-    setModelSlideOffset(BABYLON, nextModelState, nextStartOffset);
-    updateModelSwitcherVisibility();
-    updateProjectOverviewVisibility();
-    setStatus(`Switching to ${nextModelState.config.label}...`);
-
-    transitionState = {
-      startedAt: performance.now(),
-      duration: 900,
-      currentModelState,
-      nextModelState,
-      nextModelIndex,
-      nextStartOffset,
-      currentEndOffset,
-      fromCameraView: captureOrbitCameraView(orbitCamera),
-      toCameraView: getOrbitCameraView(BABYLON, getOrbitCameraSettings(nextModelState)),
-      fromEnvironmentTime,
-      toEnvironmentTime: getOrbitEnvironmentTime(nextModelState, fromEnvironmentTime)
-    };
-  }
-
-  function updateModelTransition() {
-    if (!transitionState) {
-      return;
-    }
-
-    const elapsed = performance.now() - transitionState.startedAt;
-    const progress = Math.min(elapsed / transitionState.duration, 1);
-    const eased = easeOutCubic(progress);
-    const currentOffset = transitionState.currentEndOffset * eased;
-    const nextOffset = transitionState.nextStartOffset * (1 - eased);
-
-    setModelSlideOffset(BABYLON, transitionState.currentModelState, currentOffset);
-    setModelSlideOffset(BABYLON, transitionState.nextModelState, nextOffset);
-    applyOrbitCameraView(
-      BABYLON,
-      orbitCamera,
-      interpolateOrbitCameraView(BABYLON, transitionState.fromCameraView, transitionState.toCameraView, eased)
-    );
-    applyOrbitEnvironmentBlend(
-      BABYLON,
-      sun,
-      transitionState.fromEnvironmentTime,
-      transitionState.toEnvironmentTime,
-      eased
-    );
-
-    if (progress < 1) {
-      return;
-    }
-
-    setModelSlideOffset(BABYLON, transitionState.nextModelState, 0);
-    setModelSlideOffset(BABYLON, transitionState.currentModelState, transitionState.currentEndOffset);
-    setModelStateEnabled(transitionState.currentModelState, false);
-
-    activeModelIndex = transitionState.nextModelIndex;
-    displayedModelState = transitionState.nextModelState;
-    controls.setModelState(transitionState.nextModelState);
-    applyOrbitCameraStart(BABYLON, orbitCamera, transitionState.nextModelState);
-    applyOrbitCameraConstraints(BABYLON, orbitCamera, transitionState.nextModelState);
-    applyOrbitEnvironmentSettings(BABYLON, sun, transitionState.nextModelState);
-    renderModelDebug(transitionState.nextModelState);
-    setStatus(`${transitionState.nextModelState.config.label} orbit view ready. Middle mouse rotates, Shift+middle pans, wheel zooms to cursor. Use Tour Mode to enter walk mode.`);
-
-    transitionState = null;
-    isTransitioning = false;
-    updateModelSwitcherVisibility();
-    updateProjectOverviewVisibility();
-    angjiNightMode?.sync();
-  }
-
   controls = createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, modelStates[activeModelIndex], {
     tourBgm,
     getIsAngjiNightMode: () => angjiNightMode?.isNightMode?.() || false,
     onModeChange: () => {
-      updateModelSwitcherVisibility();
       updateProjectOverviewVisibility();
       angjiNightMode?.sync();
       rlbShaderTuningPanel?.syncVisibility?.();
@@ -13734,17 +13658,14 @@ async function start() {
   void controls.preloadCharacter?.().catch((error) => {
     console.warn("Character preload failed", error);
   });
-  previousModelButton.addEventListener("click", () => startModelTransition(-1));
-  nextModelButton.addEventListener("click", () => startModelTransition(1));
   canvas.focus();
 
   renderModelDebug(modelStates[activeModelIndex]);
   applyOrbitCameraStart(BABYLON, orbitCamera, modelStates[activeModelIndex]);
   applyOrbitCameraConstraints(BABYLON, orbitCamera, modelStates[activeModelIndex]);
   applyOrbitEnvironmentSettings(BABYLON, sun, modelStates[activeModelIndex]);
-  updateModelSwitcherVisibility();
   updateProjectOverviewVisibility();
-  initializeOverviewFirebase(MODEL_CONFIGS, updateProjectOverviewVisibility);
+  initializeOverviewFirebase(activeModelConfigs, updateProjectOverviewVisibility);
 
   setStatus("Orbit view ready. Middle mouse rotates, Shift+middle pans, wheel zooms to cursor. Use Tour Mode to enter walk mode.");
   setLoadingTargetProgress(LOADING_PROGRESS.sceneReady);
@@ -13752,8 +13673,7 @@ async function start() {
   let hasRenderedFirstFrame = false;
 
   engine.runRenderLoop(() => {
-    updateModelTransition();
-    if (!controls.isWalkMode() && !isTransitioning) {
+    if (!controls.isWalkMode()) {
       applyOrbitCameraConstraints(BABYLON, orbitCamera, modelStates[activeModelIndex]);
     }
     scene.render();
