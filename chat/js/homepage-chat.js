@@ -389,7 +389,6 @@ export function createHomepageChat(config) {
 
     ensureAdminAccess(typed).then((session) => {
       if (!session) {
-        clearComposerFields();
         return;
       }
       state.currentUser = session;
@@ -654,24 +653,26 @@ export function createHomepageChat(config) {
 
     try {
       await ensureOpeningMessage(config.channel, project);
-      state.unsubscribe = subscribeRoomMessages(
-        config.channel,
-        projectId,
-        (messages) => {
-          const userKey = state.currentUser?.userKey || null;
-          state.messages = messages.map((message) => normalizeMessage(message, userKey));
-          state.firestoreReady = true;
-          renderMessages();
-        },
-        () => {
-          state.firestoreError = true;
-          renderMessages();
-        }
-      );
-    } catch {
-      state.firestoreError = true;
-      renderMessages();
+    } catch (error) {
+      console.warn('채팅 오프닝 메시지 생성 실패:', error);
     }
+
+    state.unsubscribe = subscribeRoomMessages(
+      config.channel,
+      projectId,
+      (messages) => {
+        const userKey = state.currentUser?.userKey || null;
+        state.messages = messages.map((message) => normalizeMessage(message, userKey));
+        state.firestoreReady = true;
+        state.firestoreError = null;
+        renderMessages();
+      },
+      (error) => {
+        console.error('채팅 메시지 구독 실패:', error);
+        state.firestoreError = true;
+        renderMessages();
+      }
+    );
   }
 
   async function appendMessage(text) {

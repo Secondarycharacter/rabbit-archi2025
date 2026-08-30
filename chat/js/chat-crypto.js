@@ -33,7 +33,7 @@ export function emailForUserKey(userKey) {
   bytes.forEach((byte) => {
     hex += byte.toString(16).padStart(2, '0');
   });
-  return `u${hex}@chat.rabbit-archi.local`;
+  return `chat-u${hex}@rabbit-archi2025-c40a6.firebaseapp.com`;
 }
 
 export async function hashPin(pin, saltBytes) {

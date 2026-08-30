@@ -21,7 +21,7 @@ import { emailForUserKey, normalizeUserKey } from './chat-crypto.js';
 
 const USERS_COLLECTION = 'homepageChatUsers';
 const ROOMS_COLLECTION = 'homepageChatRooms';
-const ADMIN_EMAIL = 'admin@chat.rabbit-archi.local';
+const ADMIN_EMAIL = 'chat-admin@rabbit-archi2025-c40a6.firebaseapp.com';
 const ADMIN_PASSWORD = '1031!@';
 const PIN_ATTEMPT_LIMIT = 5;
 const PIN_LOCK_MS = 1000 * 60 * 15;
@@ -109,14 +109,23 @@ function authErrorMessage(error) {
   if (code === 'auth/operation-not-allowed') {
     return 'Firebase Authentication에서 이메일/비밀번호 로그인을 켜 주세요. (무료)';
   }
+  if (code === 'auth/invalid-email') {
+    return '로그인 이메일 형식이 올바르지 않습니다. 페이지를 새로고침한 뒤 다시 시도해주세요.';
+  }
   if (code === 'auth/wrong-password' || code === 'auth/invalid-credential' || code === 'auth/invalid-login-credentials') {
     return '비밀번호가 올바르지 않습니다.';
   }
   if (code === 'auth/too-many-requests') {
     return '시도가 너무 많습니다. 잠시 후 다시 시도해주세요.';
   }
+  if (code === 'auth/unauthorized-continue-uri' || code === 'auth/unauthorized-domain') {
+    return '이 도메인이 Firebase 인증에 허용되어 있지 않습니다. Authentication → Settings → Authorized domains에 현재 주소를 추가해주세요.';
+  }
+  if (code === 'permission-denied') {
+    return '채팅 저장 권한이 없습니다. Firestore 규칙을 다시 배포해주세요.';
+  }
   if (typeof error?.message === 'string' && error.message) {
-    return error.message.replace(/^Firebase:\s*/, '');
+    return error.message.replace(/^Firebase:\s*/, '').replace(/\s*\(auth\/.*\)\.?$/, '');
   }
   return '인증에 실패했습니다.';
 }
@@ -313,30 +322,34 @@ export async function addRoomMessage(channel, projectId, message, session) {
 
   const tone = session?.isAdmin ? pickTone(author, false) : 'green';
 
-  await setDoc(
-    roomDocRef(roomKey),
-    {
-      channel,
-      projectId,
-      updatedAt: serverTimestamp()
-    },
-    { merge: true }
-  );
+  try {
+    await setDoc(
+      roomDocRef(roomKey),
+      {
+        channel,
+        projectId,
+        updatedAt: serverTimestamp()
+      },
+      { merge: true }
+    );
 
-  const docRef = await addDoc(messagesCollectionRef(roomKey), {
-    authorId: uid,
-    author,
-    text: message.text,
-    tone,
-    isSystem: false,
-    createdAt: serverTimestamp(),
-    updatedAt: null
-  });
+    const docRef = await addDoc(messagesCollectionRef(roomKey), {
+      authorId: uid,
+      author,
+      text: message.text,
+      tone,
+      isSystem: false,
+      createdAt: serverTimestamp(),
+      updatedAt: null
+    });
 
-  return {
-    messageId: docRef.id,
-    session
-  };
+    return {
+      messageId: docRef.id,
+      session
+    };
+  } catch (error) {
+    throw new Error(authErrorMessage(error));
+  }
 }
 
 export async function updateRoomMessage(channel, projectId, messageId, text) {

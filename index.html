@@ -4,571 +4,186 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>토끼 건축사사무소 워크패드 스튜디오</title>
-
-<style>
-@font-face {
-  font-family: 'NanumSquareB';
-  src: url('fonts/NanumSquareB.otf') format('opentype');
-}
-
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-body {
-  width: 100vw;
-  height: 100vh;
-  background: #000;
-  overflow: hidden;
-  font-family: 'NanumSquareB', sans-serif;
-  color: #fff;
-}
-
-.page-container {
-  position: relative;
-  width: 100%;
-  height: 100%;
-}
-
-.logo-wrapper {
-  position: absolute;
-  left: 50%;
-  top: calc(50% - 25px);
-  transform: translate(-50%, -100%);
-}
-
-.logo-frame {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  max-width: 260px;
-  border: 4px solid #fff;
-  border-radius: 50%;
-  overflow: hidden;
-}
-
-.logo-frame img {
-  width: 100%;
-  display: block;
-}
-
-.welcome-wrapper {
-  position: absolute;
-  left: 50%;
-  top: calc(50% + 25px);
-  transform: translateX(-50%);
-}
-
-.welcome-message {
-  font-size: 18px;
-  line-height: 1.5;
-  text-align: center;
-  opacity: 0;
-  transition: opacity 1s ease;
-}
-
-.welcome-message.show {
-  opacity: 1;
-}
-
-.bottom-area {
-  position: absolute;
-  left: 50%;
-  bottom: 25px;
-  transform: translateX(-50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-}
-
-.uc-animation {
-  opacity: 0;
-  transition: opacity 0.5s ease;
-}
-
-.uc-animation.show {
-  opacity: 1;
-}
-
-.uc-animation img {
-  width: 160px;
-}
-
-.maintenance-message {
-  font-size: 16px;
-  opacity: 0;
-  transition: opacity 0.5s ease;
-}
-
-.maintenance-message.show {
-  opacity: 1;
-}
-
-@keyframes fadeBlink {
-  0%, 100% { opacity: 0; }
-  50% { opacity: 1; }
-}
-
-.maintenance-message.fade {
-  animation: fadeBlink 1.5s ease-in-out infinite;
-}
-
-/* TOP MENU */
-.top-menu {
-  position: absolute;
-  top: 40px;
-  right: 50px;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 12px;
-  z-index: 100;
-}
-
-.roadmap-menu,
-.metaverse-menu {
-  color: #fff;
-  font-size: 18px;
-  letter-spacing: 2px;
-  cursor: pointer;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 1s ease;
-}
-
-.metaverse-menu {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35em;
-}
-
-.metaverse-beta {
-  display: inline-block;
-  font-size: 70%;
-  color: #ff0000;
-  letter-spacing: 1px;
-  transform: rotate(-30deg);
-  transform-origin: center center;
-  line-height: 1;
-}
-
-.roadmap-menu.show,
-.metaverse-menu.show {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.visitor-counter {
-  position: absolute;
-  top: 40px;
-  left: 50px;
-  display: flex;
-  gap: 18px;
-  color: rgba(255, 255, 255, 0.82);
-  font-size: 13px;
-  letter-spacing: 1px;
-  z-index: 100;
-}
-
-.visitor-counter span {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 6px;
-}
-
-.visitor-counter strong {
-  color: #fff;
-  font-size: 16px;
-  font-weight: 700;
-}
-
-.roadmap-overlay {
-  position: fixed;
-  inset: 0;
-  width: 100vw;
-  height: 100vh;
-  background: #000;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.5s ease;
-  z-index: 9999;
-}
-
-.roadmap-overlay.show {
-  opacity: 1;
-  visibility: visible;
-}
-
-.roadmap-overlay img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-
-.roadmap-guide {
-  position: absolute;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 12px;
-  color: rgba(30,145,20,0.85);
-  animation: fadeBlink 1.5s ease-in-out infinite;
-}
-
-/* ── 태블릿 / 아이패드 대응 ── */
-@media screen and (max-width: 1024px) {
-  .logo-frame {
-    max-width: 200px;
-  }
-
-  .welcome-message {
-    font-size: 15px;
-    white-space: normal;
-    max-width: 90vw;
-    padding: 0 20px;
-  }
-
-  .top-menu {
-    top: 24px;
-    right: 30px;
-  }
-
-  .roadmap-menu,
-  .metaverse-menu {
-    font-size: 16px;
-  }
-
-  .visitor-counter {
-    top: 24px;
-    left: 30px;
-    font-size: 12px;
-    gap: 12px;
-  }
-
-  .visitor-counter strong {
-    font-size: 14px;
-  }
-
-  .uc-animation img {
-    width: 120px;
-  }
-
-  .maintenance-message {
-    font-size: 14px;
-  }
-}
-
-/* ── 스마트폰 가로 모드 ── */
-@media screen and (max-height: 500px) and (orientation: landscape) {
-  .logo-frame {
-    max-width: 100px;
-  }
-
-  .logo-wrapper {
-    top: calc(50% - 10px);
-  }
-
-  .welcome-message {
-    font-size: 12px;
-    white-space: normal;
-    max-width: 80vw;
-  }
-
-  .top-menu {
-    top: 12px;
-    right: 16px;
-    gap: 8px;
-  }
-
-  .roadmap-menu,
-  .metaverse-menu {
-    font-size: 14px;
-  }
-
-  .visitor-counter {
-    top: 12px;
-    left: 16px;
-    font-size: 10px;
-    gap: 8px;
-  }
-
-  .visitor-counter strong {
-    font-size: 12px;
-  }
-
-  .uc-animation img {
-    width: 80px;
-  }
-
-  .maintenance-message {
-    font-size: 12px;
-  }
-
-  .bottom-area {
-    bottom: 10px;
-    gap: 8px;
-  }
-}
-
-/* ── 스마트폰 세로 모드: 가로 전환 안내 ── */
-@media screen and (max-width: 500px) and (orientation: portrait) {
-  body::after {
-    content: '↻  화면을 가로로 돌려주세요';
-    position: fixed;
-    inset: 0;
-    background: #000;
-    color: #fff;
-    font-family: 'NanumSquareB', sans-serif;
-    font-size: 18px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 99999;
-  }
-}
-</style>
+<link rel="stylesheet" href="css/homepage-shell.css">
+<link rel="stylesheet" href="chat/css/metaverse-chat.css">
 </head>
+<body class="homepage-shell">
 
-<body>
-
-<div class="page-container">
-
-  <div class="visitor-counter" id="visitorCounter" aria-live="polite">
-    <span>누적 <strong id="totalVisitorCount">--</strong></span>
-    <span>오늘 <strong id="todayVisitorCount">--</strong></span>
-  </div>
-
-  <div class="logo-wrapper">
-    <div class="logo-frame">
-      <img src="images/CI/01 CI_index.png" alt="CI">
+<div class="shell-layout" id="shellLayout">
+  <aside class="h1-panel" id="h1Panel" aria-label="프로젝트 목록">
+    <div class="h1-visitor" id="visitorCounter" aria-live="polite">
+      <div>VISITOR</div>
+      <div>누적 <strong id="totalVisitorCount">--</strong></div>
+      <div>오늘 <strong id="todayVisitorCount">--</strong></div>
     </div>
-  </div>
-
-  <div class="welcome-wrapper">
-    <div class="welcome-message" id="welcomeMessage"></div>
-  </div>
-
-  <div class="bottom-area">
-    <div class="uc-animation" id="ucAnimation">
-      <img src="images/UC/ps1.png" alt="animation" id="ucAnimationImage">
+    <div class="h1-list-shell">
+      <div class="h1-list-viewport-wrap">
+        <div class="h1-list-viewport" id="h1ListViewport">
+          <div class="h1-list-track" id="h1ListTrack"></div>
+        </div>
+        <div class="h1-scrollbar" id="h1Scrollbar" aria-hidden="true">
+          <div class="h1-scrollbar-thumb" id="h1ScrollbarThumb"></div>
+        </div>
+      </div>
     </div>
+  </aside>
 
-    <div class="maintenance-message" id="maintenanceMessage">
-      토끼굴을 정비하고 있습니다.
+  <main class="h0-panel" id="h0Panel" aria-label="메인 콘텐츠">
+    <div class="h0-stage" id="h0Stage">
+      <section class="h0-view h0-home is-active" id="h0ViewHome">
+        <div class="h0-home-logo-wrapper">
+          <div class="h0-home-logo-frame">
+            <img src="images/CI/01 CI_index.png" alt="토끼건축사사무소 CI">
+          </div>
+        </div>
+        <div class="h0-home-welcome-wrapper">
+          <div class="h0-home-welcome" id="welcomeMessage"></div>
+        </div>
+        <div class="h0-home-bottom-area">
+          <div class="h0-home-uc" id="ucAnimation">
+            <img src="images/UC/ps1.png" alt="animation" id="ucAnimationImage">
+          </div>
+          <div class="h0-home-maintenance" id="maintenanceMessage">토끼굴을 정비하고 있습니다.</div>
+        </div>
+      </section>
+
+      <section class="h0-view" id="h0ViewHistory">
+        <iframe class="h0-iframe" id="historyFrame" title="HISTORY" loading="lazy"></iframe>
+      </section>
+
+      <section class="h0-view" id="h0ViewHistoryLink">
+        <iframe class="h0-link-frame" id="historyLinkFrame" title="HISTORY Link Content" loading="lazy"></iframe>
+      </section>
+
+      <section class="h0-view" id="h0ViewMetaversePreview">
+        <div class="h0-metaverse-layout">
+          <aside class="h0-metaverse-overview" id="metaverseOverview" aria-label="설계개요"></aside>
+          <div class="h0-metaverse-preview-pane">
+            <div class="h0-metaverse-preview-stage">
+              <div class="h0-preview-media h0-preview-media--metaverse" id="metaversePreviewMedia"></div>
+            </div>
+            <p class="h0-preview-hint" id="metaversePreviewHint">프로젝트를 선택하면 Preview가 표시됩니다.</p>
+          </div>
+          <aside class="h0-split-chat h0-metaverse-chat" id="metaverseChat" aria-label="채팅">
+            <h3 class="h0-split-chat__title">CHAT</h3>
+            <div class="h0-split-chat__panel" id="metaverseChatPanel">
+              <div class="metaverse-chat__messages" id="metaverseChatMessages" role="log" aria-live="polite"></div>
+              <form class="metaverse-chat__composer" id="metaverseChatForm">
+                <input
+                  type="text"
+                  class="metaverse-chat__nickname"
+                  id="metaverseChatNickname"
+                  maxlength="16"
+                  placeholder="여기에 아이디를 입력해주세요"
+                  autocomplete="nickname"
+                >
+                <input
+                  type="text"
+                  class="metaverse-chat__pin"
+                  id="metaverseChatPin"
+                  maxlength="6"
+                  inputmode="numeric"
+                  pattern="[0-9]*"
+                  placeholder="비번은 숫자6자 내용수정,삭제시 필요합니다"
+                  autocomplete="off"
+                >
+                <div class="metaverse-chat__input-row">
+                  <textarea
+                    class="metaverse-chat__input"
+                    id="metaverseChatInput"
+                    maxlength="500"
+                    rows="2"
+                    placeholder="메시지 입력 (Shift+Enter 줄바꿈)"
+                    autocomplete="off"
+                  ></textarea>
+                  <button type="submit" class="metaverse-chat__send" aria-label="전송">↑</button>
+                </div>
+              </form>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="h0-view" id="h0ViewMetaverseLoading">
+        <div class="h0-loading">
+          <div class="h0-loading-text">LOADING</div>
+          <div class="h0-loading-bar"><span></span></div>
+        </div>
+      </section>
+
+      <section class="h0-view" id="h0ViewMetaverse">
+        <iframe class="h0-iframe" id="metaverseFrame" title="METAVERSE" allow="fullscreen"></iframe>
+        <div class="h0-metaverse-toolbar">
+          <button type="button" id="metaverseFullscreenButton">FULL</button>
+        </div>
+      </section>
+
+      <section class="h0-view" id="h0ViewExtra">
+        <div class="h0-extra-layout" id="extraLayout">
+          <aside class="h0-extra-overview" id="extraOverview" aria-label="EXTRA 설명"></aside>
+          <div class="h0-extra-preview-pane">
+            <div class="h0-extra-preview-stage">
+              <div class="h0-extra-preview-media" id="extraPreviewMedia"></div>
+            </div>
+            <p class="h0-extra-download-hint" id="extraDownloadHint" hidden>
+              <a class="h0-extra-download-link" id="extraDownloadLink" href="#" target="_blank" rel="noopener noreferrer">게임 다운로드</a>
+            </p>
+          </div>
+          <aside class="h0-split-chat h0-extra-chat" id="extraChat" aria-label="채팅">
+            <h3 class="h0-split-chat__title">CHAT</h3>
+            <div class="h0-split-chat__panel" id="extraChatPanel">
+              <div class="metaverse-chat__messages" id="extraChatMessages" role="log" aria-live="polite"></div>
+              <form class="metaverse-chat__composer" id="extraChatForm">
+                <input
+                  type="text"
+                  class="metaverse-chat__nickname"
+                  id="extraChatNickname"
+                  maxlength="16"
+                  placeholder="여기에 아이디를 입력해주세요"
+                  autocomplete="nickname"
+                >
+                <input
+                  type="text"
+                  class="metaverse-chat__pin"
+                  id="extraChatPin"
+                  maxlength="6"
+                  inputmode="numeric"
+                  pattern="[0-9]*"
+                  placeholder="비번은 숫자6자 내용수정,삭제시 필요합니다"
+                  autocomplete="off"
+                >
+                <div class="metaverse-chat__input-row">
+                  <textarea
+                    class="metaverse-chat__input"
+                    id="extraChatInput"
+                    maxlength="500"
+                    rows="2"
+                    placeholder="메시지 입력 (Shift+Enter 줄바꿈)"
+                    autocomplete="off"
+                  ></textarea>
+                  <button type="submit" class="metaverse-chat__send" aria-label="전송">↑</button>
+                </div>
+              </form>
+            </div>
+          </aside>
+        </div>
+      </section>
     </div>
-  </div>
+  </main>
 
-  <div class="top-menu">
-    <div class="roadmap-menu" id="roadmapMenu">HISTORY</div>
-    <div class="metaverse-menu" id="metaverseMenu"><span class="metaverse-beta">BETA</span>METAVERSE</div>
-  </div>
-
+  <aside class="h2-panel" id="h2Panel" aria-label="상위 메뉴">
+    <nav class="h2-menu" id="h2Menu">
+      <button type="button" class="h2-menu-item" data-category="home">HOME</button>
+      <button type="button" class="h2-menu-item" data-category="history">HISTORY</button>
+      <button type="button" class="h2-menu-item h2-menu-item--metaverse" data-category="metaverse"><span class="h2-menu-item-label"><span class="beta">BETA</span>METAVERSE</span></button>
+      <button type="button" class="h2-menu-item" data-category="extra">EXTRA</button>
+    </nav>
+    <button type="button" class="h2-admin-trigger" id="h2AdminTrigger" hidden aria-label="관리자 모드">...</button>
+  </aside>
 </div>
 
-
-
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, doc, getDoc, setDoc, increment, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-
-const firebaseConfig = {
-  apiKey: "AIzaSyBMQkGSc2RwKjAe7h5EcvWWdoJbS5_JjWs",
-  authDomain: "rabbit-archi2025-c40a6.firebaseapp.com",
-  projectId: "rabbit-archi2025-c40a6",
-  storageBucket: "rabbit-archi2025-c40a6.firebasestorage.app",
-  messagingSenderId: "577448559589",
-  appId: "1:577448559589:web:5b984b45bff89303dd650c"
-};
-
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const VISIT_STATS_COLLECTION = 'siteStats';
-const VISIT_STATS_DOC = 'visits';
-const TOTAL_VISIT_COUNTED_KEY = 'rabbitTotalVisitCounted';
-const DAILY_VISIT_COUNTED_PREFIX = 'rabbitDailyVisitCounted:';
-
-const welcomeMessage = document.getElementById('welcomeMessage');
-const maintenanceMessage = document.getElementById('maintenanceMessage');
-const ucAnimationContainer = document.getElementById('ucAnimation');
-const ucAnimationImage = document.getElementById('ucAnimationImage');
-const roadmapMenu = document.getElementById('roadmapMenu');
-const metaverseMenu = document.getElementById('metaverseMenu');
-const totalVisitorCount = document.getElementById('totalVisitorCount');
-const todayVisitorCount = document.getElementById('todayVisitorCount');
-
-const welcomeText =
-'토끼건축사사무소는 공간의 울림과 사람의 이야기에 귀 기울이고,<br>공간의 본질을 탐구하며, 새로운 도약을 꿈꾸는 건축사사무소입니다.';
-
-const animationFrames =
-Array.from({ length: 15 }, (_, idx) => `images/UC/ps${idx + 1}.png`);
-
-const tailFrames = animationFrames.slice(13);
-
-const frameDuration = 100;
-const tailLoopDuration = 5000;
-
-let animationStarted = false;
-
-function preloadFrames(frames) {
-  frames.forEach((src) => {
-    const img = new Image();
-    img.src = src;
-  });
-}
-
-function playFullSequence(callback) {
-  let index = 0;
-  function nextFrame() {
-    ucAnimationImage.src = animationFrames[index];
-    index += 1;
-    if (index < animationFrames.length) {
-      setTimeout(nextFrame, frameDuration);
-    } else if (typeof callback === 'function') {
-      callback();
-    }
-  }
-  nextFrame();
-}
-
-function playTailLoop() {
-  const startTime = performance.now();
-  let index = 0;
-  function nextTailFrame() {
-    ucAnimationImage.src = tailFrames[index % tailFrames.length];
-    index += 1;
-    if (performance.now() - startTime < tailLoopDuration) {
-      setTimeout(nextTailFrame, frameDuration);
-    } else {
-      playFullSequence(playTailLoop);
-    }
-  }
-  nextTailFrame();
-}
-
-function startUcAnimation() {
-  if (animationStarted) return;
-  animationStarted = true;
-  ucAnimationContainer.classList.add('show');
-  preloadFrames(animationFrames);
-  playFullSequence(playTailLoop);
-}
-
-function showWelcomeSequence() {
-  welcomeMessage.innerHTML = welcomeText;
-  welcomeMessage.classList.add('show');
-
-  setTimeout(() => {
-    maintenanceMessage.classList.add('show', 'fade');
-    startUcAnimation();
-    setTimeout(() => {
-      roadmapMenu.classList.add('show');
-      metaverseMenu.classList.add('show');
-    }, 2000);
-  }, 1500);
-}
-
-function getKstDateKey(date = new Date()) {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'Asia/Seoul',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
-  }).formatToParts(date);
-
-  const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
-  return `${values.year}-${values.month}-${values.day}`;
-}
-
-function formatVisitorCount(value) {
-  const count = Number(value);
-  return Number.isFinite(count) ? count.toLocaleString('ko-KR') : '--';
-}
-
-function safeGetStorage(key) {
-  try {
-    return window.localStorage.getItem(key);
-  } catch (error) {
-    return null;
-  }
-}
-
-function safeSetStorage(key, value) {
-  try {
-    window.localStorage.setItem(key, value);
-  } catch (error) {
-    console.warn('방문자 카운트 저장소 접근 실패:', error);
-  }
-}
-
-function renderVisitorCounts(data, todayKey) {
-  totalVisitorCount.textContent = formatVisitorCount(data?.totalVisitors ?? 0);
-  todayVisitorCount.textContent = formatVisitorCount(data?.dailyVisitors?.[todayKey] ?? 0);
-}
-
-async function updateVisitorCounter() {
-  const todayKey = getKstDateKey();
-  const todayStorageKey = `${DAILY_VISIT_COUNTED_PREFIX}${todayKey}`;
-  const shouldCountTotal = safeGetStorage(TOTAL_VISIT_COUNTED_KEY) !== 'true';
-  const shouldCountToday = safeGetStorage(todayStorageKey) !== 'true';
-  const statsRef = doc(db, VISIT_STATS_COLLECTION, VISIT_STATS_DOC);
-
-  try {
-    if (shouldCountTotal || shouldCountToday) {
-      const updates = {
-        lastVisitedAt: serverTimestamp()
-      };
-
-      if (shouldCountTotal) {
-        updates.totalVisitors = increment(1);
-      }
-
-      if (shouldCountToday) {
-        updates.dailyVisitors = {
-          [todayKey]: increment(1)
-        };
-      }
-
-      await setDoc(statsRef, updates, { merge: true });
-
-      if (shouldCountTotal) {
-        safeSetStorage(TOTAL_VISIT_COUNTED_KEY, 'true');
-      }
-      if (shouldCountToday) {
-        safeSetStorage(todayStorageKey, 'true');
-      }
-    }
-
-    const snapshot = await getDoc(statsRef);
-    renderVisitorCounts(snapshot.exists() ? snapshot.data() : {}, todayKey);
-  } catch (error) {
-    console.error('방문자 카운트 업데이트 실패:', error);
-    renderVisitorCounts({}, todayKey);
-  }
-}
-
-// GitHub Pages 구조: index.html(루트) → history/history.html
-roadmapMenu.addEventListener('click', () => {
-  window.location.href = 'history/history.html';
-});
-
-metaverseMenu.addEventListener('click', () => {
-  window.location.href = 'metaverse/index.html?project=angji';
-});
-
-window.addEventListener('DOMContentLoaded', () => {
-  console.log('인덱스 페이지 로드 완료');
-  updateVisitorCounter();
-  showWelcomeSequence();
-});
-
-</script>
+<script type="module" src="js/homepage-shell.js"></script>
+<script type="module" src="chat/js/metaverse-chat.js"></script>
 
 </body>
 </html>
