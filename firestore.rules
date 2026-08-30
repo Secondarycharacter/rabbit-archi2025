@@ -3,24 +3,60 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     match /homepageChatUsers/{userId} {
-      allow read, write: if false;
-    }
-
-    match /homepageChatSessions/{sessionId} {
-      allow read, write: if false;
-    }
-
-    match /homepageChatPinAttempts/{attemptId} {
-      allow read, write: if false;
+      allow read: if true;
+      allow create: if request.auth != null
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.displayId is string
+        && request.resource.data.displayId.size() <= 16;
+      allow update: if request.auth != null
+        && resource.data.uid == request.auth.uid
+        && request.resource.data.uid == request.auth.uid;
+      allow delete: if false;
     }
 
     match /homepageChatRooms/{roomId} {
       allow read: if true;
-      allow write: if false;
+      allow create, update: if true;
+      allow delete: if false;
 
       match /messages/{messageId} {
         allow read: if true;
-        allow write: if false;
+
+        allow create: if request.resource.data.text is string
+          && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 500
+          && request.resource.data.author is string
+          && request.resource.data.author.size() <= 16
+          && (
+            (
+              messageId == 'opening'
+              && request.resource.data.isSystem == true
+              && request.resource.data.authorId == 'system'
+            )
+            || (
+              request.resource.data.authorId == 'guest'
+              && request.resource.data.author == 'GUEST'
+              && request.resource.data.isSystem != true
+            )
+            || (
+              request.auth != null
+              && request.resource.data.authorId == request.auth.uid
+              && request.resource.data.isSystem != true
+            )
+          );
+
+        allow update: if request.auth != null
+          && resource.data.authorId == request.auth.uid
+          && resource.data.isSystem != true
+          && request.resource.data.authorId == resource.data.authorId
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 500;
+
+        allow delete: if request.auth != null
+          && resource.data.authorId == request.auth.uid
+          && resource.data.isSystem != true
+          && messageId != 'opening';
       }
     }
   }

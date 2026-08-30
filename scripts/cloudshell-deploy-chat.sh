@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# Cloud Shell에서 CI 링크 없이 채팅 Functions/규칙을 배포합니다.
-# Cloud Shell은 이미 gcloud에 로그인되어 있으므로 firebase login이 필요 없습니다.
+# Spark(무료) 플랜: Firestore 규칙만 배포합니다. Cloud Functions는 사용하지 않습니다.
 set -euo pipefail
 
 PROJECT_ID="${1:-rabbit-archi2025-c40a6}"
@@ -13,12 +12,9 @@ if [[ ! -f firebase.json ]]; then
   exit 1
 fi
 
-echo "==> Functions 의존성 설치"
-npm install --prefix functions
-
-echo "==> 배포: functions + firestore rules + indexes ($PROJECT_ID)"
+echo "==> 배포: firestore rules + indexes ($PROJECT_ID)"
 npx --yes -p firebase-tools@13 firebase deploy \
-  --only functions,firestore:rules,firestore:indexes \
+  --only firestore:rules,firestore:indexes \
   --project "$PROJECT_ID" \
   --non-interactive
 
