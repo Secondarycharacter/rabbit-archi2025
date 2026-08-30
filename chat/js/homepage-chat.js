@@ -18,6 +18,7 @@ const ADMIN_CANONICAL = {
   토기건축: '토끼건축'
 };
 const CHAT_SESSION_KEY = 'rabbit-homepage-chat-user-session';
+const CHAT_SESSION_EVENT = 'rabbit-homepage-chat-session-changed';
 const CHAT_PIN_PLACEHOLDER = '비번은 숫자6자 내용수정,삭제시 필요합니다';
 
 function safeGetSession(key) {
@@ -80,9 +81,18 @@ function getChatSession() {
   }
 }
 
+function clearChatSession() {
+  try {
+    window.sessionStorage.removeItem(CHAT_SESSION_KEY);
+  } catch {
+    /* ignore */
+  }
+  document.dispatchEvent(new CustomEvent(CHAT_SESSION_EVENT));
+}
+
 function setChatSession(session) {
   if (!session?.userKey || !session?.displayId) {
-    safeSetSession(CHAT_SESSION_KEY, '');
+    clearChatSession();
     return;
   }
   safeSetSession(
@@ -96,6 +106,7 @@ function setChatSession(session) {
       verifiedAt: Date.now()
     })
   );
+  document.dispatchEvent(new CustomEvent(CHAT_SESSION_EVENT));
 }
 
 async function ensureAdminAccess(adminId) {
@@ -221,6 +232,9 @@ export function createHomepageChat(config) {
   const nicknameEl = document.getElementById(config.nicknameId);
   const pinEl = document.getElementById(config.pinId);
   const inputEl = document.getElementById(config.inputId);
+  const sessionEl = root?.querySelector('.metaverse-chat__session');
+  const sessionLabelEl = root?.querySelector('.metaverse-chat__session-label');
+  const logoutEl = root?.querySelector('.metaverse-chat__logout');
 
   const state = {
     project: null,
@@ -242,14 +256,48 @@ export function createHomepageChat(config) {
     }
   }
 
+  function updateSessionBar() {
+    const loggedIn = Boolean(state.currentUser?.displayId);
+    if (sessionEl) {
+      sessionEl.hidden = !loggedIn;
+    }
+    if (sessionLabelEl) {
+      sessionLabelEl.textContent = loggedIn ? `${state.currentUser.displayId} 로그인됨` : '';
+    }
+    if (pinEl) {
+      pinEl.placeholder = loggedIn
+        ? (state.currentUser.isAdmin ? '관리자 인증됨' : '인증됨 (수정·삭제 가능)')
+        : CHAT_PIN_PLACEHOLDER;
+    }
+  }
+
   function applySessionToComposer() {
+    state.currentUser = getChatSession();
     if (!state.currentUser || !nicknameEl) {
+      if (pinEl && !pinEl.value) {
+        pinEl.placeholder = CHAT_PIN_PLACEHOLDER;
+      }
+      updateSessionBar();
       return;
     }
     nicknameEl.value = state.currentUser.displayId;
     if (pinEl) {
-      pinEl.placeholder = '인증됨 (수정·삭제 가능)';
+      pinEl.value = '';
     }
+    updateSessionBar();
+  }
+
+  function logoutChat() {
+    clearChatSession();
+    state.currentUser = null;
+    state.editingId = null;
+    clearComposerFields();
+    if (pinEl) {
+      pinEl.placeholder = CHAT_PIN_PLACEHOLDER;
+    }
+    updateSessionBar();
+    renderMessages();
+    nicknameEl?.focus();
   }
 
   function scrollMessagesToBottom() {
@@ -298,6 +346,7 @@ export function createHomepageChat(config) {
         pinEl.value = '';
         pinEl.placeholder = '관리자 인증됨';
       }
+      updateSessionBar();
       return { type: 'session', session: adminSession };
     }
 
@@ -744,6 +793,15 @@ export function createHomepageChat(config) {
 
     nicknameEl?.addEventListener('blur', () => {
       validateNicknameInput();
+    });
+
+    logoutEl?.addEventListener('click', () => {
+      logoutChat();
+    });
+
+    document.addEventListener(CHAT_SESSION_EVENT, () => {
+      applySessionToComposer();
+      renderMessages();
     });
 
     pinEl?.addEventListener('input', () => {

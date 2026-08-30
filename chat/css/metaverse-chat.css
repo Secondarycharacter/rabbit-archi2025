@@ -216,6 +216,44 @@
   opacity: 1;
 }
 
+.metaverse-chat__session {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.metaverse-chat__session[hidden] {
+  display: none;
+}
+
+.metaverse-chat__session-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: var(--h0-overview-body-size);
+  line-height: var(--h0-overview-body-line-height);
+}
+
+.metaverse-chat__logout {
+  flex-shrink: 0;
+  padding: 3px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-family: inherit;
+  font-size: 10px;
+  letter-spacing: 0.2px;
+  cursor: url('../../images/Icon/Mouse_H.png') 4 4, pointer;
+}
+
+.metaverse-chat__logout:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
 .metaverse-chat__input-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 28px;
