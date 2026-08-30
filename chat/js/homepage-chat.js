@@ -110,21 +110,28 @@ async function ensureAdminAccess(adminId) {
     return current;
   }
 
-  const password = window.prompt(
-    `"${canonical}" 는 관리자 전용 아이디입니다.\n비밀번호를 입력해주세요.`
-  );
-
-  if (password === null) {
+  if (ensureAdminAccess.busy) {
     return null;
   }
 
+  ensureAdminAccess.busy = true;
   try {
+    const password = window.prompt(
+      `"${canonical}" 는 관리자 전용 아이디입니다.\n비밀번호를 입력해주세요.`
+    );
+
+    if (password === null) {
+      return null;
+    }
+
     const session = await authenticateAdmin(canonical, password);
     setChatSession(session);
     return session;
   } catch (error) {
     window.alert(error?.message || '관리자 인증에 실패했습니다.');
     return null;
+  } finally {
+    ensureAdminAccess.busy = false;
   }
 }
 
@@ -393,16 +400,7 @@ export function createHomepageChat(config) {
       return;
     }
 
-    ensureAdminAccess(typed).then((session) => {
-      if (!session) {
-        return;
-      }
-      state.currentUser = session;
-      nicknameEl.value = session.displayId;
-      if (pinEl) {
-        pinEl.placeholder = '관리자 인증됨';
-      }
-    });
+    nicknameEl.value = resolveCanonicalAdminId(typed);
   }
 
   function startEditMessage(messageId) {
