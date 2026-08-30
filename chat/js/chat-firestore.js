@@ -12,16 +12,11 @@ import {
   serverTimestamp,
   Timestamp
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
-import {
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword
-} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
-import { chatAuth, chatDb } from './chat-firebase.js';
-import { emailForUserKey, normalizeUserKey } from './chat-crypto.js';
+import { chatDb } from './chat-firebase.js';
+import { createPinRecord, normalizeUserKey, verifyPinRecord } from './chat-crypto.js';
 
 const USERS_COLLECTION = 'homepageChatUsers';
 const ROOMS_COLLECTION = 'homepageChatRooms';
-const ADMIN_EMAIL = 'chat-admin@rabbit-archi2025-c40a6.firebaseapp.com';
 const ADMIN_PASSWORD = '1031!@';
 const PIN_ATTEMPT_LIMIT = 5;
 const PIN_LOCK_MS = 1000 * 60 * 15;
@@ -104,106 +99,81 @@ function clearPinFailures(userKey) {
   writePinAttempts(userKey, { count: 0, lockedUntil: 0 });
 }
 
-function authErrorMessage(error) {
+function firestoreErrorMessage(error) {
   const code = error?.code || '';
-  if (code === 'auth/operation-not-allowed') {
-    return 'Firebase Authentication에서 이메일/비밀번호 로그인을 켜 주세요. (무료)';
-  }
-  if (code === 'auth/invalid-email') {
-    return '로그인 이메일 형식이 올바르지 않습니다. 페이지를 새로고침한 뒤 다시 시도해주세요.';
-  }
-  if (code === 'auth/wrong-password' || code === 'auth/invalid-credential' || code === 'auth/invalid-login-credentials') {
-    return '비밀번호가 올바르지 않습니다.';
-  }
-  if (code === 'auth/too-many-requests') {
-    return '시도가 너무 많습니다. 잠시 후 다시 시도해주세요.';
-  }
-  if (code === 'auth/unauthorized-continue-uri' || code === 'auth/unauthorized-domain') {
-    return '이 도메인이 Firebase 인증에 허용되어 있지 않습니다. Authentication → Settings → Authorized domains에 현재 주소를 추가해주세요.';
-  }
-  if (code === 'permission-denied') {
+  if (code === 'permission-denied' || String(error?.message || '').includes('permission-denied')) {
     return '채팅 저장 권한이 없습니다. Firestore 규칙을 다시 배포해주세요.';
   }
   if (typeof error?.message === 'string' && error.message) {
-    return error.message.replace(/^Firebase:\s*/, '').replace(/\s*\(auth\/.*\)\.?$/, '');
+    return error.message;
   }
-  return '인증에 실패했습니다.';
+  return '요청 처리에 실패했습니다.';
 }
 
-function toSession(uid, displayId, extra = {}) {
+function toSession(userKey, displayId, extra = {}) {
   return {
-    userKey: uid,
+    userKey,
     displayId,
-    sessionToken: uid,
+    sessionToken: userKey,
     isAdmin: Boolean(extra.isAdmin)
   };
 }
 
-async function upsertUserProfile(uid, displayId, userKey) {
-  await setDoc(
-    userDocRef(userKey || uid),
-    {
-      uid,
-      displayId,
-      lastActiveAt: serverTimestamp()
-    },
-    { merge: true }
-  );
+async function getUserRecord(userKey) {
+  const snapshot = await getDoc(userDocRef(userKey));
+  if (!snapshot.exists()) {
+    return null;
+  }
+  return { id: snapshot.id, ...snapshot.data() };
 }
 
-async function signInOrRegister(email, pin, displayId, userKey) {
-  try {
-    const credential = await signInWithEmailAndPassword(chatAuth, email, pin);
-    await upsertUserProfile(credential.user.uid, displayId, userKey);
-    return toSession(credential.user.uid, displayId);
-  } catch (error) {
-    if (error?.code !== 'auth/user-not-found' && error?.code !== 'auth/invalid-credential') {
-      throw new Error(authErrorMessage(error));
-    }
-  }
-
-  try {
-    const credential = await createUserWithEmailAndPassword(chatAuth, email, pin);
-    await setDoc(userDocRef(userKey || credential.user.uid), {
-      uid: credential.user.uid,
-      displayId,
-      createdAt: serverTimestamp(),
-      lastActiveAt: serverTimestamp()
-    });
-    return toSession(credential.user.uid, displayId);
-  } catch (error) {
-    if (error?.code === 'auth/email-already-in-use') {
-      try {
-        const credential = await signInWithEmailAndPassword(chatAuth, email, pin);
-        await upsertUserProfile(credential.user.uid, displayId, userKey);
-        return toSession(credential.user.uid, displayId);
-      } catch (signInError) {
-        throw new Error(authErrorMessage(signInError));
-      }
-    }
-    throw new Error(authErrorMessage(error));
-  }
+async function registerUser(userKey, displayId, password) {
+  const pinRecord = await createPinRecord(password);
+  await setDoc(userDocRef(userKey), {
+    displayId,
+    passwordHash: pinRecord.passwordHash,
+    salt: pinRecord.salt,
+    iterations: pinRecord.iterations,
+    createdAt: serverTimestamp(),
+    lastActiveAt: serverTimestamp()
+  });
+  return toSession(userKey, displayId);
 }
 
-export async function ensureUserForPost(displayId, pin) {
+async function signInOrRegister(displayId, password, options = {}) {
   const trimmed = String(displayId || '').trim().slice(0, 16);
-  const userKey = normalizeUserKey(trimmed);
+  const userKey = options.userKey || normalizeUserKey(trimmed);
   if (!userKey) {
     throw new Error('아이디를 입력해주세요.');
   }
 
   assertPinNotLocked(userKey);
 
-  try {
-    const session = await signInOrRegister(emailForUserKey(userKey), pin, trimmed, userKey);
+  const existing = await getUserRecord(userKey);
+  if (!existing) {
+    const session = await registerUser(userKey, trimmed, password);
     clearPinFailures(userKey);
-    return session;
-  } catch (error) {
-    if (String(error?.message || '').includes('비밀번호가 올바르지 않습니다')) {
-      recordPinFailure(userKey);
-    }
-    throw error;
+    return options.isAdmin ? { ...session, isAdmin: true } : session;
   }
+
+  const valid = await verifyPinRecord(password, existing);
+  if (!valid) {
+    recordPinFailure(userKey);
+    throw new Error('비밀번호가 올바르지 않습니다.');
+  }
+
+  clearPinFailures(userKey);
+  try {
+    await updateDoc(userDocRef(userKey), { lastActiveAt: serverTimestamp() });
+  } catch {
+    /* ignore */
+  }
+
+  return toSession(userKey, existing.displayId || trimmed, { isAdmin: options.isAdmin });
+}
+
+export async function ensureUserForPost(displayId, pin) {
+  return signInOrRegister(displayId, pin);
 }
 
 export async function authenticateUser(displayId, pin) {
@@ -220,8 +190,10 @@ export async function authenticateAdmin(displayId, adminPassword) {
   }
 
   const trimmed = String(displayId || '').trim().slice(0, 16);
-  const session = await signInOrRegister(ADMIN_EMAIL, ADMIN_PASSWORD, trimmed, 'admin');
-  return { ...session, isAdmin: true };
+  return signInOrRegister(trimmed, ADMIN_PASSWORD, {
+    userKey: normalizeUserKey(trimmed),
+    isAdmin: true
+  });
 }
 
 export async function ensureOpeningMessage(channel, project) {
@@ -309,15 +281,11 @@ function pickTone(author, self) {
 
 export async function addRoomMessage(channel, projectId, message, session) {
   const roomKey = buildRoomKey(channel, projectId);
-  const uid = chatAuth.currentUser?.uid || session?.userKey || null;
-
-  if (!uid) {
-    throw new Error('아이디와 비밀번호로 로그인한 뒤 메시지를 보낼 수 있습니다.');
-  }
-
+  const authorId = session?.userKey;
   const author = session?.displayId || message.displayId;
-  if (!author) {
-    throw new Error('아이디를 입력해주세요.');
+
+  if (!authorId || !author) {
+    throw new Error('아이디와 비밀번호를 입력한 뒤 메시지를 보낼 수 있습니다.');
   }
 
   const tone = session?.isAdmin ? pickTone(author, false) : 'green';
@@ -334,7 +302,7 @@ export async function addRoomMessage(channel, projectId, message, session) {
     );
 
     const docRef = await addDoc(messagesCollectionRef(roomKey), {
-      authorId: uid,
+      authorId,
       author,
       text: message.text,
       tone,
@@ -348,7 +316,7 @@ export async function addRoomMessage(channel, projectId, message, session) {
       session
     };
   } catch (error) {
-    throw new Error(authErrorMessage(error));
+    throw new Error(firestoreErrorMessage(error));
   }
 }
 

@@ -13,7 +13,10 @@ import { isValidPin, normalizeUserKey } from './chat-crypto.js';
 const VALID_TONES = new Set(['mint', 'green', 'orange', 'purple', 'slate']);
 const MAX_MESSAGE_LENGTH = 500;
 const DEFAULT_GUEST_ID = 'GUEST';
-const ADMIN_IDS = ['토끼건축', 'RABBITARCHI'];
+const ADMIN_IDS = ['토끼건축', 'RABBITARCHI', '토기건축'];
+const ADMIN_CANONICAL = {
+  토기건축: '토끼건축'
+};
 const CHAT_SESSION_KEY = 'rabbit-homepage-chat-user-session';
 const CHAT_PIN_PLACEHOLDER = '비번은 숫자6자 내용수정,삭제시 필요합니다';
 
@@ -47,6 +50,9 @@ function isAdminId(value) {
 
 function resolveCanonicalAdminId(value) {
   const trimmed = normalizeAdminId(value);
+  if (ADMIN_CANONICAL[trimmed]) {
+    return ADMIN_CANONICAL[trimmed];
+  }
   return ADMIN_IDS.find((id) => id.toLowerCase() === trimmed.toLowerCase()) || trimmed;
 }
 
