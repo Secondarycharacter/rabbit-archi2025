@@ -100,9 +100,12 @@ function clearPinFailures(userKey) {
 }
 
 function firestoreErrorMessage(error) {
-  const code = error?.code || '';
-  if (code === 'permission-denied' || String(error?.message || '').includes('permission-denied')) {
-    return '채팅 저장 권한이 없습니다. Firestore 규칙을 다시 배포해주세요.';
+  const text = `${error?.code || ''} ${error?.message || ''}`;
+  if (
+    text.includes('permission-denied') ||
+    text.includes('Missing or insufficient permissions')
+  ) {
+    return '채팅 저장 권한이 없습니다. Firebase 콘솔에서 firestore.rules를 게시한 뒤 새로고침해주세요.';
   }
   if (typeof error?.message === 'string' && error.message) {
     return error.message;
