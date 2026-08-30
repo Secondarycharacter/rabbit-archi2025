@@ -268,8 +268,9 @@ export function createHomepageChat(config) {
     const pin = String(pinEl?.value || '').trim();
 
     if (!typed) {
-      clearComposerFields();
-      return { type: 'guest' };
+      window.alert('아이디와 6자리 비밀번호를 입력해주세요.');
+      nicknameEl?.focus();
+      return null;
     }
 
     if (isAdminId(typed)) {
@@ -689,33 +690,16 @@ export function createHomepageChat(config) {
     }
 
     try {
-      const messagePayload = { text: normalized };
-      let session = null;
-
-      if (authInfo.type === 'guest') {
-        messagePayload.guest = true;
-      } else {
-        session = authInfo.session || null;
-        if (!session?.sessionToken && authInfo.type === 'pin') {
-          messagePayload.displayId = authInfo.displayId;
-          messagePayload.pin = authInfo.pin;
-        }
-      }
-
       const result = await addRoomMessage(
         config.channel,
         state.projectId,
-        messagePayload,
-        session
+        { text: normalized },
+        authInfo.session || null
       );
 
-      if (result.session?.sessionToken) {
+      if (result.session?.userKey) {
         state.currentUser = result.session;
         setChatSession(result.session);
-      }
-
-      if (authInfo.type === 'guest') {
-        clearComposerFields();
       }
 
       return true;

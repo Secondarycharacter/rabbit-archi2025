@@ -300,21 +300,18 @@ function pickTone(author, self) {
 
 export async function addRoomMessage(channel, projectId, message, session) {
   const roomKey = buildRoomKey(channel, projectId);
-  const isGuest = Boolean(message.guest);
   const uid = chatAuth.currentUser?.uid || session?.userKey || null;
 
-  let authorId = 'guest';
-  let author = 'GUEST';
-  let tone = pickTone('GUEST', false);
-
-  if (!isGuest) {
-    if (!uid) {
-      throw new Error('인증 정보가 없습니다.');
-    }
-    authorId = uid;
-    author = session?.displayId || message.displayId || 'GUEST';
-    tone = session?.isAdmin ? pickTone(author, false) : 'green';
+  if (!uid) {
+    throw new Error('아이디와 비밀번호로 로그인한 뒤 메시지를 보낼 수 있습니다.');
   }
+
+  const author = session?.displayId || message.displayId;
+  if (!author) {
+    throw new Error('아이디를 입력해주세요.');
+  }
+
+  const tone = session?.isAdmin ? pickTone(author, false) : 'green';
 
   await setDoc(
     roomDocRef(roomKey),
@@ -327,7 +324,7 @@ export async function addRoomMessage(channel, projectId, message, session) {
   );
 
   const docRef = await addDoc(messagesCollectionRef(roomKey), {
-    authorId,
+    authorId: uid,
     author,
     text: message.text,
     tone,
@@ -338,7 +335,7 @@ export async function addRoomMessage(channel, projectId, message, session) {
 
   return {
     messageId: docRef.id,
-    session: isGuest ? null : session
+    session
   };
 }
 

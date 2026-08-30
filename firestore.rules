@@ -34,11 +34,6 @@ service cloud.firestore {
               && request.resource.data.authorId == 'system'
             )
             || (
-              request.resource.data.authorId == 'guest'
-              && request.resource.data.author == 'GUEST'
-              && request.resource.data.isSystem != true
-            )
-            || (
               request.auth != null
               && request.resource.data.authorId == request.auth.uid
               && request.resource.data.isSystem != true
