@@ -21,20 +21,13 @@ const CHAT_SESSION_KEY = 'rabbit-homepage-chat-user-session';
 const CHAT_SESSION_EVENT = 'rabbit-homepage-chat-session-changed';
 const CHAT_PIN_PLACEHOLDER = '비번은 숫자6자 내용수정,삭제시 필요합니다';
 
-function safeGetSession(key) {
-  try {
-    return window.sessionStorage.getItem(key);
-  } catch {
-    return null;
-  }
-}
+let memorySession = null;
 
-function safeSetSession(key, value) {
-  try {
-    window.sessionStorage.setItem(key, value);
-  } catch {
-    /* ignore */
-  }
+try {
+  window.sessionStorage.removeItem(CHAT_SESSION_KEY);
+  window.localStorage.removeItem(CHAT_SESSION_KEY);
+} catch {
+  /* ignore leftover storage from older builds */
 }
 
 function normalizeAdminId(value) {
@@ -62,28 +55,17 @@ function isSessionValid(session) {
 }
 
 function getChatSession() {
-  const raw = safeGetSession(CHAT_SESSION_KEY);
-  if (!raw) {
+  if (!memorySession?.userKey || !memorySession?.displayId) {
     return null;
   }
-  try {
-    const parsed = JSON.parse(raw);
-    if (!parsed?.userKey || !parsed?.displayId) {
-      return null;
-    }
-    if (!isSessionValid(parsed)) {
-      safeSetSession(CHAT_SESSION_KEY, '');
-      return null;
-    }
-    return parsed;
-  } catch {
-    return null;
-  }
+  return memorySession;
 }
 
 function clearChatSession() {
+  memorySession = null;
   try {
     window.sessionStorage.removeItem(CHAT_SESSION_KEY);
+    window.localStorage.removeItem(CHAT_SESSION_KEY);
   } catch {
     /* ignore */
   }
@@ -95,17 +77,14 @@ function setChatSession(session) {
     clearChatSession();
     return;
   }
-  safeSetSession(
-    CHAT_SESSION_KEY,
-    JSON.stringify({
-      userKey: session.userKey,
-      displayId: session.displayId,
-      sessionToken: session.sessionToken,
-      expiresAt: session.expiresAt || null,
-      isAdmin: Boolean(session.isAdmin),
-      verifiedAt: Date.now()
-    })
-  );
+  memorySession = {
+    userKey: session.userKey,
+    displayId: session.displayId,
+    sessionToken: session.sessionToken,
+    expiresAt: session.expiresAt || null,
+    isAdmin: Boolean(session.isAdmin),
+    verifiedAt: Date.now()
+  };
   document.dispatchEvent(new CustomEvent(CHAT_SESSION_EVENT));
 }
 
