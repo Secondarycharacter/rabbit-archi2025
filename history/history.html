@@ -206,6 +206,14 @@
         isEmbed = new URLSearchParams(window.location.search).get("embed") === "1";
       } catch (e) {}
 
+      // embed: zone-a / footer 돌출 -70px → 시각 높이 960+70+70=1100
+      var EMBED_VISUAL_H = 1100;
+      var EMBED_V_MARGIN = 0.90; // 상·하 흰 여백 (기본 0.98 대비)
+
+      if (isEmbed) {
+        document.body.classList.add('is-embedded');
+      }
+
       var overlay = document.getElementById('rotate-overlay');
 
       function isPhone() {
@@ -235,8 +243,8 @@
           document.body.style.setProperty('overflow', 'hidden', 'important');
           document.body.style.setProperty('background', '#f7f3ef', 'important');
 
-          var scaleW = (vw * 0.98) / DESIGN_W;
-          var scaleH = (vh * 0.98) / VISUAL_H;
+          var scaleW = (vw * 0.96) / DESIGN_W;
+          var scaleH = (vh * EMBED_V_MARGIN) / EMBED_VISUAL_H;
           var scale = Math.min(scaleW, scaleH);
 
           wrapper.style.setProperty('position', 'fixed', 'important');

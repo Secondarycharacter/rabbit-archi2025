@@ -395,3 +395,14 @@ deleteBtn.addEventListener('click', async () => {
 async function initApp() { await loadProjectsFromFirestore(); subscribeToFirestore(); }
 renderProjectPeriodFilter();
 initApp();
+
+const isEmbeddedHistory = new URLSearchParams(window.location.search).get('embed') === '1';
+if (isEmbeddedHistory && adminTrigger) {
+  adminTrigger.style.display = 'none';
+}
+
+window.addEventListener('message', (event) => {
+  if (event.data?.type === 'rabbit-admin-open') {
+    adminTrigger?.click();
+  }
+});

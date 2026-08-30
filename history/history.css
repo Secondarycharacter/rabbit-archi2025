@@ -487,6 +487,20 @@ body{
 }
 
 /* ==========================================
+   H0 / 메타버스 embed=1 — 상·하 여백 확보
+   (standalone history.html 레이아웃은 그대로)
+   ========================================== */
+body.is-embedded .zone-a1,
+body.is-embedded .zone-a2,
+body.is-embedded .zone-a3 {
+  margin-top: -70px !important;
+}
+
+body.is-embedded .zone-footer {
+  bottom: -70px;
+}
+
+/* ==========================================
    아이패드, 갤럭시탭 등 태블릿 화면 맞춤
    ※ 실제 스케일 계산은 history.html 내 JS가 담당합니다.
       JS가 setProperty('important')로 강제 적용하므로

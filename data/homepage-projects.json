@@ -1,0 +1,109 @@
+{
+  "history": [
+    {
+      "id": "history-angji",
+      "category": "history",
+      "title": "앵지밭골 시니어형 소규모체육관",
+      "date": "2026-05",
+      "link": null
+    },
+    {
+      "id": "history-geochang",
+      "category": "history",
+      "title": "거창군 지역활력타운 다누리복합문화센터",
+      "date": "2026-03",
+      "link": null
+    },
+    {
+      "id": "history-gapyeong-design",
+      "category": "history",
+      "title": "가평 수녀원 기본 및 실시설계",
+      "date": "2026-02",
+      "link": null
+    },
+    {
+      "id": "history-jinju",
+      "category": "history",
+      "title": "글로컬 어울림센터 조성사업",
+      "date": "2026-01",
+      "link": null
+    },
+    {
+      "id": "history-gapyeong-restore",
+      "category": "history",
+      "title": "가평 수녀원 복원도 작성",
+      "date": "2026-02",
+      "link": null
+    },
+    {
+      "id": "history-chungju",
+      "category": "history",
+      "title": "서충주 종합사회복지관",
+      "date": "2025-11",
+      "link": null
+    }
+  ],
+  "metaverse": [
+    {
+      "id": "angji",
+      "category": "metaverse",
+      "title": "앵지밭골",
+      "overviewId": "angji",
+      "designOverviewTitle": "앵지밭골 시니어형 소규모체육관",
+      "period": "2026 H1",
+      "date": "2026-05",
+      "previewType": "video",
+      "preview": "metaverse/preview/202603_Angji/preview.mp4",
+      "metaverseUrl": "metaverse/index.html?project=angji"
+    },
+    {
+      "id": "geochang",
+      "category": "metaverse",
+      "title": "거창",
+      "overviewId": "geochang",
+      "designOverviewTitle": "거창군 지역활력타운 다누리복합문화센터",
+      "period": "2026 H1",
+      "date": "2026-03",
+      "previewType": "video",
+      "preview": "metaverse/preview/202602_Geochang/preview.mp4",
+      "metaverseUrl": "metaverse/index.html?project=geochang"
+    },
+    {
+      "id": "jinju",
+      "category": "metaverse",
+      "title": "진주",
+      "overviewId": "jinju",
+      "designOverviewTitle": "글로컬 어울림센터 조성사업",
+      "period": "2026 H1",
+      "date": "2026-01",
+      "previewType": "video",
+      "preview": "metaverse/preview/202601_Jinju/preview.mp4",
+      "metaverseUrl": "metaverse/index.html?project=jinju"
+    },
+    {
+      "id": "chungju",
+      "category": "metaverse",
+      "title": "충주",
+      "overviewId": "chungju",
+      "designOverviewTitle": "서충주 종합사회복지관",
+      "period": "2025 H2",
+      "date": "2025-11",
+      "previewType": "video",
+      "preview": "metaverse/preview/202501_Chungju/preview.mp4",
+      "metaverseUrl": "metaverse/index.html?project=chungju"
+    }
+  ],
+  "extra": [
+    {
+      "id": "s1-scammer-hunter",
+      "category": "extra",
+      "title": "SCAMMER HUNTER",
+      "period": "2026 H2",
+      "date": "2026-08",
+      "previewType": "video",
+      "preview": "extra/Info/S1/S1.mp4",
+      "descriptionPath": "extra/Info/S1/S1.txt",
+      "downloadUrl": "https://drive.google.com/file/d/1-Tf_SnkpW_rOOa9ZxH1fxEpeZ98FQJgR/view?usp=sharing"
+    }
+  ]
+}
