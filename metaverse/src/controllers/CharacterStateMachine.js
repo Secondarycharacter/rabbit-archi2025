@@ -245,7 +245,25 @@ export function createCharacterStateMachine(options = {}) {
       return true;
     }
 
+    // Dance / Throw: lock move + jump until the clip ends.
+    if (activeAction && BLOCKING_ACTIONS.has(activeAction)) {
+      return true;
+    }
+
     return Boolean(activeAction && JUMP_ACTIONS.has(activeAction));
+  }
+
+  function canStartJumpWhileActive() {
+    if (!activeAction) {
+      return true;
+    }
+
+    // Never interrupt dance/throw with jump or jump-over.
+    if (BLOCKING_ACTIONS.has(activeAction)) {
+      return false;
+    }
+
+    return true;
   }
 
   function buildPreviewState(isGrounded = true) {
@@ -365,7 +383,7 @@ export function createCharacterStateMachine(options = {}) {
       airborneFromJump = false;
     }
 
-    if (input.jumpRequest && isGrounded && !walkJumpPhase) {
+    if (input.jumpRequest && isGrounded && !walkJumpPhase && canStartJumpWhileActive()) {
       if (!tryStartLocomotionJump(input, input.jumpRequest)) {
         if (activeAction && JUMP_ACTIONS.has(activeAction) && input.jumpRequest.action === activeAction) {
           jumpRetrigger = true;

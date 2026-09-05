@@ -237,19 +237,43 @@ export function isGuestDevLabelOccluded(
   return false;
 }
 
+function getGuestDevLabelStyle(guest) {
+  const isGuideNpc = guest?.spawn?.id === "Angji-Guide"
+    || String(guest?.spawn?.devLabel || "").toUpperCase() === "GUIDE";
+
+  return {
+    isGuideNpc,
+    font: isGuideNpc ? "bold 72px sans-serif" : "bold 48px sans-serif",
+    color: isGuideNpc ? "#33dd66" : "#ffffff",
+    baselineY: isGuideNpc ? 108 : 64,
+    textureWidth: isGuideNpc ? 512 : 256,
+    textureHeight: isGuideNpc ? 160 : 96
+  };
+}
+
 export function createGuestDevLabel(BABYLON, scene, guest, labelText) {
   if (!labelText || !guest?.root) {
     return null;
   }
 
+  const style = getGuestDevLabelStyle(guest);
+
   const texture = new BABYLON.DynamicTexture(
     `guest-label-tex-${guest.spawn.id}`,
-    { width: 256, height: 96 },
+    { width: style.textureWidth, height: style.textureHeight },
     scene,
     false
   );
   texture.hasAlpha = true;
-  texture.drawText(String(labelText), null, 64, "bold 48px sans-serif", "#ffffff", "transparent", true);
+  texture.drawText(
+    String(labelText),
+    null,
+    style.baselineY,
+    style.font,
+    style.color,
+    "transparent",
+    true
+  );
 
   const material = new BABYLON.StandardMaterial(`guest-label-mat-${guest.spawn.id}`, scene);
   material.diffuseTexture = texture;
@@ -325,7 +349,8 @@ export function setGuestDevLabelText(guest, labelText) {
   }
 
   label.texture.clear();
-  label.texture.drawText(text, null, 64, "bold 48px sans-serif", "#ffffff", "transparent", true);
+  const style = getGuestDevLabelStyle(guest);
+  label.texture.drawText(text, null, style.baselineY, style.font, style.color, "transparent", true);
   label.labelText = text;
   return true;
 }

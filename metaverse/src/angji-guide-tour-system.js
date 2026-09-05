@@ -2,9 +2,9 @@
  * Angji GUIDE scripted tour — separate from generic NPC dialog (multi-line bubbles).
  */
 
-import { ANGJI_GUIDE_SPAWN, loadAngjiGuideTourData } from "./angji-guide-tour-config.js?v=angji-guide-tour-20260822-v22";
-import { getGuestHeadLocalY, projectWorldPointToScreen, getGuestDialogAnchorWorldPosition, setGuestDevLabelVisible } from "./guest-dev-label.js?v=angji-guest-labels-20260823";
-import { normalizeTourData } from "./angji-guide-tour-data.js?v=angji-guide-manager-20260822";
+import { ANGJI_GUIDE_SPAWN, loadAngjiGuideTourData } from "./angji-guide-tour-config.js?v=guide-esc-label-20260905";
+import { getGuestHeadLocalY, projectWorldPointToScreen, getGuestDialogAnchorWorldPosition, setGuestDevLabelVisible } from "./guest-dev-label.js?v=guide-label-20260905";
+import { normalizeTourData } from "./angji-guide-tour-data.js?v=guide-esc-label-20260905";
 
 const GUIDE_STATE = {
   IDLE: "IDLE",
@@ -114,6 +114,7 @@ export function createAngjiGuideTourSystem(BABYLON, scene, options = {}) {
   const ui = ensureGuideDom();
   let tourData = null;
   let state = GUIDE_STATE.IDLE;
+  let guideSpawnPoseLocked = false;
   let eventIndex = 0;
   let lineIndex = 0;
   let typedChars = 0;
@@ -652,6 +653,11 @@ export function createAngjiGuideTourSystem(BABYLON, scene, options = {}) {
 
     state = next;
     onTourActiveChange?.(isActive());
+    syncGuideHeadLabel();
+  }
+
+  function isOrbitSpinActive() {
+    return state === GUIDE_STATE.ORBIT_SPIN && !dialogPaused;
   }
 
   function isActive() {
@@ -723,9 +729,6 @@ export function createAngjiGuideTourSystem(BABYLON, scene, options = {}) {
     typedChars = 0;
     typeAccum = 0;
     holdAccum = 0;
-    dialogCameraFrozen = false;
-    frozenDialogCameraPos = null;
-    frozenDialogLookTarget = null;
   }
 
   function getLineHoldSeconds(line) {
@@ -838,6 +841,10 @@ export function createAngjiGuideTourSystem(BABYLON, scene, options = {}) {
       const snapped = getGuideFloorY(x, z, fallbackY);
 
       if (Number.isFinite(snapped)) {
+        if (Number.isFinite(fallbackY) && snapped < fallbackY - 1) {
+          return fallbackY;
+        }
+
         return snapped;
       }
     }
@@ -893,7 +900,8 @@ export function createAngjiGuideTourSystem(BABYLON, scene, options = {}) {
   }
 
   function allowsFreeLook() {
-    return getWalkMode() && state === GUIDE_STATE.DIALOG && !dialogPaused;
+    // PDF 수정 #2: 설명 중 마우스 카메라 회전 비허용
+    return false;
   }
 
   function computeDialogLookTarget(cameraPos, baseLookTarget) {
@@ -1022,7 +1030,7 @@ export function createAngjiGuideTourSystem(BABYLON, scene, options = {}) {
     orbitCam.radius = radius;
     orbitCam.beta = getOrbitBeta(spin, offset, radius);
     orbitCam.alpha = startAlpha + (savedOrbitPause.orbitSpinT / (spin.durationSeconds || 10)) * Math.PI * 2 * (spin.rotationTurns || 1);
-    orbitCam.attachControl(scene.getEngine().getRenderingCanvas(), false);
+    orbitCam.detachControl?.();
     scene.activeCamera = orbitCam;
     orbitSpinT = savedOrbitPause.orbitSpinT;
     savedWalkCameraState = savedOrbitPause.walkCameraState;
@@ -1039,26 +1047,46 @@ export function createAngjiGuideTourSystem(BABYLON, scene, options = {}) {
   }
 
   function getGuideSpawnEvent() {
-    return getEvents()[0] || {
-      guidePosition: ANGJI_GUIDE_SPAWN.position,
+    const events = getEvents();
+    const candidate = events.find((event) => event.id === "00") || events[0] || null;
+    const pos = candidate?.guidePosition;
+    const hasWorldPosition = Number.isFinite(pos?.x)
+      && Number.isFinite(pos?.y)
+      && Number.isFinite(pos?.z)
+      && (Math.hypot(pos.x, pos.z) >= 1 || Math.abs(pos.y) >= 1);
+
+    if (hasWorldPosition) {
+      return candidate;
+    }
+
+    return {
+      guidePosition: { ...ANGJI_GUIDE_SPAWN.position },
       guideRotationY: ANGJI_GUIDE_SPAWN.rotationY
     };
   }
 
-  function positionGuideNpcOnly(event) {
+  function positionGuideNpcOnly(event, options = {}) {
     const guest = guideGuest;
 
-    if (!guest?.root || !event) {
+    if (!guest?.root || !event?.guidePosition) {
       return;
     }
 
-    guest.root.position.set(
-      event.guidePosition.x,
-      snapGuideRootFloorY(event.guidePosition.x, event.guidePosition.z, event.guidePosition.y, event),
-      event.guidePosition.z
-    );
+    // Keep the first idle placement. Outdoor guest refresh / npc overlay used to
+    // re-snap the GUIDE a few seconds later onto a nearby floor hit.
+    if (guideSpawnPoseLocked && options.force !== true) {
+      return;
+    }
+
+    const x = event.guidePosition.x;
+    const z = event.guidePosition.z;
+    const fallbackY = event.guidePosition.y;
+    const floorY = snapGuideRootFloorY(x, z, fallbackY, event);
+
+    guest.root.position.set(x, floorY, z);
     guest.root.rotation.y = event.guideRotationY;
     baseGuideRotY = event.guideRotationY;
+    guideSpawnPoseLocked = true;
   }
 
   function resolveDialogCameraFraming(guest, playerEyePos) {
@@ -1154,7 +1182,7 @@ export function createAngjiGuideTourSystem(BABYLON, scene, options = {}) {
   }
 
   function applyGuideTransform(event) {
-    positionGuideNpcOnly(event);
+    positionGuideNpcOnly(event, { force: true });
     lockPlayerToGuideDialogPose();
     snapGuideGazeToPlayer();
   }
@@ -1175,24 +1203,52 @@ export function createAngjiGuideTourSystem(BABYLON, scene, options = {}) {
     showLine(getCurrentLine());
   }
 
+  function isGuideGuestReady(guest = guideGuest) {
+    return Boolean(
+      guest?.root
+      && guest.root.isDisposed?.() !== true
+    );
+  }
+
   async function ensureGuideSpawned() {
     const gcs = getGuestCharacterSystem();
 
-    if (!gcs || guideGuest) {
+    if (!gcs) {
       return guideGuest;
     }
 
-    await gcs.ensureSpawned([ANGJI_GUIDE_SPAWN], { parallel: false, showOnLoad: true });
-    guideGuest = gcs.getGuests?.()?.find((g) => g.spawn?.id === ANGJI_GUIDE_SPAWN.id) || null;
+    const liveGuest = gcs.getGuests?.()?.find((g) => g.spawn?.id === ANGJI_GUIDE_SPAWN.id) || null;
 
-    if (guideGuest) {
-      tintGuideMeshes(BABYLON, guideGuest);
-      gcs.revealGuest?.(ANGJI_GUIDE_SPAWN.id);
-      gcs.refreshDevLabels?.();
-      positionGuideNpcOnly(getGuideSpawnEvent());
-      playGuideClip("Idle", true);
-      syncGuideHeadLabel();
+    if (isGuideGuestReady(liveGuest)) {
+      guideGuest = liveGuest;
+    } else {
+      guideGuest = null;
     }
+
+    if (!guideGuest) {
+      await gcs.ensureSpawned([ANGJI_GUIDE_SPAWN], { parallel: false, showOnLoad: false });
+      guideGuest = gcs.getGuests?.()?.find((g) => g.spawn?.id === ANGJI_GUIDE_SPAWN.id) || null;
+    }
+
+    if (!guideGuest?.root) {
+      console.warn("[angji-guide] spawn failed — Angji-Guide was not added to the scene");
+      return null;
+    }
+
+    tintGuideMeshes(BABYLON, guideGuest);
+    gcs.revealGuest?.(ANGJI_GUIDE_SPAWN.id);
+    guideGuest.root.setEnabled(!getIsNightMode());
+    gcs.refreshDevLabels?.();
+    positionGuideNpcOnly(getGuideSpawnEvent());
+    playGuideClip("Idle", true);
+    syncGuideHeadLabel();
+    console.info("[angji-guide] spawned", {
+      night: getIsNightMode(),
+      enabled: guideGuest.root.isEnabled(),
+      x: Number(guideGuest.root.position.x.toFixed?.(2) ?? guideGuest.root.position.x),
+      y: Number(guideGuest.root.position.y.toFixed?.(2) ?? guideGuest.root.position.y),
+      z: Number(guideGuest.root.position.z.toFixed?.(2) ?? guideGuest.root.position.z)
+    });
 
     return guideGuest;
   }
@@ -1220,6 +1276,7 @@ export function createAngjiGuideTourSystem(BABYLON, scene, options = {}) {
     syncDialogLookCamera();
     showLine(getCurrentLine());
     setState(GUIDE_STATE.DIALOG);
+    syncGuideHeadLabel();
     onStatus?.("GUIDE 투어를 시작합니다.");
   }
 
@@ -1242,7 +1299,7 @@ export function createAngjiGuideTourSystem(BABYLON, scene, options = {}) {
     eventIndex = 0;
     lineIndex = 0;
     clearOrbitPauseState();
-    positionGuideNpcOnly(getGuideSpawnEvent());
+    positionGuideNpcOnly(getGuideSpawnEvent(), { force: true });
     restoreDialogCameraState();
     restoreTourEntryState?.();
     playGuideClip("Idle", true);
@@ -1297,7 +1354,28 @@ export function createAngjiGuideTourSystem(BABYLON, scene, options = {}) {
     }, 2200);
   }
 
-  function advanceLine() {
+  function snapDialogCameraToGuide() {
+    const camera = getActiveCamera();
+    const guest = guideGuest;
+    const body = getPlayerBody();
+
+    if (!camera || !guest?.root || !body?.position) {
+      return false;
+    }
+
+    const { lookTarget, cam: desired } = resolveDialogCameraFraming(guest, body.position);
+
+    camera.position.copyFrom(desired);
+    camera.setTarget(computeDialogLookTarget(camera.position, lookTarget));
+    dialogCameraFrozen = true;
+    frozenDialogCameraPos = desired.clone();
+    frozenDialogLookTarget = lookTarget.clone();
+    cameraBlend = 1;
+    resetDialogLookOffsets();
+    return true;
+  }
+
+  function advanceLine(options = {}) {
     const event = getCurrentEvent();
     const lines = event?.dialogues || [];
     lineIndex += 1;
@@ -1313,20 +1391,26 @@ export function createAngjiGuideTourSystem(BABYLON, scene, options = {}) {
     }
 
     setState(GUIDE_STATE.DIALOG);
-    dialogCameraFrozen = false;
-    frozenDialogCameraPos = null;
-    frozenDialogLookTarget = null;
 
     if (advanceLineTimer !== null) {
       window.clearTimeout(advanceLineTimer);
+      advanceLineTimer = null;
+    }
+
+    const showNextLine = () => {
+      if (state === GUIDE_STATE.DIALOG) {
+        showLine(getCurrentLine());
+      }
+    };
+
+    if (options.showImmediately) {
+      showNextLine();
+      return;
     }
 
     advanceLineTimer = window.setTimeout(() => {
       advanceLineTimer = null;
-
-      if (state === GUIDE_STATE.DIALOG) {
-        showLine(getCurrentLine());
-      }
+      showNextLine();
     }, 140);
   }
 
@@ -1427,7 +1511,7 @@ export function createAngjiGuideTourSystem(BABYLON, scene, options = {}) {
     orbitCam.alpha = Number.isFinite(spin.rotationY)
       ? spin.rotationY
       : Math.atan2(offset.x, offset.z);
-    orbitCam.attachControl(scene.getEngine().getRenderingCanvas(), false);
+    orbitCam.detachControl?.();
     scene.activeCamera = orbitCam;
     orbitSpinT = 0;
     hideUi();
@@ -1437,14 +1521,29 @@ export function createAngjiGuideTourSystem(BABYLON, scene, options = {}) {
   }
 
   function finishOrbitSpin() {
-    restoreWalkCameraFromOrbit();
+    const orbitCam = getOrbitCamera();
+    orbitCam?.detachControl?.();
+
+    const walkCam = getWalkCamera?.() || getActiveCamera();
+    if (walkCam) {
+      scene.activeCamera = walkCam;
+    }
+
     dialogCameraFrozen = false;
     frozenDialogCameraPos = null;
     frozenDialogLookTarget = null;
-    captureDialogCameraState();
-    resetDialogLookOffsets();
+    savedWalkCameraState = null;
+    savedCameraController = null;
+
     applyGuideTransform(getCurrentEvent());
-    advanceLine();
+    const body = getPlayerBody();
+    const character = getPlayerCharacter();
+    character?.syncFromPlayerEye?.(body?.position);
+    character?.updateVisual?.(0, false);
+
+    advanceLine({ showImmediately: true });
+    snapDialogCameraToGuide();
+    onStatus?.(null);
   }
 
   function updateBubblePosition() {
@@ -1477,21 +1576,24 @@ export function createAngjiGuideTourSystem(BABYLON, scene, options = {}) {
     syncGuideHeadLabel();
   }
 
+  function isGuideHeadLabelVisible() {
+    const guest = guideGuest;
+
+    // Hide only after the player accepts the start-tour YES choice (`tourStarted`).
+    // Restore when the tour ends, is declined, or is stopped mid-way (ESC → Stop).
+    return !getIsNightMode()
+      && guest?.root?.isEnabled?.() !== false
+      && !tourStarted;
+  }
+
   function syncGuideHeadLabel() {
     const guest = guideGuest;
-    const gcs = getGuestCharacterSystem();
 
-    if (!guest || !gcs) {
+    if (!guest) {
       return;
     }
 
-    const showLabel = isActive()
-      && state !== GUIDE_STATE.ORBIT_SPIN
-      && state !== GUIDE_STATE.IDLE
-      && state !== GUIDE_STATE.COMPLETE
-      && !dialogPaused;
-
-    setGuestDevLabelVisible(guest, showLabel && guest.root?.isEnabled?.() !== false);
+    setGuestDevLabelVisible(guest, isGuideHeadLabelVisible());
   }
 
   function updateDialogCamera(dt) {
@@ -1536,8 +1638,20 @@ export function createAngjiGuideTourSystem(BABYLON, scene, options = {}) {
       return;
     }
 
+    if (dialogCameraFrozen && frozenDialogCameraPos && frozenDialogLookTarget) {
+      camera.position.copyFrom(frozenDialogCameraPos);
+      camera.setTarget(computeDialogLookTarget(camera.position, frozenDialogLookTarget));
+      return;
+    }
+
     camera.position.copyFrom(desired);
     camera.setTarget(computeDialogLookTarget(camera.position, lookTarget));
+
+    if (cameraBlend >= 1) {
+      dialogCameraFrozen = true;
+      frozenDialogCameraPos = desired.clone();
+      frozenDialogLookTarget = lookTarget.clone();
+    }
   }
 
   function updateDialogTyping(dt) {
@@ -1636,13 +1750,17 @@ export function createAngjiGuideTourSystem(BABYLON, scene, options = {}) {
     }
 
     if (!guideGuest?.root) {
-      void ensureGuideSpawned().then(() => syncGuideNightVisibility(false));
+      void ensureGuideSpawned().then((guest) => {
+        if (guest?.root) {
+          syncGuideNightVisibility(getIsNightMode());
+        }
+      });
       return;
     }
 
     guideGuest.root.setEnabled(true);
     getGuestCharacterSystem()?.revealGuest?.(ANGJI_GUIDE_SPAWN.id);
-    positionGuideNpcOnly(getGuideSpawnEvent());
+    positionGuideNpcOnly(getGuideSpawnEvent(), { force: true });
     playGuideClip("Idle", true);
     setState(GUIDE_STATE.IDLE);
     syncGuideHeadLabel();
@@ -1661,6 +1779,8 @@ export function createAngjiGuideTourSystem(BABYLON, scene, options = {}) {
     }
 
     if (state === GUIDE_STATE.ORBIT_SPIN && !dialogPaused) {
+      lockPlayerToGuideDialogPose();
+
       const spin = tourData.orbitSpin;
       const orbitCam = getOrbitCamera();
       orbitSpinT += dt;
@@ -1835,23 +1955,26 @@ export function createAngjiGuideTourSystem(BABYLON, scene, options = {}) {
       pauseOrbitForEsc();
     }
 
-    const prompt = tourData?.escPrompt;
+    const prompt = tourData?.escPrompt || {
+      ko: "투어에서 빠져나가시겠습니까?",
+      en: "Would you like to leave the tour?"
+    };
 
     hideUi();
-
-    const escLabels = tourData?.escChoiceLabels || {};
 
     showChoice(
       prompt,
       () => {
+        pendingChoice = null;
         exitGuideTourToTourEntry();
       },
       () => {
+        pendingChoice = null;
         resumeEscDialog();
       },
       {
-        primaryLabel: escLabels.stop || "중지 / Stop",
-        secondaryLabel: escLabels.continue || "계속 / Continue",
+        primaryLabel: "예 / Yes",
+        secondaryLabel: "아니오 / No",
         choiceState: GUIDE_STATE.ESC_CHOICE
       }
     );
@@ -1870,34 +1993,99 @@ export function createAngjiGuideTourSystem(BABYLON, scene, options = {}) {
     setState(GUIDE_STATE.IDLE);
   }
 
-  function reloadTourData(nextData) {
+  async function reloadTourData(nextData) {
     if (!nextData) {
       return false;
     }
 
     tourData = normalizeTourData(nextData);
+    const tourWasActive = isActive();
 
-    if (isActive()) {
+    if (!tourWasActive) {
+      eventIndex = 0;
+      lineIndex = 0;
+      tourStarted = false;
+      tourCompleted = false;
+    }
+
+    await ensureGuideSpawned();
+    syncGuideNightVisibility(getIsNightMode());
+    return !tourWasActive;
+  }
+
+  async function previewEventTransform(eventIndex) {
+    const event = getEvents()[eventIndex];
+
+    if (!event || getIsNightMode()) {
       return false;
     }
 
-    eventIndex = 0;
-    lineIndex = 0;
-    tourStarted = false;
-    tourCompleted = false;
-    positionGuideNpcOnly(getGuideSpawnEvent());
-    playGuideClip("Idle", true);
+    await ensureGuideSpawned();
+    positionGuideNpcOnly(event, { force: true });
+    frameOrbitCameraOnGuide();
     return true;
   }
 
-  function previewEventTransform(eventIndex) {
-    const event = getEvents()[eventIndex];
+  function frameOrbitCameraOnGuide() {
+    if (getWalkMode()) {
+      return;
+    }
 
-    if (!event) {
+    const orbitCam = getOrbitCamera();
+    const guest = guideGuest;
+
+    if (!orbitCam || !guest?.root) {
+      return;
+    }
+
+    const pos = guest.root.getAbsolutePosition();
+    const target = new BABYLON.Vector3(pos.x, pos.y + 0.85, pos.z);
+    const radius = 14;
+
+    orbitCam.setTarget(target);
+    orbitCam.radius = radius;
+    orbitCam.beta = clamp(Number.isFinite(orbitCam.beta) ? orbitCam.beta : 0.95, 0.55, 1.2);
+    scene.activeCamera = orbitCam;
+  }
+
+  function captureOrbitSpinCamera() {
+    const orbitCam = getOrbitCamera();
+
+    if (!orbitCam?.position || !orbitCam?.target) {
+      return null;
+    }
+
+    const position = orbitCam.position;
+    const target = orbitCam.target;
+
+    return {
+      position: { x: position.x, y: position.y, z: position.z },
+      target: { x: target.x, y: target.y, z: target.z },
+      rotationY: Number.isFinite(orbitCam.alpha)
+        ? orbitCam.alpha
+        : Math.atan2(position.x - target.x, position.z - target.z)
+    };
+  }
+
+  function previewOrbitSpin(spin = tourData?.orbitSpin) {
+    const orbitCam = getOrbitCamera();
+
+    if (!orbitCam || !spin?.position || !spin?.target || getIsNightMode() || getWalkMode()) {
       return false;
     }
 
-    positionGuideNpcOnly(event);
+    const { target, startPos } = getOrbitVectors(spin);
+    const offset = startPos.subtract(target);
+    const radius = Math.max(offset.length(), 1);
+    const startAlpha = Number.isFinite(spin.rotationY)
+      ? spin.rotationY
+      : Math.atan2(offset.x, offset.z);
+
+    orbitCam.setTarget(target);
+    orbitCam.radius = radius;
+    orbitCam.beta = getOrbitBeta(spin, offset, radius);
+    orbitCam.alpha = startAlpha;
+    scene.activeCamera = orbitCam;
     return true;
   }
 
@@ -1924,11 +2112,14 @@ export function createAngjiGuideTourSystem(BABYLON, scene, options = {}) {
     init,
     update,
     isActive,
+    isOrbitSpinActive,
     blocksPlayerControl,
     allowsFreeLook,
     applyLookInput,
     reloadTourData,
     previewEventTransform,
+    previewOrbitSpin,
+    captureOrbitSpinCamera,
     captureGuideTransform,
     getTourDataSnapshot,
     handleSpacePress,
@@ -1936,6 +2127,8 @@ export function createAngjiGuideTourSystem(BABYLON, scene, options = {}) {
     handleEscape,
     dispose,
     ensureGuideSpawned,
-    syncGuideNightVisibility
+    syncGuideNightVisibility,
+    isGuideHeadLabelVisible,
+    syncGuideHeadLabel
   };
 }

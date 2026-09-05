@@ -1,16 +1,20 @@
 /** Angji GUIDE tour — spawn + data loader */
 
-import { loadEffectiveTourData } from "./angji-guide-tour-data.js?v=angji-guide-manager-20260822";
+import {
+  DEFAULT_GUIDE_SPAWN_TRANSFORM,
+  loadRuntimeTourData
+} from "./angji-guide-tour-data.js?v=guide-esc-label-20260905";
 
-export const ANGJI_GUIDE_TOUR_VERSION = "angji-guide-tour-20260822-v22";
-export { ANGJI_GUIDE_TOUR_DATA_URL } from "./angji-guide-tour-data.js?v=angji-guide-manager-20260822";
+export const ANGJI_GUIDE_TOUR_VERSION = "guide-esc-label-20260905";
+export { ANGJI_GUIDE_TOUR_DATA_URL } from "./angji-guide-tour-data.js?v=guide-esc-label-20260905";
 
 export const ANGJI_GUIDE_SPAWN = {
   id: "Angji-Guide",
   assetRoot: "./assets/character/",
   file: "00 Guide/Guide.glb",
-  position: { x: -44.89, y: 21.95, z: 29.8 },
-  rotationY: 4.6915,
+  position: { ...DEFAULT_GUIDE_SPAWN_TRANSFORM.position },
+  rotationY: DEFAULT_GUIDE_SPAWN_TRANSFORM.rotationY,
+  preferExternalFloor: true,
   targetHeight: 1.6,
   scaleMultiplier: 1,
   devLabel: "GUIDE",
@@ -40,5 +44,15 @@ export const ANGJI_GUIDE_SPAWN = {
 };
 
 export async function loadAngjiGuideTourData(url) {
-  return loadEffectiveTourData(url);
+  const data = await loadRuntimeTourData(url);
+
+  try {
+    const { overlayGuideTourWithEditorMarkers } = await import(
+      "./editor-mode/scene-marker-data.js?v=guide-tour-bidirectional-20260903"
+    );
+    return overlayGuideTourWithEditorMarkers(data);
+  } catch (error) {
+    console.warn("[guide-tour] editor tour overlay skipped", error);
+    return data;
+  }
 }

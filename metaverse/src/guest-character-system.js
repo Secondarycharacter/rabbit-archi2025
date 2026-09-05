@@ -1,6 +1,5 @@
 import {
-  isAngjiDanceAnimationClip,
-  shouldAngjiGuestAllowDanceRootMotion
+  isAngjiDanceAnimationClip
 } from "./angji-guest-config.js?v=angji-guest-numbers-20260820";
 import {
   createGuestDevLabel,
@@ -12,8 +11,9 @@ import {
 } from "./guest-dev-label.js?v=angji-guest-labels-20260823";
 import {
   createRootMotionNeutralizer,
+  freezeIdleCarrierTranslation,
   stripLocomotionRootMotion
-} from "./controllers/RootMotionNeutralizer.js?v=guest-root-motion-20260705";
+} from "./controllers/RootMotionNeutralizer.js?v=dwarf-inplace-20260905";
 
 export const GUEST_ASSET_ROOT = "./assets/guest/";
 const GUEST_TARGET_HEIGHT = 1.75;
@@ -22,6 +22,11 @@ const PATROL_DEFAULT_DECEL_DISTANCE = 2.8;
 const PATROL_MIN_SPEED_FACTOR = 0.15;
 const PATROL_ACCEL_RATE = 0.024;
 const PATROL_DEPART_TURN_SPEED = 0.14;
+const DANCE_RETURN_ARRIVE_DISTANCE = 0.15;
+const DANCE_RETURN_SPEED = 0.075;
+const DANCE_RETURN_CLIP_CANDIDATES = ["Walking", "Walk", "WALKING", "Run", "Running", "Run_Fast"];
+const DANCE_CLIP_BLEND_SPEED = 0.12;
+const DANCE_CLIP_CROSSFADE_SEC = 0.28;
 const NIGHT_DEVI_CHASE_TYPE = "nightDeviChase";
 const NIGHT_DEVI_ENERGY_MAX = 5;
 const NIGHT_DEVI_ENERGY_BAR_WIDTH = 1.2 * 0.2;
@@ -33,6 +38,7 @@ const NIGHT_DEVI_PROBE_HEIGHT = 1.45;
 function applyGuestMeshCollisionFlags(mesh, guestId) {
   mesh.isPickable = false;
   mesh.checkCollisions = false;
+  mesh.alwaysSelectAsActiveMesh = true;
   mesh.metadata = {
     ...(mesh.metadata || {}),
     passThrough: true,
@@ -134,6 +140,302 @@ function resolveClip(animationGroups, clipName) {
   )) || null;
 }
 
+function stopAnimationGroupKeepPose(group) {
+  if (!group) {
+    return;
+  }
+
+  const animatables = [...(group.animatables || [])];
+  animatables.forEach((item) => {
+    try {
+      item.stop(true);
+    } catch {
+      // ignore older Babylon signatures
+    }
+  });
+
+  try {
+    group.pause();
+  } catch {
+    // ignore
+  }
+}
+
+function applyAnimationGroupStartPose(group) {
+  if (!group || typeof group.goToFrame !== "function") {
+    return;
+  }
+
+  const startFrame = Number.isFinite(group.from) ? group.from : 0;
+
+  try {
+    group.goToFrame(startFrame);
+  } catch {
+    // ignore
+  }
+}
+
+function getAnimationGroupPlayhead(group) {
+  const animatable = group?.animatables?.[0];
+
+  if (Number.isFinite(animatable?.masterFrame)) {
+    return animatable.masterFrame;
+  }
+
+  const runtime = animatable?._runtimeAnimations?.[0];
+  if (Number.isFinite(runtime?.currentFrame)) {
+    return runtime.currentFrame;
+  }
+
+  return null;
+}
+
+function isAnimationGroupNearEnd(group, padFrames = 2) {
+  if (!group?.isPlaying) {
+    return false;
+  }
+
+  const playhead = getAnimationGroupPlayhead(group);
+  const from = group.from;
+  const to = group.to;
+
+  if (!Number.isFinite(playhead) || !Number.isFinite(to)) {
+    return false;
+  }
+
+  if (Number.isFinite(from) && playhead <= from + padFrames) {
+    return false;
+  }
+
+  return playhead >= to - padFrames;
+}
+
+function isAnimationGroupPlayheadAtEnd(group, padFrames = 2) {
+  const playhead = getAnimationGroupPlayhead(group);
+  const to = group?.to;
+
+  if (!Number.isFinite(playhead) || !Number.isFinite(to)) {
+    return false;
+  }
+
+  return playhead >= to - padFrames;
+}
+
+function hardResetAnimationGroup(group) {
+  if (!group) {
+    return;
+  }
+
+  try {
+    group.setWeightForAllAnimatables?.(1);
+  } catch {
+    // ignore
+  }
+
+  try {
+    group.stop(true);
+  } catch {
+    try {
+      group.stop();
+    } catch {
+      // ignore
+    }
+  }
+
+  try {
+    group.reset();
+  } catch {
+    // ignore
+  }
+
+  applyAnimationGroupStartPose(group);
+}
+
+function resetGuestSequenceClipGroups(guest) {
+  const clipNames = [
+    ...(guest.spawn?.animation?.clips || []),
+    ...DANCE_RETURN_CLIP_CANDIDATES
+  ];
+  const seen = new Set();
+
+  clipNames.forEach((clipName) => {
+    const group = resolveClip(guest.animationGroups, clipName);
+
+    if (!group || seen.has(group)) {
+      return;
+    }
+
+    seen.add(group);
+    hardResetAnimationGroup(group);
+  });
+
+  guest.rootMotionNeutralizer?.neutralize?.({ pinNodes: true, syncSample: true });
+  guest.rootMotionNeutralizer?.resetRootMotionSample?.();
+  guest.rootMotionLockUntil = 0;
+}
+
+function observeGuestClipNearEnd(guest, group, onNearEnd) {
+  guest.sequenceEndObserver?.remove?.();
+  guest.sequenceEndObserver = null;
+
+  if (guest.sequenceClipTimeoutId) {
+    window.clearTimeout(guest.sequenceClipTimeoutId);
+    guest.sequenceClipTimeoutId = null;
+  }
+
+  const scene = guest.root?.getScene?.();
+  let finished = false;
+  const startedAt = performance.now();
+  const durationMs = getClipDurationMs(group);
+  // Ignore stale "already at end" playheads right after a hard reset/restart.
+  const minMs = Math.max(250, Math.min(durationMs * 0.35, Math.max(300, durationMs - 250)));
+  const fallbackMs = Math.max(minMs + 50, durationMs - 80);
+
+  const finish = (reason = "tick") => {
+    if (finished) {
+      return;
+    }
+
+    const elapsed = performance.now() - startedAt;
+
+    if (elapsed < minMs && reason !== "timeout") {
+      return;
+    }
+
+    if (reason === "tick" || reason === "end") {
+      const playhead = getAnimationGroupPlayhead(group);
+      const atStart = Number.isFinite(playhead)
+        && Number.isFinite(group.from)
+        && playhead <= group.from + 2;
+      const nearEnd = isAnimationGroupNearEnd(group) || isAnimationGroupPlayheadAtEnd(group);
+
+      // Natural AnimationGroup end: trust it once minMs has passed, even if
+      // Babylon reset the playhead back to the start frame.
+      if (reason === "end" && elapsed >= minMs) {
+        // accept
+      } else if (atStart && group.isPlaying) {
+        return;
+      } else if (group.isPlaying && !nearEnd) {
+        return;
+      } else if (!group.isPlaying && !nearEnd && reason === "tick") {
+        return;
+      }
+    }
+
+    finished = true;
+    guest.sequenceEndObserver?.remove?.();
+    guest.sequenceEndObserver = null;
+
+    if (guest.sequenceClipTimeoutId) {
+      window.clearTimeout(guest.sequenceClipTimeoutId);
+      guest.sequenceClipTimeoutId = null;
+    }
+
+    try {
+      group.pause();
+    } catch {
+      // keep the last posed frame instead of restoring bind pose
+    }
+
+    onNearEnd();
+  };
+
+  const endObserver = group.onAnimationGroupEndObservable.add(() => finish("end"));
+  let tickObserver = null;
+
+  if (scene?.onBeforeAnimationsObservable) {
+    tickObserver = scene.onBeforeAnimationsObservable.add(() => {
+      if (guest.activeAnimationGroup !== group) {
+        return;
+      }
+
+      if (performance.now() - startedAt < minMs) {
+        return;
+      }
+
+      if (isAnimationGroupNearEnd(group) || isAnimationGroupPlayheadAtEnd(group)) {
+        finish("tick");
+      }
+    });
+  }
+
+  guest.sequenceClipTimeoutId = window.setTimeout(() => finish("timeout"), fallbackMs);
+
+  guest.sequenceEndObserver = {
+    remove: () => {
+      endObserver?.remove?.();
+
+      if (tickObserver && scene) {
+        scene.onBeforeAnimationsObservable.remove(tickObserver);
+      }
+    }
+  };
+}
+
+function getSequenceRestartPeers(guest) {
+  const raw = guest.syncSequencePeers;
+
+  if (!Array.isArray(raw) || raw.length < 2) {
+    return [guest];
+  }
+
+  const enabled = raw.filter((item) => (
+    item
+    && item.root?.isEnabled()
+    && item.spawn?.animation?.type === "sequence"
+    && haveSameSequenceClips(guest, item)
+  ));
+
+  // If the synced group broke up, fall back to solo restart so nobody waits forever.
+  return enabled.length >= 2 ? enabled : [guest];
+}
+
+function queueSequenceRestart(guest) {
+  const peers = getSequenceRestartPeers(guest);
+  const waitingOnReturn = peers.some((item) => item.danceSequencePhase === "returning");
+
+  if (waitingOnReturn) {
+    return;
+  }
+
+  if (peers.some((item) => item.syncSequenceRestartQueued)) {
+    return;
+  }
+
+  peers.forEach((item) => {
+    item.syncSequenceRestartQueued = true;
+    item.danceSequencePhase = null;
+    item.danceSequenceClipIndex = 0;
+  });
+
+  window.requestAnimationFrame(() => {
+    peers.forEach((item) => {
+      item.syncSequenceRestartQueued = false;
+    });
+
+    const ready = peers.filter((item) => item.root?.isEnabled());
+
+    if (!ready.length) {
+      return;
+    }
+
+    ready.forEach((item) => {
+      restoreDanceSequenceHomePose(item);
+      resetGuestSequenceClipGroups(item);
+    });
+
+    if (ready.length > 1 && canSyncSequenceGuests(ready)) {
+      playSyncedSequenceAnimations(ready);
+      return;
+    }
+
+    ready.forEach((item) => {
+      item.syncSequencePeers = null;
+      playGuestAnimation(item);
+    });
+  });
+}
+
 function stopGuestAnimation(guest) {
   guest.sequenceEndObserver?.remove?.();
   guest.sequenceEndObserver = null;
@@ -143,12 +445,29 @@ function stopGuestAnimation(guest) {
     guest.arrivalClipTimeoutId = null;
   }
 
+  if (guest.sequenceClipTimeoutId) {
+    window.clearTimeout(guest.sequenceClipTimeoutId);
+    guest.sequenceClipTimeoutId = null;
+  }
+
   if (guest.syncSequenceTimeoutId) {
     window.clearTimeout(guest.syncSequenceTimeoutId);
     guest.syncSequenceTimeoutId = null;
   }
 
   guest.syncSequenceRunId = null;
+  guest.danceSequencePhase = null;
+  guest.danceSequenceClipIndex = 0;
+
+  if (guest.clipCrossfade?.from) {
+    try {
+      guest.clipCrossfade.from.stop?.();
+    } catch {
+      // ignore
+    }
+  }
+
+  guest.clipCrossfade = null;
 
   if (guest.activeAnimationGroup) {
     try {
@@ -169,10 +488,16 @@ function getGuestLocomotionClipNames(spawn) {
     return [];
   }
 
+  const waypointClips = (movement.patrolTargets || []).flatMap((target) => (
+    [target?.moveClip, target?.arrivalClip]
+  ));
+
   return [
     movement.clip,
     ...(movement.clips || []),
-    movement.cycleRestClip
+    movement.cycleRestClip,
+    movement.arrivalClip,
+    ...waypointClips
   ].filter(Boolean);
 }
 
@@ -205,52 +530,288 @@ function stripGuestLocomotionRootMotion(BABYLON, animationGroups, spawn) {
       "Jump_Run",
       ...attackNames
     ], { forceStripAllPosition: true });
-    return;
-  }
-
-  const clipNames = getGuestRootMotionClipNames(spawn);
-
-  if (shouldAngjiGuestAllowDanceRootMotion(spawn?.id)) {
-    const strippedClipNames = new Set([
-      ...clipNames.filter((clipName) => !isAngjiDanceAnimationClip(clipName)),
+    freezeIdleCarrierTranslation(animationGroups, [
       "Idle",
       "IDLE",
       "Walking",
+      "WALKING",
       "Run_Fast",
+      "Run",
       "Running"
-    ]);
-
-    stripLocomotionRootMotion(BABYLON, animationGroups, [...strippedClipNames], {
-      forceStripAllPosition: spawn.movement?.type === "patrol"
+    ], {
+      skipClipNames: attackNames
     });
     return;
   }
 
-  if (!clipNames.length) {
+  // Keep sequence/dance hip translation so planar root motion can drive the guest root.
+  const clipNames = getGuestRootMotionClipNames(spawn)
+    .filter((clipName) => !shouldKeepSequenceRootMotion(spawn, clipName));
+
+  const strippedClipNames = [...new Set([
+    ...clipNames,
+    "Idle",
+    "IDLE",
+    "Walking",
+    "WALKING",
+    "Run_Fast",
+    "Run",
+    "Running"
+  ])];
+
+  if (!strippedClipNames.length) {
     stripLocomotionRootMotion(BABYLON, animationGroups, ["Idle", "IDLE", "Walking"]);
+    freezeIdleCarrierTranslation(animationGroups, ["Idle", "IDLE", "Walking"]);
     return;
   }
 
-  stripLocomotionRootMotion(BABYLON, animationGroups, clipNames, {
+  stripLocomotionRootMotion(BABYLON, animationGroups, strippedClipNames, {
     forceStripAllPosition: spawn.movement?.type === "patrol"
+  });
+
+  freezeIdleCarrierTranslation(animationGroups, [
+    "Idle",
+    "IDLE",
+    "Idle_Standard",
+    "Idle_Dwarf",
+    "Walking",
+    "WALKING",
+    "Walk",
+    "Run_Fast",
+    "Run",
+    "Running"
+  ], {
+    skipClipNames: (animationGroups || [])
+      .map((group) => group.name)
+      .filter((name) => shouldKeepSequenceRootMotion(spawn, name))
   });
 }
 
-function applyGuestPlanarRootMotion(guest) {
-  const delta = guest.rootMotionNeutralizer?.consumePlanarRootMotionDelta?.();
+function snapGuestRootToFloor(guest, resolveFloorY, options = {}) {
+  if (!guest?.root || typeof resolveFloorY !== "function") {
+    return;
+  }
 
-  if (delta) {
-    guest.root.position.x += delta.x;
-    guest.root.position.z += delta.z;
+  const position = guest.root.position;
+  const floorY = resolveFloorY.length >= 4
+    ? resolveFloorY(position.x, position.z, position.y, options)
+    : resolveFloorY(position.x, position.z, position.y);
+
+  if (Number.isFinite(floorY)) {
+    position.y = floorY;
+  }
+}
+
+function isGuestRootMotionLocked(guest) {
+  if (guest?.clipCrossfade) {
+    return true;
+  }
+
+  const until = guest?.rootMotionLockUntil;
+
+  return Number.isFinite(until) && performance.now() < until;
+}
+
+function applyGuestPlanarRootMotion(guest, resolveFloorY = null) {
+  if (isGuestRootMotionLocked(guest)) {
+    guest.rootMotionNeutralizer?.neutralize?.({ pinNodes: true });
+    guest.rootMotionNeutralizer?.resetRootMotionSample?.();
+    return;
+  }
+
+  const delta = guest.rootMotionNeutralizer?.consumePlanarRootMotionDelta?.();
+  const dx = delta?.x || 0;
+  const dz = delta?.z || 0;
+  const distance = Math.hypot(dx, dz);
+
+  // Clip resets jump the Idle carrier back to its start key — do not teleport the NPC.
+  if (distance > 0.45) {
+    guest.rootMotionNeutralizer?.neutralize?.({ pinNodes: true });
+    guest.rootMotionNeutralizer?.resetRootMotionSample?.();
+    return;
+  }
+
+  // Ignore sub-centimeter Idle wobble so pin/sample noise does not tremble XZ.
+  if (distance > 0.003) {
+    guest.root.position.x += dx;
+    guest.root.position.z += dz;
+  }
+
+  // Pin the Idle carrier only. Keep lastLocal on the authored pose so the next
+  // sample is frame-to-frame, not rest→pose (which stacked every tick).
+  guest.rootMotionNeutralizer?.neutralize?.({ pinNodes: true });
+
+  if (distance > 0.01) {
+    snapGuestRootToFloor(guest, resolveFloorY, { includeUpperFloors: true });
   }
 }
 
 function isGuestPlayingAngjiDanceRootMotion(guest) {
-  if (!shouldAngjiGuestAllowDanceRootMotion(guest.spawn?.id)) {
+  if (guest.danceSequencePhase === "returning") {
     return false;
   }
 
+  if (guest.danceSequencePhase === "playing") {
+    return true;
+  }
+
   return isAngjiDanceAnimationClip(guest.activeAnimationGroup?.name);
+}
+
+function shouldKeepSequenceRootMotion(spawn, clipName) {
+  if (isAngjiDanceAnimationClip(clipName)) {
+    return true;
+  }
+
+  if (!isSequenceAnimation(spawn?.animation)) {
+    return false;
+  }
+
+  const target = normalizeClipName(clipName);
+  return (spawn.animation.clips || []).some((clip) => normalizeClipName(clip) === target);
+}
+
+function isSequenceAnimation(animation) {
+  return animation?.type === "sequence" && Array.isArray(animation.clips) && animation.clips.length > 0;
+}
+
+function isDanceSequenceAnimation(animation) {
+  return isSequenceAnimation(animation)
+    && animation.clips.some((clip) => isAngjiDanceAnimationClip(clip));
+}
+
+function lockGuestInitialSpawnPose(guest, pose = null) {
+  if (guest.initialSpawnPose) {
+    return guest.initialSpawnPose;
+  }
+
+  const spawn = guest.resolvedSpawn || guest.spawn;
+  const source = pose || {
+    x: spawn?.position?.x ?? guest.root?.position?.x ?? 0,
+    y: spawn?.position?.y ?? guest.root?.position?.y ?? 0,
+    z: spawn?.position?.z ?? guest.root?.position?.z ?? 0,
+    rotationY: spawn?.rotationY ?? guest.root?.rotation?.y ?? 0
+  };
+
+  guest.initialSpawnPose = {
+    x: source.x,
+    y: source.y,
+    z: source.z,
+    rotationY: source.rotationY ?? 0
+  };
+
+  return guest.initialSpawnPose;
+}
+
+function captureDanceSequenceHome(guest) {
+  // Lock return target to the first appearance pose. Re-capturing every loop
+  // (or from a mutated spawn) made Mark-4/5/6 walk to the wrong spot from loop 2+.
+  const origin = lockGuestInitialSpawnPose(guest);
+  guest.danceSequenceHome = {
+    x: origin.x,
+    y: origin.y,
+    z: origin.z,
+    rotationY: origin.rotationY
+  };
+}
+
+function resolveDanceReturnClipName(guest) {
+  for (const clipName of DANCE_RETURN_CLIP_CANDIDATES) {
+    if (resolveClip(guest.animationGroups, clipName)) {
+      return clipName;
+    }
+  }
+
+  return null;
+}
+
+function restoreDanceSequenceHomePose(guest) {
+  const home = guest.danceSequenceHome;
+
+  if (!home || !guest.root) {
+    return;
+  }
+
+  guest.root.position.set(home.x, home.y, home.z);
+  guest.root.rotation.set(0, home.rotationY, 0);
+  syncGuestRootMotionSample(guest);
+  resetGuestRootMotion(guest);
+}
+
+function finishDanceSequenceReturn(guest) {
+  restoreDanceSequenceHomePose(guest);
+  resetGuestSequenceClipGroups(guest);
+  guest.danceSequencePhase = null;
+  guest.danceSequenceClipIndex = 0;
+  // Always re-enter the sequence after walking home (solo or synced).
+  queueSequenceRestart(guest);
+}
+
+function beginDanceSequenceReturn(guest) {
+  const home = guest.danceSequenceHome;
+
+  if (!home || !guest.root) {
+    guest.danceSequencePhase = null;
+    playGuestAnimation(guest);
+    return;
+  }
+
+  const dx = home.x - guest.root.position.x;
+  const dz = home.z - guest.root.position.z;
+  const distance = Math.hypot(dx, dz);
+
+  if (distance <= DANCE_RETURN_ARRIVE_DISTANCE) {
+    finishDanceSequenceReturn(guest);
+    return;
+  }
+
+  guest.danceSequencePhase = "returning";
+  const clipName = resolveDanceReturnClipName(guest);
+
+  if (!clipName) {
+    finishDanceSequenceReturn(guest);
+    return;
+  }
+
+  playGuestLoopClip(guest, clipName);
+}
+
+function updateDanceSequenceReturn(guest, deltaScale, resolveFloorY) {
+  const home = guest.danceSequenceHome;
+
+  if (!home || !guest.root) {
+    finishDanceSequenceReturn(guest);
+    return;
+  }
+
+  const position = guest.root.position;
+  const dx = home.x - position.x;
+  const dz = home.z - position.z;
+  const distance = Math.hypot(dx, dz);
+
+  if (distance <= DANCE_RETURN_ARRIVE_DISTANCE) {
+    finishDanceSequenceReturn(guest);
+    return;
+  }
+
+  const step = DANCE_RETURN_SPEED * Math.min(Math.max(deltaScale, 0.001), 2);
+  const move = Math.min(step, distance);
+  const inv = 1 / distance;
+  position.x += dx * inv * move;
+  position.z += dz * inv * move;
+
+  if (typeof resolveFloorY === "function") {
+    const floorY = resolveFloorY.length >= 4
+      ? resolveFloorY(position.x, position.z, position.y, { includeUpperFloors: true })
+      : resolveFloorY(position.x, position.z, position.y);
+
+    if (Number.isFinite(floorY)) {
+      position.y = floorY;
+    }
+  }
+
+  guest.root.rotation.y = Math.atan2(dx, dz);
+  syncGuestRootMotionSample(guest);
 }
 
 function resetGuestRootMotion(guest) {
@@ -261,31 +822,136 @@ function syncGuestRootMotionSample(guest) {
   guest.rootMotionNeutralizer?.resetRootMotionSample?.();
 }
 
-function startGuestClip(guest, group, loop) {
+function enableAnimationGroupBlending(group, speed = DANCE_CLIP_BLEND_SPEED) {
+  group?.targetedAnimations?.forEach((targeted) => {
+    if (!targeted?.animation) {
+      return;
+    }
+
+    targeted.animation.enableBlending = true;
+    targeted.animation.blendingSpeed = speed;
+  });
+}
+
+function updateGuestClipCrossfade(guest, deltaScale) {
+  const fade = guest.clipCrossfade;
+
+  if (!fade) {
+    return;
+  }
+
+  const dt = Math.max(deltaScale, 0.001) / 60;
+  fade.elapsed += dt;
+  const u = Math.min(1, fade.elapsed / Math.max(fade.duration, 0.01));
+  const smooth = u * u * (3 - 2 * u);
+
+  try {
+    fade.to?.setWeightForAllAnimatables?.(smooth);
+    fade.from?.setWeightForAllAnimatables?.(1 - smooth);
+  } catch {
+    // ignore weight API gaps
+  }
+
+  if (u < 1) {
+    return;
+  }
+
+  try {
+    fade.from?.stop?.();
+    fade.from?.setWeightForAllAnimatables?.(1);
+  } catch {
+    // ignore
+  }
+
+  try {
+    fade.to?.setWeightForAllAnimatables?.(1);
+  } catch {
+    // ignore
+  }
+
+  guest.clipCrossfade = null;
+  // Resume root motion from the blended pose without applying a corrective teleport.
+  syncGuestRootMotionSample(guest);
+  guest.rootMotionLockUntil = performance.now() + 80;
+}
+
+function startGuestClip(guest, group, loop, options = {}) {
   if (!group) {
     return;
   }
 
-  if (guest.activeAnimationGroup && guest.activeAnimationGroup !== group) {
+  const previous = guest.activeAnimationGroup;
+  const blend = options.blend === true;
+  const blendSpeed = options.blendSpeed ?? DANCE_CLIP_BLEND_SPEED;
+  const crossfadeSec = options.crossfadeSec ?? DANCE_CLIP_CROSSFADE_SEC;
+
+  if (guest.clipCrossfade?.from && guest.clipCrossfade.from !== previous) {
     try {
-      guest.activeAnimationGroup.stop();
+      guest.clipCrossfade.from.stop?.();
+    } catch {
+      // ignore
+    }
+    guest.clipCrossfade = null;
+  }
+
+  if (blend && previous && previous !== group) {
+    enableAnimationGroupBlending(previous, blendSpeed);
+    enableAnimationGroupBlending(group, blendSpeed);
+
+    try {
+      group.stop();
+      group.reset();
+      group.start(Boolean(loop));
+      group.setWeightForAllAnimatables?.(0);
+      previous.setWeightForAllAnimatables?.(1);
+    } catch {
+      try {
+        group.start(Boolean(loop));
+      } catch {
+        // ignore
+      }
+    }
+
+    guest.activeAnimationGroup = group;
+    guest.clipCrossfade = {
+      from: previous,
+      to: group,
+      elapsed: 0,
+      duration: crossfadeSec
+    };
+    // Lock planar root motion while Idle keys ease from clipA end → clipB start.
+    guest.rootMotionLockUntil = performance.now() + crossfadeSec * 1000 + 50;
+    syncGuestRootMotionSample(guest);
+    guest.rootMotionNeutralizer?.neutralize?.({ syncSample: true });
+    return;
+  }
+
+  if (previous && previous !== group) {
+    try {
+      previous.setWeightForAllAnimatables?.(1);
     } catch {
       // ignore stale groups
     }
+
+    stopAnimationGroupKeepPose(previous);
   }
 
   resetGuestRootMotion(guest);
+  hardResetAnimationGroup(group);
 
   try {
-    group.stop();
-    group.reset();
+    group.setWeightForAllAnimatables?.(1);
   } catch {
     // ignore stale groups
   }
 
   group.speedRatio = 1;
-  group.start(loop);
+  group.start(Boolean(loop));
+  applyAnimationGroupStartPose(group);
   guest.activeAnimationGroup = group;
+  guest.clipCrossfade = null;
+  guest.rootMotionLockUntil = performance.now() + 80;
+  syncGuestRootMotionSample(guest);
 }
 
 function warnMissingClip(guest, clipName) {
@@ -304,7 +970,13 @@ function playGuestLoopClip(guest, clipName) {
   startGuestClip(guest, group, true);
 }
 
-function pickPatrolLocomotionClip(movement) {
+function pickPatrolLocomotionClip(movement, guest = null) {
+  const target = movement?.patrolTargets?.[guest?.patrolTargetIndex];
+
+  if (target?.moveClip) {
+    return target.moveClip;
+  }
+
   if (movement.clip) {
     return movement.clip;
   }
@@ -339,7 +1011,85 @@ function playGuestClipNTimes(guest, clipName, times, onComplete) {
 }
 
 function startPatrolLocomotionClip(guest) {
-  playGuestLoopClip(guest, pickPatrolLocomotionClip(guest.spawn.movement));
+  playGuestLoopClip(guest, pickPatrolLocomotionClip(guest.spawn.movement, guest));
+}
+
+function beginPatrolWaypointArrivalClip(guest, clipName, times = 1) {
+  if (guest.patrolArrivalPending) {
+    return;
+  }
+
+  guest.patrolArrivalPending = true;
+  guest.patrolPhase = "idle";
+  playGuestClipNTimes(guest, clipName, times, () => {
+    guest.patrolArrivalPending = false;
+
+    if (!guest.root?.isEnabled()) {
+      return;
+    }
+
+    resumePatrolAfterWaypoint(guest);
+  });
+}
+
+function handlePatrolArrival(guest) {
+  const { movement } = guest.spawn;
+  const targets = movement?.patrolTargets || [];
+  const index = guest.patrolTargetIndex;
+  const target = targets[index];
+  const isCycleHome = targets.length > 0 && index === targets.length - 1;
+
+  // Per-waypoint arrival (path point specific animation).
+  if (target?.arrivalClip) {
+    beginPatrolWaypointArrivalClip(
+      guest,
+      target.arrivalClip,
+      target.arrivalCount ?? 1
+    );
+    return;
+  }
+
+  // Mark-19 style: rest/dance only after a full loop (last waypoint).
+  if (isCycleHome && movement?.cycleRestClip) {
+    if (guest.patrolArrivalPending) {
+      return;
+    }
+
+    guest.patrolArrivalPending = true;
+    guest.patrolPhase = "idle";
+    playGuestClipNTimes(guest, movement.cycleRestClip, movement.cycleRestCount ?? 1, () => {
+      guest.patrolArrivalPending = false;
+
+      if (!guest.root.isEnabled()) {
+        return;
+      }
+
+      advancePatrolTarget(guest);
+      guest.patrolPhase = "moving";
+      startPatrolLocomotionClip(guest);
+    });
+    return;
+  }
+
+  const arrivalClip = movement?.arrivalClip;
+
+  if (!arrivalClip) {
+    resumePatrolAfterWaypoint(guest);
+    return;
+  }
+
+  if (guest.patrolArrivalPending) {
+    return;
+  }
+
+  guest.patrolArrivalPending = true;
+
+  if (movement.arrivalLookAt) {
+    beginPatrolArrivalFacing(guest);
+    return;
+  }
+
+  beginPatrolWaypointIdle(guest);
 }
 
 function getClipDurationMs(group, fallbackMs = 2000) {
@@ -379,9 +1129,9 @@ function playGuestClipOnce(guest, clipName, onComplete) {
     onComplete?.();
   };
 
-  guest.sequenceEndObserver = group.onAnimationGroupEndObservable.add(finish);
-  guest.arrivalClipTimeoutId = window.setTimeout(finish, getClipDurationMs(group));
   startGuestClip(guest, group, false);
+  observeGuestClipNearEnd(guest, group, finish);
+  guest.arrivalClipTimeoutId = window.setTimeout(finish, Math.max(200, getClipDurationMs(group) - 80));
 }
 
 function playGuestAnimation(guest) {
@@ -401,16 +1151,17 @@ function playGuestAnimation(guest) {
     return;
   }
 
-  if (animation.type === "loop") {
+  if (animation.type === "loop" || animation.type === "once") {
     const clipCandidates = animation.clipAliases?.length
       ? animation.clipAliases
       : animation.clips;
+    const shouldLoop = animation.type !== "once";
 
     for (const clipName of clipCandidates) {
       const group = resolveClip(animationGroups, clipName);
 
       if (group) {
-        startGuestClip(guest, group, true);
+        startGuestClip(guest, group, shouldLoop);
         return;
       }
 
@@ -422,27 +1173,49 @@ function playGuestAnimation(guest) {
 
   if (animation.type === "sequence") {
     let clipIndex = 0;
+    // Solo sequences must not wait on a stale synced peer list from a prior run.
+    if (!Array.isArray(guest.syncSequencePeers) || guest.syncSequencePeers.length < 2) {
+      guest.syncSequencePeers = null;
+    }
+
+    guest.danceSequencePhase = "playing";
+    guest.danceSequenceClipIndex = 0;
+    captureDanceSequenceHome(guest);
+    resetGuestSequenceClipGroups(guest);
 
     const playNext = () => {
+      if (clipIndex >= animation.clips.length) {
+        beginDanceSequenceReturn(guest);
+        return;
+      }
+
       const clipName = animation.clips[clipIndex];
       const group = resolveClip(animationGroups, clipName);
 
       if (!group) {
         warnMissingClip(guest, clipName);
-        clipIndex = (clipIndex + 1) % animation.clips.length;
-        if (clipIndex !== 0) {
-          playNext();
+        clipIndex += 1;
+
+        if (clipIndex >= animation.clips.length) {
+          beginDanceSequenceReturn(guest);
+          return;
         }
+
+        playNext();
         return;
       }
 
-      guest.sequenceEndObserver?.remove?.();
-      guest.sequenceEndObserver = group.onAnimationGroupEndObservable.add(() => {
-        resetGuestRootMotion(guest);
-        clipIndex = (clipIndex + 1) % animation.clips.length;
+      guest.danceSequenceClipIndex = clipIndex;
+      guest.danceSequencePhase = "playing";
+      startGuestClip(guest, group, false, { blend: false });
+      observeGuestClipNearEnd(guest, group, () => {
+        // Keep guest.root where this clip ended. Next clip continues from here.
+        guest.rootMotionNeutralizer?.neutralize?.({ pinNodes: true });
+        guest.rootMotionNeutralizer?.resetRootMotionSample?.();
+        guest.rootMotionLockUntil = performance.now() + 80;
+        clipIndex += 1;
         playNext();
       });
-      startGuestClip(guest, group, false);
     };
 
     playNext();
@@ -482,6 +1255,11 @@ function playSyncedSequenceAnimations(guests) {
 
   const clips = activeGuests[0].spawn.animation.clips;
   activeGuests.forEach(stopGuestAnimation);
+  activeGuests.forEach((guest) => {
+    captureDanceSequenceHome(guest);
+    resetGuestSequenceClipGroups(guest);
+    guest.syncSequencePeers = activeGuests;
+  });
 
   let runId = 0;
 
@@ -513,26 +1291,51 @@ function playSyncedSequenceAnimations(guests) {
       }
 
       guest.syncSequenceRunId = currentRunId;
-      startGuestClip(guest, group, false);
+      guest.danceSequencePhase = "playing";
+      guest.danceSequenceClipIndex = clipIndex;
+      startGuestClip(guest, group, false, { blend: false });
     });
 
-    const durations = entries
-      .filter((entry) => entry.group)
-      .map((entry) => getClipDurationMs(entry.group));
-    const waitMs = durations.length ? Math.max(...durations) : 2000;
-    const timeoutId = window.setTimeout(() => {
+    const lead = entries.find((entry) => entry.group);
+    let advanced = false;
+    const advance = () => {
+      if (advanced) {
+        return;
+      }
+
+      advanced = true;
       readyGuests.forEach((guest) => {
-        if (guest.syncSequenceTimeoutId === timeoutId) {
+        if (guest.syncSequenceTimeoutId) {
+          window.clearTimeout(guest.syncSequenceTimeoutId);
           guest.syncSequenceTimeoutId = null;
         }
+
+        guest.sequenceEndObserver?.remove?.();
+        guest.sequenceEndObserver = null;
       });
 
       if (!readyGuests.every((guest) => guest.root.isEnabled() && guest.syncSequenceRunId === currentRunId)) {
         return;
       }
 
-      playClipIndex((clipIndex + 1) % clips.length);
-    }, waitMs);
+      const nextIndex = clipIndex + 1;
+
+      if (nextIndex >= clips.length) {
+        readyGuests.forEach((guest) => beginDanceSequenceReturn(guest));
+        return;
+      }
+
+      playClipIndex(nextIndex);
+    };
+
+    if (lead?.guest && lead.group) {
+      observeGuestClipNearEnd(lead.guest, lead.group, advance);
+    }
+
+    const waitMs = lead?.group
+      ? Math.max(200, getClipDurationMs(lead.group) - 200)
+      : 2000;
+    const timeoutId = window.setTimeout(advance, waitMs);
 
     readyGuests.forEach((guest) => {
       guest.syncSequenceTimeoutId = timeoutId;
@@ -709,57 +1512,6 @@ function updatePatrolDepartTurn(guest, deltaScale) {
     guest.patrolPhase = "moving";
     startPatrolLocomotionClip(guest);
   });
-}
-
-function handlePatrolArrival(guest) {
-  const { movement } = guest.spawn;
-  const targets = movement?.patrolTargets || [];
-  const isCycleHome = Boolean(
-    movement?.cycleRestClip
-    && targets.length > 0
-    && guest.patrolTargetIndex === targets.length - 1
-  );
-
-  if (isCycleHome) {
-    if (guest.patrolArrivalPending) {
-      return;
-    }
-
-    guest.patrolArrivalPending = true;
-    guest.patrolPhase = "idle";
-    playGuestClipNTimes(guest, movement.cycleRestClip, movement.cycleRestCount ?? 1, () => {
-      guest.patrolArrivalPending = false;
-
-      if (!guest.root.isEnabled()) {
-        return;
-      }
-
-      advancePatrolTarget(guest);
-      guest.patrolPhase = "moving";
-      startPatrolLocomotionClip(guest);
-    });
-    return;
-  }
-
-  const arrivalClip = movement?.arrivalClip;
-
-  if (!arrivalClip) {
-    resumePatrolAfterWaypoint(guest);
-    return;
-  }
-
-  if (guest.patrolArrivalPending) {
-    return;
-  }
-
-  guest.patrolArrivalPending = true;
-
-  if (movement.arrivalLookAt) {
-    beginPatrolArrivalFacing(guest);
-    return;
-  }
-
-  beginPatrolWaypointIdle(guest);
 }
 
 function blendPatrolHeight(position, targetY, deltaScale) {
@@ -1759,8 +2511,20 @@ async function loadGuestCharacter(BABYLON, scene, spawn, helpers) {
   root.setEnabled(false);
 
   const animationGroups = result.animationGroups || [];
+  animationGroups.forEach((group) => {
+    try {
+      group.stop();
+    } catch {
+      // ignore
+    }
+  });
   stripGuestLocomotionRootMotion(BABYLON, animationGroups, spawn);
-  const rootMotionNeutralizer = createRootMotionNeutralizer(BABYLON, { meshes: guestMeshes });
+  const rootMotionNeutralizer = createRootMotionNeutralizer(BABYLON, {
+    meshes: guestMeshes,
+    root,
+    contentRoot,
+    pinTransformCarriers: true
+  });
 
   return {
     spawn,
@@ -1780,7 +2544,10 @@ async function loadGuestCharacter(BABYLON, scene, spawn, helpers) {
     fitScale,
     baseFitScale,
     rawHeight,
-    scaleMultiplier
+    scaleMultiplier,
+    // Locked on first placeGuestAtResolvedSpawn / capture — not at raw GLB load.
+    initialSpawnPose: null,
+    danceSequenceHome: null
   };
 }
 
@@ -1820,6 +2587,18 @@ function resetGuestPatrolState(guest) {
   guest.patrolSpeedFactor = 0;
   guest.patrolFloorTick = 0;
   initPatrolCycleSpeed(guest);
+}
+
+function restartGuestPatrol(guest) {
+  if (guest?.spawn?.movement?.type !== "patrol") {
+    return false;
+  }
+
+  resetGuestPatrolState(guest);
+  stopGuestAnimation(guest);
+  playGuestAnimation(guest);
+  guest._editorNeedsPatrolRestart = false;
+  return true;
 }
 
 function disposeGuestRuntimeResources(guest) {
@@ -1867,6 +2646,8 @@ function disposeGuestRuntimeResources(guest) {
   guest.root = null;
   guest.resolvedSpawn = null;
   guest.nightChase = null;
+  guest.initialSpawnPose = null;
+  guest.danceSequenceHome = null;
 }
 
 export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
@@ -1874,6 +2655,15 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
   let visible = false;
   const loadPromises = new Map();
   let guestProjectEpoch = 0;
+  const guestLoadGeneration = new Map();
+
+  function getGuestLoadGeneration(guestId) {
+    return guestLoadGeneration.get(guestId) || 0;
+  }
+
+  function bumpGuestLoadGeneration(guestId) {
+    guestLoadGeneration.set(guestId, getGuestLoadGeneration(guestId) + 1);
+  }
   let revealAnimStartedCount = 0;
   let revealAnimSkippedCount = 0;
   let sequenceNeutralizeFrame = 0;
@@ -1888,7 +2678,8 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
     getPlayerPosition = null,
     getCollisionMeshes = null,
     canGuestMoveHorizontal = null,
-    hasGuestLineOfSight = null
+    hasGuestLineOfSight = null,
+    shouldPauseMovement = null
   } = helpers;
 
   function getGuestLabelText(guestOrSpawn) {
@@ -2009,6 +2800,13 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
       resolvedSpawn.position.z
     );
     guest.root.rotation.set(0, resolvedSpawn.rotationY, 0);
+    // First visible placement is the canonical sequence return target.
+    lockGuestInitialSpawnPose(guest, {
+      x: resolvedSpawn.position.x,
+      y: resolvedSpawn.position.y,
+      z: resolvedSpawn.position.z,
+      rotationY: resolvedSpawn.rotationY
+    });
   }
 
   function startGuestPatrolIfNeeded(guest, wasVisible) {
@@ -2169,7 +2967,16 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
 
   function disposeGuests(options = {}) {
     const onlyIds = options.onlyIds?.length ? new Set(options.onlyIds) : null;
-    guestProjectEpoch += 1;
+
+    if (!onlyIds) {
+      guestProjectEpoch += 1;
+      guestLoadGeneration.clear();
+    } else {
+      onlyIds.forEach((guestId) => {
+        bumpGuestLoadGeneration(guestId);
+        loadPromises.delete(guestId);
+      });
+    }
 
     getGuests().forEach((guest) => {
       const guestId = guest.spawn.id;
@@ -2194,6 +3001,7 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
   async function dispose() {
     hide();
     guestProjectEpoch += 1;
+    guestLoadGeneration.clear();
 
     getGuests().forEach((guest) => {
       disposeGuestRuntimeResources(guest);
@@ -2303,9 +3111,14 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
     }
 
     const loadEpoch = guestProjectEpoch;
+    const loadGeneration = getGuestLoadGeneration(resolvedSpawn.id);
     const loadPromise = loadGuestCharacter(BABYLON, scene, resolvedSpawn, helpers)
       .then((guest) => {
-        if (!guest || loadEpoch !== guestProjectEpoch) {
+        if (
+          !guest
+          || loadEpoch !== guestProjectEpoch
+          || loadGeneration !== getGuestLoadGeneration(resolvedSpawn.id)
+        ) {
           if (guest) {
             disposeGuestInstance(guest);
           }
@@ -2409,6 +3222,66 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
     return guestsById.has(spawnId);
   }
 
+  function shouldPlantGuestIdle(guest) {
+    if (!guest?.root?.isEnabled() || isNightDeviChaseGuest(guest)) {
+      return false;
+    }
+
+    if (guest.spawn.movement?.type === "rootMotion") {
+      return false;
+    }
+
+    if (guest.danceSequencePhase === "playing" || isGuestPlayingAngjiDanceRootMotion(guest)) {
+      return false;
+    }
+
+    return true;
+  }
+
+  scene.onAfterAnimationsObservable.add(() => {
+    if (!visible) {
+      return;
+    }
+
+    getGuests().forEach((guest) => {
+      if (!shouldPlantGuestIdle(guest)) {
+        return;
+      }
+
+      // Nodes only — pinning Idle bones + rotation after the clip writes them
+      // snaps XZ back and forth and reads as tremble.
+      guest.rootMotionNeutralizer?.neutralize?.({ pinNodes: true });
+    });
+  });
+
+  scene.onBeforeRenderObservable.add(() => {
+    if (!visible) {
+      return;
+    }
+
+    getGuests().forEach((guest) => {
+      if (!guest.root?.isEnabled() || isNightDeviChaseGuest(guest)) {
+        return;
+      }
+
+      if (guest.danceSequencePhase === "returning") {
+        return;
+      }
+
+      if (guest.spawn.movement?.type === "patrol") {
+        if (guest.patrolPhase === "idle" && isGuestPlayingAngjiDanceRootMotion(guest)) {
+          applyGuestPlanarRootMotion(guest, resolveGuestFloorY);
+        }
+
+        return;
+      }
+
+      if (guest.spawn.movement?.type === "rootMotion" || isGuestPlayingAngjiDanceRootMotion(guest)) {
+        applyGuestPlanarRootMotion(guest, resolveGuestFloorY);
+      }
+    });
+  });
+
   function update(deltaScale) {
     if (!visible) {
       return;
@@ -2427,6 +3300,8 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
         syncGuestDevLabelVisibility(guest);
       }
 
+      updateGuestClipCrossfade(guest, deltaScale);
+
       if (isNightDeviChaseGuest(guest)) {
         updateNightDeviChase(guest, deltaScale, resolveGuestFloorY, getPlayerPosition, {
           BABYLON,
@@ -2438,27 +3313,41 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
         return;
       }
 
-      if (guest.spawn.movement?.type === "patrol") {
-        updateGuestPatrol(guest, deltaScale, resolveGuestFloorY);
+      if (guest.danceSequencePhase === "returning") {
+        if (!shouldPauseMovement?.()) {
+          updateDanceSequenceReturn(guest, deltaScale, resolveGuestFloorY);
+        }
+        return;
+      }
 
-        if (guest.patrolPhase === "idle" && isGuestPlayingAngjiDanceRootMotion(guest)) {
-          applyGuestPlanarRootMotion(guest);
+      // Watchdog: after walk-home some guests could sit idle with no clip if a
+      // synced peer wait or restart queue got stuck. Force another loop.
+      if (
+        guest.spawn.animation?.type === "sequence"
+        && guest.danceSequenceHome
+        && guest.danceSequencePhase == null
+        && !guest.syncSequenceRestartQueued
+        && !guest.activeAnimationGroup
+        && !guest.clipCrossfade
+      ) {
+        queueSequenceRestart(guest);
+        return;
+      }
+
+      if (guest.spawn.movement?.type === "patrol") {
+        if (!shouldPauseMovement?.()) {
+          updateGuestPatrol(guest, deltaScale, resolveGuestFloorY);
         }
 
         return;
       }
 
-      if (guest.spawn.movement?.type === "rootMotion") {
-        applyGuestPlanarRootMotion(guest);
-        return;
-      }
-
-      if (isGuestPlayingAngjiDanceRootMotion(guest)) {
-        applyGuestPlanarRootMotion(guest);
-        return;
-      }
-
-      if (guest.spawn.animation?.type === "sequence" && shouldNeutralizeSequence) {
+      if (
+        guest.spawn.animation?.type === "sequence"
+        && guest.danceSequencePhase !== "playing"
+        && guest.danceSequencePhase !== "returning"
+        && shouldNeutralizeSequence
+      ) {
         guest.rootMotionNeutralizer?.neutralize?.({ syncSample: true });
       }
     });
@@ -2491,6 +3380,52 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
     });
   }
 
+  function refreshPatrolGuests(options = {}) {
+    const onlyIds = options.onlyIds?.length ? new Set(options.onlyIds) : null;
+    let restarted = 0;
+
+    getGuests().forEach((guest) => {
+      if (onlyIds && !onlyIds.has(guest.spawn?.id)) {
+        return;
+      }
+
+      if (guest.spawn?.movement?.type !== "patrol") {
+        return;
+      }
+
+      if (options.force || guest._editorNeedsPatrolRestart || guest.patrolPhase == null) {
+        restartGuestPatrol(guest);
+        guest._editorNeedsPatrolRestart = false;
+        restarted += 1;
+      }
+    });
+
+    return restarted;
+  }
+
+  function refreshGuestAnimations(options = {}) {
+    const onlyIds = options.onlyIds?.length ? new Set(options.onlyIds) : null;
+    let restarted = 0;
+
+    getGuests().forEach((guest) => {
+      if (onlyIds && !onlyIds.has(guest.spawn?.id)) {
+        return;
+      }
+
+      if (guest.spawn?.movement?.type === "patrol") {
+        return;
+      }
+
+      if (options.force || guest._editorNeedsAnimRestart) {
+        playGuestAnimation(guest);
+        guest._editorNeedsAnimRestart = false;
+        restarted += 1;
+      }
+    });
+
+    return restarted;
+  }
+
   return {
     ensureSpawned,
     preload,
@@ -2504,6 +3439,8 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
     update,
     refreshDevLabels,
     applyGuestLabelTexts,
+    refreshPatrolGuests,
+    refreshGuestAnimations,
     getGuests,
     getGuestSceneAudit,
     resetRevealDiagnostics,

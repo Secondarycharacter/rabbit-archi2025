@@ -189,6 +189,37 @@ export function createCameraController(BABYLON, scene, camera, options = {}) {
     camera.setTarget(lookAtTarget);
   }
 
+  function computeFollowPosition(anchorPosition, visualHeight = 1.75) {
+    const aimHeight = visualHeight * 0.82;
+    const cameraBaseHeight = Math.max(heightOffset, visualHeight * 0.42);
+
+    lookAtOffset.set(0, aimHeight, 0);
+
+    const cosPitch = Math.cos(pitch);
+    const offsetX = Math.sin(yaw) * cosPitch * distance + Math.cos(yaw) * shoulderOffset;
+    const offsetY = Math.sin(pitch) * distance + cameraBaseHeight;
+    const offsetZ = Math.cos(yaw) * cosPitch * distance - Math.sin(yaw) * shoulderOffset;
+
+    desiredPosition.set(
+      anchorPosition.x + offsetX,
+      anchorPosition.y + offsetY,
+      anchorPosition.z + offsetZ
+    );
+    lookAtTarget.copyFrom(anchorPosition).addInPlace(lookAtOffset);
+
+    return resolveCollision(anchorPosition, desiredPosition);
+  }
+
+  function snapToAnchor(anchorPosition, visualHeight = 1.75) {
+    if (!anchorPosition) {
+      return;
+    }
+
+    const resolvedPosition = computeFollowPosition(anchorPosition, visualHeight);
+    camera.position.copyFrom(resolvedPosition);
+    camera.setTarget(lookAtTarget);
+  }
+
   function reset(initialYaw, initialPitch = BABYLON.Tools.ToRadians(12)) {
     yaw = initialYaw + Math.PI;
     pitch = clamp(initialPitch, minPitchRad, maxPitchRad);
@@ -217,6 +248,7 @@ export function createCameraController(BABYLON, scene, camera, options = {}) {
     applyWheelDelta,
     update,
     reset,
+    snapToAnchor,
     captureState: () => ({
       yaw,
       pitch,

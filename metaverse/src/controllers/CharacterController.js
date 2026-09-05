@@ -20,10 +20,20 @@ export async function loadCharacterModel(BABYLON, scene, options = {}) {
 
   const fileName = `${file}?v=${Date.now()}`;
   const result = await BABYLON.SceneLoader.ImportMeshAsync("", rootPath, fileName, scene);
-  const root = new BABYLON.TransformNode("tps-character-root", scene);
-  const contentRoot = new BABYLON.TransformNode("tps-character-content", scene);
+  (result.animationGroups || []).forEach((group) => {
+    try {
+      group.stop();
+    } catch {
+      // ignore auto-started import clips
+    }
+  });
+  // PlayerRoot owns world movement; PlayerContent holds the GLB (visual only).
+  const root = new BABYLON.TransformNode("PlayerRoot", scene);
+  const contentRoot = new BABYLON.TransformNode("PlayerContent", scene);
   const meshes = result.meshes.filter((mesh) => typeof mesh.getTotalVertices === "function" && mesh.getTotalVertices() > 0);
 
+  root.metadata = { ...(root.metadata || {}), role: "player-root" };
+  contentRoot.metadata = { ...(contentRoot.metadata || {}), role: "player-content" };
   contentRoot.parent = root;
 
   const importedNodes = [...result.meshes, ...(result.transformNodes || [])];
@@ -98,6 +108,8 @@ export async function loadCharacterModel(BABYLON, scene, options = {}) {
   meshes.forEach((mesh) => {
     mesh.isPickable = false;
     mesh.checkCollisions = false;
+    // Idle plant / root-motion can temporarily skew bounds; keep drawn anyway.
+    mesh.alwaysSelectAsActiveMesh = true;
     mesh.metadata = { ...(mesh.metadata || {}), passThrough: true, playerCharacter: true };
   });
 

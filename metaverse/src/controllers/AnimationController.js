@@ -900,6 +900,7 @@ export function createAnimationController(BABYLON, animationGroups, options = {}
     getLocomotionState: () => locomotionState,
     getCurrentAction: () => currentActionClip,
     getCurrentActionKey: () => currentActionKey,
+    getCurrentClip: () => currentClip,
     isJumpAction: () => Boolean(currentActionKey && JUMP_ACTION_KEYS.has(currentActionKey)),
     blocksHorizontalMovement: () => Boolean(currentActionClip) && !JUMP_ACTION_KEYS.has(currentActionKey),
     hasClip: (clipName) => Boolean(getGroup(clipName)),

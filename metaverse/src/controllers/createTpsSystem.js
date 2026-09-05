@@ -1,16 +1,34 @@
-import { createAnimationController } from "./AnimationController.js?v=tps-jump-nocol-20260629";
-import { createCameraController } from "./CameraController.js?v=floor2-ceiling-camera-20260629";
-import { createCharacterStateMachine, ACTION } from "./CharacterStateMachine.js?v=tps-jump-nocol-20260629";
+import { createAnimationController } from "./AnimationController.js?v=pose-feet-20260905";
+import { createCameraController } from "./CameraController.js?v=tour-cam-snap-20260903";
+import { createCharacterStateMachine, ACTION } from "./CharacterStateMachine.js?v=dance-lock-plant-20260905";
 import { createInputController } from "./InputController.js?v=tps-jump-nocol-20260629";
-import { createMovementController } from "./MovementController.js?v=tps-jump-nocol-20260629";
+import { createMovementController } from "./MovementController.js?v=dance-lock-plant-20260905";
 import {
   createCharacterController,
   loadCharacterModel,
   CHARACTER_FILE,
   CHARACTER_ROOT
-} from "./CharacterController.js?v=character-spawn-fix-20260701";
-import { CLIP_NAMES } from "./AnimationController.js?v=tps-jump-nocol-20260629";
-import { createRootMotionNeutralizer, stripLocomotionRootMotion } from "./RootMotionNeutralizer.js?v=tps-jump-nocol-20260629";
+} from "./CharacterController.js?v=player-root-inplace-20260905";
+import { CLIP_NAMES } from "./AnimationController.js?v=pose-feet-20260905";
+import {
+  applyPlayerRootInPlacePolicy,
+  createRootMotionNeutralizer,
+  freezeIdleCarrierTranslation,
+  stripLocomotionRootMotion
+} from "./RootMotionNeutralizer.js?v=sole-plant-20260905";
+
+/**
+ * PlayerRoot architecture (player TPS only):
+ * ① asset.root = PlayerRoot — world movement
+ * ② GLB under contentRoot — visual child
+ * ③ Idle/Walk/Run ignore content planar root motion
+ * ④ Jump_Over keeps vertical + consumed planar anim motion
+ * ⑤ Idle uses foot-plant (contentRoot counters sole drift)
+ *
+ * Set to `false` to restore the previous strip/freeze/pin path immediately
+ * if this policy causes regressions.
+ */
+export const USE_PLAYER_ROOT_INPLACE = true;
 
 function shouldIgnoreCollisionDuringJump(stateOutput, isGrounded) {
   // Cover the WHOLE jump action, including the grounded wind-up before takeoff.
@@ -44,6 +62,78 @@ export function createTpsSystem(BABYLON, scene, camera, options = {}) {
   let character = null;
   let animation = null;
   let rootMotionNeutralizer = null;
+  let idlePlantMode = "root";
+  let idlePlantObserver = null;
+  let previousIdlePlantMode = "root";
+  let pendingStopFootSample = null;
+  let lastPlantDeltaSeconds = 1 / 60;
+
+  /**
+   * Sole-reference idle plant (no pinIdleNodes — that fought plantFeet and reintroduced skate).
+   * Runs only on onAfterAnimations after Babylon has posed the skeleton.
+   */
+  function applyIdlePlant() {
+    if (idlePlantMode === "none") {
+      rootMotionNeutralizer?.resetFootPlantOffset?.();
+      return;
+    }
+
+    if (idlePlantMode !== "feet") {
+      rootMotionNeutralizer?.resetFootPlantOffset?.();
+      return;
+    }
+
+    if (!rootMotionNeutralizer?.isFootPlantActive?.()) {
+      const stopSample = pendingStopFootSample;
+      pendingStopFootSample = null;
+
+      if (stopSample) {
+        rootMotionNeutralizer?.captureFootPlant?.(stopSample);
+        rootMotionNeutralizer?.beginFootPlantSession?.({ smooth: true });
+      } else {
+        rootMotionNeutralizer?.captureFootPlant?.();
+        rootMotionNeutralizer?.beginFootPlantSession?.({ smooth: false });
+      }
+    }
+
+    rootMotionNeutralizer?.plantFeet?.({
+      blendSeconds: 0.14,
+      deltaSeconds: lastPlantDeltaSeconds
+    });
+  }
+
+  function syncIdlePlantMode(stateOutput, inputFrame) {
+    const jumping = stateOutput.activeAction === ACTION.JUMP_OVER
+      || stateOutput.walkJumpUsesAnimRootMotion
+      || Boolean(stateOutput.walkJumpPhase);
+    const actionLocksPlant = stateOutput.activeAction === ACTION.DANCE
+      || stateOutput.activeAction === ACTION.THROW;
+    const idleStanding = stateOutput.locomotionState === "idle"
+      && !inputFrame.hasMovementInput
+      && !jumping
+      && !actionLocksPlant;
+
+    let nextMode = "root";
+
+    if (jumping || actionLocksPlant) {
+      nextMode = "none";
+    } else if (idleStanding) {
+      nextMode = "feet";
+    }
+
+    if (nextMode !== "feet" && previousIdlePlantMode === "feet") {
+      pendingStopFootSample = null;
+      rootMotionNeutralizer?.endFootPlantSession?.();
+    }
+
+    if (nextMode === "none" && previousIdlePlantMode !== "none") {
+      pendingStopFootSample = null;
+      rootMotionNeutralizer?.endFootPlantSession?.();
+    }
+
+    idlePlantMode = nextMode;
+    previousIdlePlantMode = nextMode;
+  }
   const stateMachine = createCharacterStateMachine({
     landingAnimDelayMs: controllerSettings.landingAnimDelayMs ?? 0,
     runAnimHoldSpeedThreshold: controllerSettings.runAnimHoldSpeedThreshold ?? 0.035,
@@ -109,17 +199,66 @@ export function createTpsSystem(BABYLON, scene, camera, options = {}) {
         targetHeight: controllerSettings.characterTargetHeight ?? 1.75
       })
         .then((loadedAsset) => {
-          stripLocomotionRootMotion(BABYLON, loadedAsset.animationGroups, [
+          loadedAsset.animationGroups.forEach((group) => {
+            try {
+              group.stop();
+            } catch {
+              // ignore
+            }
+          });
+          const locomotionClips = [
             CLIP_NAMES.walking,
             CLIP_NAMES.running,
             CLIP_NAMES.idleStandard,
             CLIP_NAMES.idleDwarg,
             CLIP_NAMES.jumpOver
-          ], {
-            preserveVerticalClipNames: [CLIP_NAMES.jumpOver]
-          });
+          ];
+          const freezeSkipClips = [
+            CLIP_NAMES.jumpOver,
+            CLIP_NAMES.jumpStand,
+            CLIP_NAMES.jumpRunning,
+            CLIP_NAMES.dance
+          ];
+
+          if (USE_PLAYER_ROOT_INPLACE) {
+            // New path: PlayerRoot moves; content GLB stays in-place for locomotion.
+            applyPlayerRootInPlacePolicy(
+              BABYLON,
+              loadedAsset,
+              loadedAsset.animationGroups,
+              locomotionClips,
+              {
+                preserveVerticalClipNames: [CLIP_NAMES.jumpOver],
+                skipClipNames: freezeSkipClips
+              }
+            );
+            console.info("[tps] PlayerRoot in-place policy ON (set USE_PLAYER_ROOT_INPLACE=false to revert)");
+          } else {
+            // LEGACY — previous strip + freeze path (safe rollback).
+            stripLocomotionRootMotion(BABYLON, loadedAsset.animationGroups, locomotionClips, {
+              preserveVerticalClipNames: [CLIP_NAMES.jumpOver]
+            });
+            freezeIdleCarrierTranslation(loadedAsset.animationGroups, [
+              CLIP_NAMES.walking,
+              CLIP_NAMES.running,
+              CLIP_NAMES.idleStandard,
+              CLIP_NAMES.idleDwarg
+            ], {
+              skipClipNames: freezeSkipClips
+            });
+            console.info("[tps] PlayerRoot in-place policy OFF (legacy root-motion strip)");
+          }
+
           asset = loadedAsset;
-          rootMotionNeutralizer = createRootMotionNeutralizer(BABYLON, loadedAsset);
+          rootMotionNeutralizer = createRootMotionNeutralizer(BABYLON, {
+            ...loadedAsset,
+            captureIdleNodes: true
+          });
+          if (!idlePlantObserver) {
+            idlePlantObserver = scene.onAfterAnimationsObservable.add(() => {
+              applyIdlePlant();
+            });
+          }
           character = createCharacterController(BABYLON, asset, characterOptions);
           animation = createAnimationController(BABYLON, asset.animationGroups, {
             blendIdleWalk: controllerSettings.blendIdleWalk ?? 0.4,
@@ -163,6 +302,10 @@ export function createTpsSystem(BABYLON, scene, camera, options = {}) {
     cameraController.reset(initialYaw);
     character?.reset(playerBody.position, initialYaw);
     character?.syncFromPlayerEye(playerBody.position);
+    cameraController.snapToAnchor(
+      getPhysicsAnchor(),
+      character?.getVisualHeight?.() ?? 1.75
+    );
     stateMachine.reset();
     movementController.reset();
     inputController.clear();
@@ -300,6 +443,20 @@ export function createTpsSystem(BABYLON, scene, camera, options = {}) {
       && stateOutput.locomotionState === "idle"
       && !inputFrame.hasMovementInput;
 
+    const canPlantAtStop = stoppedLocomoting
+      && !stateOutput.walkJumpPhase
+      && stateOutput.activeAction !== ACTION.DANCE
+      && stateOutput.activeAction !== ACTION.THROW
+      && stateOutput.activeAction !== ACTION.JUMP_OVER;
+
+    // Sample walk/run soles now; commit after idle poses in onAfterAnimations
+    // with a short blend so the mesh does not pop to the idle authored offset.
+    if (canPlantAtStop) {
+      pendingStopFootSample = rootMotionNeutralizer?.sampleFootPlantAnchor?.() || null;
+    }
+
+    lastPlantDeltaSeconds = deltaSeconds;
+
     // Jump animation starts before vertical physics (space → anim → impulse).
     animation.applyStateMachineOutput(stateOutput, { fastStop: stoppedLocomoting });
     animation.update(deltaSeconds);
@@ -318,6 +475,8 @@ export function createTpsSystem(BABYLON, scene, camera, options = {}) {
     ) {
       rootMotionNeutralizer?.resetRootMotionSample?.();
     }
+
+    syncIdlePlantMode(stateOutput, inputFrame);
 
     if (stateOutput.walkJumpUsesAnimRootMotion && applyHorizontalMove) {
       const rootDelta = rootMotionNeutralizer?.consumePlanarRootMotionDelta?.();

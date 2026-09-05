@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Metaverse Architecture Tour</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="./styles/main.css?v=angji-guide-tour-20260822-v22">
+  <link rel="stylesheet" href="./styles/main.css?v=npc-dialog-preview-canvas-20260903">
 </head>
 <body>
   <main class="game-shell">
@@ -43,9 +43,7 @@
           <button id="orbitViewButton" type="button">Orbit View</button>
           <button id="tourModeButton" type="button">Tour Mode</button>
           <button id="nightModeButton" type="button" hidden>Night Mode</button>
-          <button class="local-dev-only" id="npcGuestManagerButton" type="button">게스트 관리</button>
-          <button class="local-dev-only" id="guideManagerButton" type="button">가이드 관리</button>
-          <button class="local-dev-only" id="rlbTuningToggleButton" type="button" hidden>RLB 쉐이더</button>
+          <button class="local-dev-only" id="editorModeButton" type="button">Editor Mode</button>
         </div>
       </div>
 
@@ -91,23 +89,6 @@
         </div>
       </form>
       <p id="overviewAdminStatus">Firebase 설정 전에는 이 브라우저에 임시 저장됩니다.</p>
-    </aside>
-
-    <aside class="rlb-tuning-panel local-dev-only" id="rlbTuningPanel" hidden>
-      <header class="rlb-tuning-panel__header">
-        <h2>RLB 쉐이더 튜닝</h2>
-        <div class="rlb-tuning-panel__actions">
-          <button id="rlbTuningSaveButton" type="button">저장</button>
-          <button id="rlbTuningResetButton" type="button">초기화</button>
-          <button id="rlbTuningCloseButton" type="button" aria-label="닫기">×</button>
-        </div>
-      </header>
-      <nav class="rlb-tuning-tabs" id="rlbTuningTabs" aria-label="조명 종류"></nav>
-      <div class="rlb-tuning-layout">
-        <section class="rlb-tuning-lights" id="rlbTuningLights" hidden></section>
-        <div class="rlb-tuning-body" id="rlbTuningBody"></div>
-      </div>
-      <p class="rlb-tuning-status" id="rlbTuningStatus"></p>
     </aside>
 
 
@@ -170,7 +151,7 @@
   <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
   <script src="https://cdn.babylonjs.com/addons/babylonjs.addons.min.js"></script>
   <script src="./lib/babylonjs-fbx-loader.js"></script>
-  <script type="module" src="./src/first-person-tour.js?v=angji-npc-korean-names-20260822"></script>
+  <script type="module" src="./src/first-person-tour.js?v=sole-plant-20260905"></script>
   <script>
     (function () {
       const isEmbedded = new URLSearchParams(window.location.search).get('embed') === '1';

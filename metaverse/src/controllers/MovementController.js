@@ -98,6 +98,12 @@ export function createMovementController(settings = {}) {
   }
 
   function applyGroundVelocity(input, stateOutput, modelSpeedMultiplier, deltaSeconds) {
+    if (stateOutput.blocksHorizontalMovement) {
+      velocityX = 0;
+      velocityZ = 0;
+      return;
+    }
+
     if (postWalkJumpRampActive && postWalkJumpRampDirection) {
       postWalkJumpRampElapsed += deltaSeconds;
       const isRunning = !postWalkJumpRampUsesWalkSpeed && (

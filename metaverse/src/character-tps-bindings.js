@@ -68,7 +68,7 @@ export function applyCharacterTpsKeyDown(event, {
     return true;
   }
 
-  if (key === "j" && !event.repeat && walkMode) {
+  if (key === "j" && !event.repeat && walkMode && !inputBlocked) {
     event.preventDefault();
     tpsSystem?.getInputController?.()?.queueJumpOver();
     return true;
@@ -77,7 +77,7 @@ export function applyCharacterTpsKeyDown(event, {
   if (CHARACTER_MOVEMENT_KEYS.includes(key)) {
     event.preventDefault();
 
-    if (walkMode) {
+    if (walkMode && !inputBlocked) {
       keys.add(key);
     }
 

@@ -34,12 +34,12 @@
     "en": "Please find me again if you would like a guided explanation."
   },
   "escPrompt": {
-    "ko": "건물 소개는 다음에 들으시겠어요?",
-    "en": "Would you like to hear the building introduction later?"
+    "ko": "투어에서 빠져나가시겠습니까?",
+    "en": "Would you like to leave the tour?"
   },
   "escChoiceLabels": {
-    "stop": "중지 / Stop",
-    "continue": "계속 / Continue"
+    "stop": "예 / Yes",
+    "continue": "아니오 / No"
   },
   "restartTourPrompt": {
     "ko": "GUIDE 투어를 다시 시작하시겠습니까?",
