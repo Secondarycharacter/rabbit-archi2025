@@ -763,25 +763,6 @@ body.homepage-shell.is-pointer {
   100% { transform: translateX(320%); }
 }
 
-.h0-metaverse-toolbar {
-  position: absolute;
-  right: 12px;
-  bottom: 12px;
-  z-index: 5;
-  display: flex;
-  gap: 8px;
-}
-
-.h0-metaverse-toolbar button {
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  background: rgba(0, 0, 0, 0.55);
-  color: #fff;
-  font-size: 11px;
-  letter-spacing: 1px;
-  padding: 6px 10px;
-  cursor: url('../images/Icon/Mouse_H.png') 4 4, pointer;
-}
-
 .h0-extra-layout {
   display: grid;
   grid-template-columns: 30% 55% 15%;

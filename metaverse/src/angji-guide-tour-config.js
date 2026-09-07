@@ -3,10 +3,10 @@
 import {
   DEFAULT_GUIDE_SPAWN_TRANSFORM,
   loadRuntimeTourData
-} from "./angji-guide-tour-data.js?v=guide-esc-label-20260905";
+} from "./angji-guide-tour-data.js?v=restore-common-dialogues-20260907";
 
-export const ANGJI_GUIDE_TOUR_VERSION = "guide-esc-label-20260905";
-export { ANGJI_GUIDE_TOUR_DATA_URL } from "./angji-guide-tour-data.js?v=guide-esc-label-20260905";
+export const ANGJI_GUIDE_TOUR_VERSION = "restore-common-dialogues-20260907";
+export { ANGJI_GUIDE_TOUR_DATA_URL } from "./angji-guide-tour-data.js?v=restore-common-dialogues-20260907";
 
 export const ANGJI_GUIDE_SPAWN = {
   id: "Angji-Guide",

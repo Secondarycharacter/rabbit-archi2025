@@ -3,7 +3,7 @@
  */
 
 export const ANGJI_GUIDE_TOUR_DATA_URL = "./data/guide/angji-guide-tour.json";
-export const ANGJI_GUIDE_MANAGER_VERSION = "guide-esc-label-20260905";
+export const ANGJI_GUIDE_MANAGER_VERSION = "restore-common-dialogues-20260907";
 export const ANGJI_GUIDE_STORAGE_KEY = "angji-guide-tour-manager-v1";
 
 export const DEFAULT_GUIDE_SPAWN_TRANSFORM = {
@@ -13,8 +13,11 @@ export const DEFAULT_GUIDE_SPAWN_TRANSFORM = {
 
 /** Shipped GUIDE 360° intro — matches GitHub `angji-guide-tour.json`. */
 export const DEFAULT_ORBIT_SPIN = {
+  id: "orbit_spin",
+  name: "사이트 전경",
   position: { x: -167.35, y: 25.00, z: 73.26 },
   target: { x: -10.54, y: 50.00, z: 16.37 },
+  cameraHeight: 25,
   rotationY: 1.9188,
   durationSeconds: 20,
   rotationTurns: 1,
@@ -52,11 +55,19 @@ export function isImplausibleOrbitSpin(spin) {
   return Math.hypot(px, pz) < 1 && Math.abs(py) < 1;
 }
 
+export function isImplausibleOrbitSequences(sequences) {
+  if (!Array.isArray(sequences) || sequences.length === 0) {
+    return true;
+  }
+
+  return sequences.every((spin) => isImplausibleOrbitSpin(spin));
+}
+
 export const GUIDE_TOUR_GLOBAL_DEFAULTS = {
   dialogDistance: 1.2,
   interactionDistance: 2.0,
   textSpeed: 0.0583,
-  lineHoldSeconds: 1.0,
+  lineHoldSeconds: 0,
   lineHoldPerChar: 0.02,
   lineHoldMaxExtra: 3.33,
   cameraBlendSeconds: 0.85,
@@ -69,19 +80,15 @@ export const GUIDE_TOUR_GLOBAL_DEFAULTS = {
     "Dance_Samba05",
     "Dance_Samba06",
     "Dance_Samba07"
-  ]
+  ],
+  /** "__random_dance__" = pick any clip whose name starts with Dance */
+  idleDanceClip: "__random_dance__"
 };
 
-export const GUIDE_POST_EVENT_TYPES = ["none", "yes_no", "other"];
+/** Sentinel for Idle dance dropdown: random among Dance* clips. */
+export const IDLE_DANCE_RANDOM_VALUE = "__random_dance__";
 
-export const GUIDE_CAMERA_EFFECTS = [
-  "default",
-  "landscape",
-  "hall",
-  "outdoor",
-  "building",
-  "lookUp"
-];
+export const GUIDE_POST_EVENT_TYPES = ["none", "yes_no", "other"];
 
 function deepClone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -117,19 +124,89 @@ function normalizePosition(raw = {}, fallback = { x: 0, y: 0, z: 0 }) {
   };
 }
 
-function normalizeOrbitSpin(raw) {
-  if (isImplausibleOrbitSpin(raw)) {
-    return deepClone(DEFAULT_ORBIT_SPIN);
-  }
+export function normalizeOrbitSequence(raw = {}, index = 0) {
+  const fallback = DEFAULT_ORBIT_SPIN;
+  const position = normalizePosition(raw.position, fallback.position);
+  const target = normalizePosition(raw.target, fallback.target);
+  // Prefer explicit position.y (카메라 Y); cameraHeight remains a compat alias.
+  const cameraHeight = Number.isFinite(Number(raw.position?.y))
+    ? asNumber(raw.position.y, fallback.position.y)
+    : asNumber(raw.cameraHeight, position.y);
+  position.y = cameraHeight;
+
+  const idBase = index === 0 ? "orbit_spin" : `orbit_${index + 1}`;
+  const id = String(raw.id || idBase).trim() || idBase;
 
   return {
-    position: normalizePosition(raw.position, DEFAULT_ORBIT_SPIN.position),
-    target: normalizePosition(raw.target, DEFAULT_ORBIT_SPIN.target),
-    rotationY: asNumber(raw.rotationY, DEFAULT_ORBIT_SPIN.rotationY),
-    durationSeconds: asNumber(raw.durationSeconds, DEFAULT_ORBIT_SPIN.durationSeconds),
-    rotationTurns: asNumber(raw.rotationTurns, DEFAULT_ORBIT_SPIN.rotationTurns),
-    pitchOffsetDegrees: asNumber(raw.pitchOffsetDegrees, DEFAULT_ORBIT_SPIN.pitchOffsetDegrees)
+    id,
+    name: String(raw.name || (index === 0 ? "사이트 전경" : `오르빗 ${index + 1}`)).trim() || id,
+    position,
+    target,
+    cameraHeight,
+    rotationY: asNumber(raw.rotationY, fallback.rotationY),
+    durationSeconds: Math.max(0.5, asNumber(raw.durationSeconds, fallback.durationSeconds)),
+    rotationTurns: asNumber(raw.rotationTurns, fallback.rotationTurns),
+    pitchOffsetDegrees: asNumber(raw.pitchOffsetDegrees, fallback.pitchOffsetDegrees)
   };
+}
+
+/** @deprecated Prefer normalizeOrbitSequence / orbitSequences. */
+function normalizeOrbitSpin(raw) {
+  if (isImplausibleOrbitSpin(raw)) {
+    return normalizeOrbitSequence(DEFAULT_ORBIT_SPIN, 0);
+  }
+
+  return normalizeOrbitSequence(raw, 0);
+}
+
+export function normalizeOrbitSequences(raw = {}) {
+  if (Array.isArray(raw.orbitSequences) && raw.orbitSequences.length > 0) {
+    const seen = new Set();
+    return raw.orbitSequences.map((item, index) => {
+      const seq = normalizeOrbitSequence(item, index);
+      let id = seq.id;
+      let suffix = 2;
+
+      while (seen.has(id)) {
+        id = `${seq.id}_${suffix}`;
+        suffix += 1;
+      }
+
+      seen.add(id);
+      return { ...seq, id };
+    });
+  }
+
+  if (raw.orbitSpin && !isImplausibleOrbitSpin(raw.orbitSpin)) {
+    return [normalizeOrbitSequence({ ...raw.orbitSpin, id: raw.orbitSpin.id || "orbit_spin" }, 0)];
+  }
+
+  return [normalizeOrbitSequence(DEFAULT_ORBIT_SPIN, 0)];
+}
+
+export function findOrbitSequence(tourData, sequenceId) {
+  const sequences = Array.isArray(tourData?.orbitSequences)
+    ? tourData.orbitSequences
+    : normalizeOrbitSequences(tourData || {});
+  const id = String(sequenceId || "").trim();
+
+  if (id) {
+    const matched = sequences.find((item) => item.id === id);
+
+    if (matched) {
+      return matched;
+    }
+  }
+
+  return sequences[0] || normalizeOrbitSequence(DEFAULT_ORBIT_SPIN, 0);
+}
+
+export function createEmptyOrbitSequence(index = 0) {
+  return normalizeOrbitSequence({
+    ...DEFAULT_ORBIT_SPIN,
+    id: index === 0 ? "orbit_spin" : `orbit_${Date.now().toString(36)}`,
+    name: index === 0 ? "사이트 전경" : `오르빗 ${index + 1}`
+  }, index);
 }
 
 export function normalizePostEvent(raw = {}) {
@@ -149,20 +226,20 @@ export function syncDialogueLinePostEvent(line) {
   let postEvent = normalizePostEvent(line.postEvent || {});
 
   if (postEvent.type === "none") {
-    if (startTourChoice) {
-      postEvent = { ...postEvent, type: "yes_no" };
-    } else if (orbitAfter) {
-      postEvent = { ...postEvent, type: "other", checkpointId: "orbit_spin" };
-    }
+    // Explicit "없음" clears both legacy runtime flags and the badge.
+    startTourChoice = false;
+    orbitAfter = false;
+    postEvent = { ...postEvent, checkpointId: "" };
   } else if (postEvent.type === "yes_no") {
     startTourChoice = true;
     orbitAfter = false;
+    postEvent = { ...postEvent, checkpointId: "" };
   } else if (postEvent.type === "other") {
     startTourChoice = false;
-    orbitAfter = !postEvent.checkpointId || postEvent.checkpointId === "orbit_spin";
-    if (!postEvent.checkpointId && orbitAfter) {
+    if (!postEvent.checkpointId) {
       postEvent = { ...postEvent, checkpointId: "orbit_spin" };
     }
+    orbitAfter = Boolean(postEvent.checkpointId);
   } else {
     startTourChoice = false;
     orbitAfter = false;
@@ -174,9 +251,73 @@ export function syncDialogueLinePostEvent(line) {
   return line;
 }
 
+/** Build 「다음 이벤트」 dropdown options including orbit sequences. */
+export function buildPostEventSelectOptions(orbitSequences = []) {
+  const options = [
+    { value: "none", label: "없음" },
+    { value: "yes_no", label: "YES / NO" }
+  ];
+
+  (orbitSequences || []).forEach((seq) => {
+    options.push({
+      value: `orbit:${seq.id}`,
+      label: `오르빗 · ${seq.name || seq.id}`
+    });
+  });
+
+  return options;
+}
+
+export function encodePostEventSelectValue(postEvent = {}, line = null) {
+  // Prefer explicit postEvent, but fall back to legacy runtime flags so the
+  // editor dropdown matches what the tour actually runs.
+  if (postEvent?.type === "yes_no" || line?.startTourChoice) {
+    return "yes_no";
+  }
+
+  if (postEvent?.type === "other" && postEvent.checkpointId) {
+    return `orbit:${postEvent.checkpointId}`;
+  }
+
+  if (line?.orbitAfter) {
+    return `orbit:${postEvent?.checkpointId || "orbit_spin"}`;
+  }
+
+  return "none";
+}
+
+export function decodePostEventSelectValue(value) {
+  const raw = String(value || "none");
+
+  if (raw === "yes_no") {
+    return { type: "yes_no", checkpointId: "" };
+  }
+
+  if (raw.startsWith("orbit:")) {
+    return { type: "other", checkpointId: raw.slice("orbit:".length) || "orbit_spin" };
+  }
+
+  return { type: "none", checkpointId: "" };
+}
+
 export function normalizeDialogueLine(line = {}, index = 0, eventId = "00") {
   const order = index + 1;
   const id = String(line.id || `${eventId}_${String(order).padStart(2, "0")}`);
+
+  let startTourChoice = asBool(line.startTourChoice, false);
+  let orbitAfter = asBool(line.orbitAfter, false);
+  let postEvent = normalizePostEvent(line.postEvent || {});
+
+  // Legacy JSON may only set startTourChoice / orbitAfter without postEvent.type.
+  if ((!postEvent.type || postEvent.type === "none") && startTourChoice) {
+    postEvent = { ...postEvent, type: "yes_no", checkpointId: "" };
+  } else if ((!postEvent.type || postEvent.type === "none") && orbitAfter) {
+    postEvent = {
+      ...postEvent,
+      type: "other",
+      checkpointId: postEvent.checkpointId || "orbit_spin"
+    };
+  }
 
   const normalized = {
     id,
@@ -185,10 +326,9 @@ export function normalizeDialogueLine(line = {}, index = 0, eventId = "00") {
     textSpeed: line.textSpeed == null || line.textSpeed === ""
       ? null
       : asNumber(line.textSpeed, null),
-    startTourChoice: asBool(line.startTourChoice, false),
-    orbitAfter: asBool(line.orbitAfter, false),
-    cameraEffect: line.cameraEffect ? String(line.cameraEffect) : null,
-    postEvent: normalizePostEvent(line.postEvent || {})
+    startTourChoice,
+    orbitAfter,
+    postEvent
   };
 
   return syncDialogueLinePostEvent(normalized);
@@ -226,7 +366,6 @@ export function normalizeTourEvent(event = {}, index = 0) {
     guidePosition,
     guideRotationY,
     keepConfiguredY: asBool(event.keepConfiguredY, false),
-    cameraEffect: String(event.cameraEffect || "default"),
     closingAnimations: Array.isArray(event.closingAnimations)
       ? event.closingAnimations.map(String)
       : undefined,
@@ -238,6 +377,10 @@ export function normalizeTourData(raw = {}) {
   const events = Array.isArray(raw.events)
     ? raw.events.map((event, index) => normalizeTourEvent(event, index))
     : [];
+  const orbitSequences = normalizeOrbitSequences(raw);
+  const orbitSpin = orbitSequences[0]
+    ? normalizeOrbitSequence(orbitSequences[0], 0)
+    : normalizeOrbitSpin(raw.orbitSpin);
 
   return {
     version: asNumber(raw.version, 2),
@@ -253,7 +396,42 @@ export function normalizeTourData(raw = {}) {
     idleDanceClips: Array.isArray(raw.idleDanceClips)
       ? raw.idleDanceClips.map(String)
       : [...GUIDE_TOUR_GLOBAL_DEFAULTS.idleDanceClips],
-    orbitSpin: normalizeOrbitSpin(raw.orbitSpin),
+    idleDanceClip: (() => {
+      const explicit = String(raw.idleDanceClip || "").trim();
+
+      if (explicit) {
+        return explicit;
+      }
+
+      const clips = Array.isArray(raw.idleDanceClips)
+        ? raw.idleDanceClips.map(String).filter(Boolean)
+        : [];
+
+      // Legacy multi-clip lists behaved as a random pool → map to random Dance*.
+      if (clips.length === 1) {
+        return clips[0];
+      }
+
+      return IDLE_DANCE_RANDOM_VALUE;
+    })(),
+    orbitSequences,
+    // Compat alias for older readers — first sequence.
+    orbitSpin,
+    closingAnimations: (() => {
+      if (Array.isArray(raw.closingAnimations) && raw.closingAnimations.length) {
+        return raw.closingAnimations.map(String);
+      }
+
+      // Migrate legacy per-event closingAnimations (usually last event).
+      for (let i = events.length - 1; i >= 0; i -= 1) {
+        const clips = events[i]?.closingAnimations;
+        if (Array.isArray(clips) && clips.length) {
+          return clips.map(String);
+        }
+      }
+
+      return ["Greeting_bow", "Greeting_Hand", "Idle"];
+    })(),
     transitionPrompt: raw.transitionPrompt ? deepClone(raw.transitionPrompt) : undefined,
     declineMessage: raw.declineMessage ? deepClone(raw.declineMessage) : undefined,
     escPrompt: raw.escPrompt ? deepClone(raw.escPrompt) : undefined,
@@ -288,7 +466,6 @@ export function createEmptyTourEvent(index = 0) {
     title: `새 이벤트 ${id}`,
     guidePosition: { ...DEFAULT_GUIDE_SPAWN_TRANSFORM.position },
     guideRotationY: DEFAULT_GUIDE_SPAWN_TRANSFORM.rotationY,
-    cameraEffect: "default",
     dialogues: [createEmptyDialogueLine(id, 0)]
   }, index);
 }
@@ -318,7 +495,7 @@ export function loadStoredTourData() {
   const storedSpawn = stored.events?.find((event) => event.id === "00") || stored.events?.[0];
   const shouldPersist = isInvalidGuideWorldPosition(storedSpawn?.guidePosition)
     || isImplausibleGuideAltitude(storedSpawn?.guidePosition?.y)
-    || isImplausibleOrbitSpin(stored.orbitSpin);
+    || isImplausibleOrbitSequences(normalized.orbitSequences);
 
   if (shouldPersist) {
     writeStorage(ANGJI_GUIDE_STORAGE_KEY, normalized);
@@ -430,28 +607,99 @@ function repairEventAltitudesAgainstBase(data, base) {
     };
   });
 
-  if (isImplausibleOrbitSpin(next.orbitSpin) || !next.orbitSpin) {
-    next.orbitSpin = deepClone(base?.orbitSpin || DEFAULT_ORBIT_SPIN);
+  if (isImplausibleOrbitSequences(next.orbitSequences)) {
+    next.orbitSequences = normalizeOrbitSequences(base || { orbitSpin: DEFAULT_ORBIT_SPIN });
+    next.orbitSpin = next.orbitSequences[0];
   }
 
   return next;
 }
 
-function pinShippedOrbitSpin(data, base) {
+function isBlankLocalizedBlock(block) {
+  if (!block || typeof block !== "object") {
+    return true;
+  }
+
+  return !String(block.ko || "").trim() && !String(block.en || "").trim();
+}
+
+function pinShippedGuideDefaults(data, base) {
   if (!data || !base) {
     return data;
   }
 
-  if (base.orbitSpin) {
-    data.orbitSpin = deepClone(base.orbitSpin);
+  // Only fill missing/implausible orbit sequences — do not wipe editor-authored lists.
+  if (isImplausibleOrbitSequences(data.orbitSequences)) {
+    data.orbitSequences = normalizeOrbitSequences(base);
+    data.orbitSpin = data.orbitSequences[0];
+  } else if (!Array.isArray(data.orbitSequences) || data.orbitSequences.length === 0) {
+    data.orbitSequences = normalizeOrbitSequences(base);
+    data.orbitSpin = data.orbitSequences[0];
+  } else {
+    data.orbitSpin = data.orbitSequences[0];
   }
 
-  if (base.escPrompt) {
-    data.escPrompt = deepClone(base.escPrompt);
-  }
+  [
+    "transitionPrompt",
+    "declineMessage",
+    "escPrompt",
+    "restartTourPrompt"
+  ].forEach((key) => {
+    if (base[key] && isBlankLocalizedBlock(data[key])) {
+      data[key] = deepClone(base[key]);
+    }
+  });
 
-  if (base.escChoiceLabels) {
+  if (base.escChoiceLabels && !data.escChoiceLabels) {
     data.escChoiceLabels = deepClone(base.escChoiceLabels);
+  }
+
+  // Restore blank dialogue lines from shipped JSON (localStorage wipe / bad sync).
+  if (Array.isArray(base.events) && Array.isArray(data.events)) {
+    const baseById = new Map(base.events.map((event) => [String(event.id), event]));
+
+    data.events = data.events.map((event) => {
+      const fromBase = baseById.get(String(event.id));
+
+      if (!fromBase?.dialogues?.length || !Array.isArray(event.dialogues)) {
+        return event;
+      }
+
+      const baseLines = new Map(fromBase.dialogues.map((line) => [String(line.id), line]));
+      const dialogues = event.dialogues.map((line, index) => {
+        const baseLine = baseLines.get(String(line.id)) || fromBase.dialogues[index];
+
+        if (!baseLine) {
+          return line;
+        }
+
+        const koBlank = !String(line.ko || "").trim();
+        const enBlank = !String(line.en || "").trim();
+
+        if (!koBlank && !enBlank) {
+          return line;
+        }
+
+        return {
+          ...line,
+          ko: koBlank ? String(baseLine.ko || "") : line.ko,
+          en: enBlank ? String(baseLine.en || "") : line.en
+        };
+      });
+
+      // If storage somehow dropped to a single empty line, restore full base set.
+      const onlyEmptyShell = dialogues.length <= 1
+        && !String(dialogues[0]?.ko || "").trim()
+        && !String(dialogues[0]?.en || "").trim()
+        && fromBase.dialogues.length > 1;
+
+      return {
+        ...event,
+        dialogues: onlyEmptyShell
+          ? deepClone(fromBase.dialogues)
+          : dialogues
+      };
+    });
   }
 
   return data;
@@ -472,7 +720,7 @@ export async function loadEffectiveTourData(url = ANGJI_GUIDE_TOUR_DATA_URL) {
       return stored;
     }
 
-    const repaired = pinShippedOrbitSpin(
+    const repaired = pinShippedGuideDefaults(
       repairEventAltitudesAgainstBase(stored, base),
       base
     );
@@ -487,7 +735,7 @@ export async function loadEffectiveTourData(url = ANGJI_GUIDE_TOUR_DATA_URL) {
 
   try {
     const { isGuideTourFirestoreConfigured, loadGuideTourFromFirestore } = await import(
-      "./editor-mode/guide-tour-firestore.js?v=guide-orbit-github-20260903"
+      "./editor-mode/guide-tour-firestore.js?v=guide-base-firestore-20260905"
     );
 
     if (isGuideTourFirestoreConfigured()) {
@@ -495,7 +743,7 @@ export async function loadEffectiveTourData(url = ANGJI_GUIDE_TOUR_DATA_URL) {
 
       if (remote) {
         return base
-          ? pinShippedOrbitSpin(repairEventAltitudesAgainstBase(remote, base), base)
+          ? pinShippedGuideDefaults(repairEventAltitudesAgainstBase(remote, base), base)
           : remote;
       }
     }

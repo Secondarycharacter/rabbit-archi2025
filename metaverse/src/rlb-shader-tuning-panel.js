@@ -22,8 +22,10 @@ import {
   resolveRlbTypeColorTemperatureK,
   resolveRlbTypeSpillColor,
   saveRlbTuningState,
+  setAllRlbShaderEnabled,
+  setRlbTypeShaderEnabled,
   syncSpillColorFromTemperature
-} from "./rlb-shader-tuning.js?v=rlb-shader-proximity-20260819-group-v47";
+} from "./rlb-shader-tuning.js?v=rlb-range-restore-20260907j";
 
 const COLOR_TEMP_FIELD = {
   key: "colorTemperatureK",
@@ -122,19 +124,24 @@ function ensureTypeProfile(tuningState, typeName) {
 }
 
 export function createRlbShaderTuningPanel(options = {}) {
-  const panel = document.getElementById("rlbTuningPanel");
-  const toggleButton = document.getElementById("rlbTuningToggleButton");
-  const tabsRoot = document.getElementById("rlbTuningTabs");
-  const lightsRoot = document.getElementById("rlbTuningLights");
-  const bodyRoot = document.getElementById("rlbTuningBody");
-  const statusEl = document.getElementById("rlbTuningStatus");
-  const saveButton = document.getElementById("rlbTuningSaveButton");
-  const resetButton = document.getElementById("rlbTuningResetButton");
-  const closeButton = document.getElementById("rlbTuningCloseButton");
+  const panel = options.panelEl || document.getElementById("rlbTuningPanel");
+  const toggleButton = options.toggleButton ?? document.getElementById("rlbTuningToggleButton");
+  const tabsRoot = options.tabsRoot || document.getElementById("rlbTuningTabs");
+  const lightsRoot = options.lightsRoot || document.getElementById("rlbTuningLights");
+  const bodyRoot = options.bodyRoot || document.getElementById("rlbTuningBody");
+  const statusEl = options.statusEl || document.getElementById("rlbTuningStatus");
+  const saveButton = options.saveButton || document.getElementById("rlbTuningSaveButton");
+  const resetButton = options.resetButton || document.getElementById("rlbTuningResetButton");
+  const closeButton = options.closeButton || document.getElementById("rlbTuningCloseButton");
 
-  if (!panel || !toggleButton || !tabsRoot || !bodyRoot) {
+  if (!panel || !tabsRoot || !bodyRoot) {
     console.warn("[rlb-tune] panel DOM missing — tuning UI disabled");
-    return { syncVisibility() {}, dispose() {} };
+    return {
+      syncVisibility() {},
+      openPanel() {},
+      closePanel() {},
+      dispose() {}
+    };
   }
 
   let tuningState = ensureRlbGroupState(loadRlbTuningState());
@@ -183,6 +190,33 @@ export function createRlbShaderTuningPanel(options = {}) {
       return;
     }
 
+    // Grouped fixtures (e.g. all OutdoorLight → 잔디등) read group.profile, not
+    // types[type]. Keep both in sync so type-tab sliders still hit the model.
+    if (activeTab && activeTab !== "Global") {
+      if (activeGroupId && tuningState.groups?.[activeGroupId]?.typeName === activeTab) {
+        const group = tuningState.groups[activeGroupId];
+        const sameTypeGroups = Object.values(tuningState.groups || {})
+          .filter((entry) => entry?.typeName === activeTab);
+
+        if (sameTypeGroups.length === 1 && group.profile) {
+          tuningState.types[activeTab] = {
+            ...(tuningState.types[activeTab] || {}),
+            ...group.profile
+          };
+        }
+      } else if (tuningState.types?.[activeTab]) {
+        const typeProfile = tuningState.types[activeTab];
+        Object.values(tuningState.groups || {}).forEach((group) => {
+          if (group?.typeName === activeTab) {
+            group.profile = {
+              ...(group.profile || {}),
+              ...typeProfile
+            };
+          }
+        });
+      }
+    }
+
     glowOptionsSync();
     syncSpillColorFromTemperature(tuningState.global);
     const activeLights = glow.applyTuning?.(tuningState) ?? 0;
@@ -218,8 +252,19 @@ export function createRlbShaderTuningPanel(options = {}) {
     const live = glow?.getTuningState?.();
 
     if (live && live !== tuningState) {
-      Object.assign(live.global, tuningState.global);
-      Object.keys(tuningState.types).forEach((typeName) => {
+      if (!live.global) {
+        live.global = {};
+      }
+
+      if (tuningState.global) {
+        Object.assign(live.global, tuningState.global);
+      }
+
+      if (!live.types) {
+        live.types = {};
+      }
+
+      Object.keys(tuningState.types || {}).forEach((typeName) => {
         live.types[typeName] = {
           ...live.types[typeName],
           ...tuningState.types[typeName]
@@ -230,7 +275,12 @@ export function createRlbShaderTuningPanel(options = {}) {
       live.lightGroups = tuningState.lightGroups;
       tuningState = live;
     }
-    ensureRlbGroupState(tuningState);
+
+    tuningState = ensureRlbGroupState(tuningState);
+
+    if (!tuningState.global) {
+      tuningState.global = createDefaultRlbTuningState().global;
+    }
   };
 
   const refreshUi = ({ restoreScroll = true } = {}) => {
@@ -907,8 +957,25 @@ export function createRlbShaderTuningPanel(options = {}) {
 
   const renderBody = () => {
     bodyRoot.innerHTML = "";
+
+    try {
+      renderBodyContent();
+    } catch (error) {
+      console.error("[rlb-tune] renderBody failed", error);
+      const message = document.createElement("p");
+      message.className = "rlb-tuning-hint";
+      message.textContent = `설정 패널을 표시하지 못했습니다: ${error?.message || error}`;
+      bodyRoot.appendChild(message);
+    }
+  };
+
+  const renderBodyContent = () => {
     const { counts, materialNames, tabs } = readModelTypeInfo();
     ensureActiveTabVisible(tabs);
+
+    if (!tuningState.global) {
+      tuningState.global = createDefaultRlbTuningState().global;
+    }
 
     if (activeTab === "Global") {
       syncSpillColorFromTemperature(tuningState.global);
@@ -929,11 +996,34 @@ export function createRlbShaderTuningPanel(options = {}) {
       preview.append(swatch, previewText);
       bodyRoot.appendChild(preview);
 
+      const allTypes = Object.keys(tuningState.types || {});
+      const allGroups = Object.values(tuningState.groups || {});
+      const allSpillOn = allTypes.every((typeName) => isRlbTypeShaderEnabled(typeName, tuningState))
+        && allGroups.every((group) => group?.profile?.shaderEnabled !== false);
+
+      const masterToggleRow = document.createElement("label");
+      masterToggleRow.className = "rlb-tuning-toggle";
+      const masterToggleInput = document.createElement("input");
+      masterToggleInput.type = "checkbox";
+      masterToggleInput.checked = allSpillOn;
+      const masterToggleText = document.createElement("span");
+      masterToggleText.textContent = "모든 조명 쉐이더 spill 사용";
+      masterToggleRow.append(masterToggleInput, masterToggleText);
+      masterToggleInput.addEventListener("change", () => {
+        setAllRlbShaderEnabled(tuningState, masterToggleInput.checked);
+        refreshUi();
+        applyLive();
+        setStatus(masterToggleInput.checked
+          ? "모든 종류·그룹 spill을 켰습니다. 저장을 눌러 야간모드에 유지하세요."
+          : "모든 종류·그룹 spill을 껐습니다. 저장을 눌러 야간모드에 유지하세요.");
+      });
+      bodyRoot.appendChild(masterToggleRow);
+
       const totalFixtures = Object.values(counts).reduce((sum, count) => sum + count, 0);
       const hint = document.createElement("p");
       hint.className = "rlb-tuning-hint";
       hint.textContent = totalFixtures > 0
-        ? "Global: spill 혼합·기본 색온도. 왼쪽 목록을 스크롤해 조명 이름을 확인하고, 클릭하면 모델에서 해당 이름이 커집니다."
+        ? "Global: spill 혼합·기본 색온도. 종류 탭의 spill 해제는 해당 종류 그룹에도 함께 적용됩니다. 저장 후 야간모드에 반영됩니다."
         : "모델에 RLB 조명 재질이 없습니다.";
       bodyRoot.appendChild(hint);
       return;
@@ -971,6 +1061,17 @@ export function createRlbShaderTuningPanel(options = {}) {
         ? `${formatRlbTuningTabLabel(activeTab, counts[activeTab])} · 재질 예: ${sampleMaterial}`
         : formatRlbTuningTabLabel(activeTab, counts[activeTab]));
     bodyRoot.appendChild(header);
+
+    if (!editingGroup) {
+      const groupCount = getRlbGroupsForType(tuningState, activeTab).length;
+
+      if (groupCount > 0) {
+        const groupHint = document.createElement("p");
+        groupHint.className = "rlb-tuning-hint";
+        groupHint.textContent = `이 종류는 그룹 ${groupCount}개가 있습니다. 슬라이더 변경은 해당 그룹 설정에도 같이 반영됩니다.`;
+        bodyRoot.appendChild(groupHint);
+      }
+    }
 
     if (editingGroup) {
       const groupBar = document.createElement("div");
@@ -1024,7 +1125,13 @@ export function createRlbShaderTuningPanel(options = {}) {
     toggleText.textContent = "쉐이더 spill 사용";
     toggleRow.append(toggleInput, toggleText);
     toggleInput.addEventListener("change", () => {
-      profile.shaderEnabled = toggleInput.checked;
+      if (editingGroup) {
+        profile.shaderEnabled = toggleInput.checked;
+      } else {
+        // Type tab is a master switch: also flip every group under this type.
+        setRlbTypeShaderEnabled(tuningState, activeTab, toggleInput.checked);
+      }
+
       refreshUi();
       applyLive();
     });
@@ -1192,20 +1299,36 @@ export function createRlbShaderTuningPanel(options = {}) {
     hint.textContent = controlsDisabled
       ? (editingGroup
         ? "이 그룹 spill이 꺼져 있습니다. fixture emissive만 유지됩니다."
-        : "이 조명 종류의 spill 쉐이더가 꺼져 있습니다. fixture emissive만 유지됩니다.")
+        : "이 조명 종류의 spill 쉐이더가 꺼져 있습니다(그룹 포함). fixture emissive만 유지됩니다.")
       : (editingGroup
         ? "이 그룹에 속한 조명은 모두 같은 반경·배율·색온도·외곽 설정을 씁니다."
-        : "미분류 조명: 종류 기본값. 왼쪽에서 선택 후 그룹 만들기로 같은 종류도 따로 맞출 수 있습니다.");
+        : "종류 기본값입니다. spill 해제 시 이 종류의 모든 그룹에도 함께 꺼집니다. 저장 후 야간모드에 반영됩니다.");
     bodyRoot.appendChild(hint);
+  };
+
+  const normalizePanelTuningState = (nextState) => {
+    const defaults = createDefaultRlbTuningState();
+    const state = ensureRlbGroupState(nextState);
+
+    state.global = {
+      ...defaults.global,
+      ...(state.global || {})
+    };
+    state.types = {
+      ...defaults.types,
+      ...(state.types || {})
+    };
+
+    return state;
   };
 
   const openPanel = () => {
     const glow = getGlow();
 
     if (glow?.getTuningState?.()) {
-      tuningState = ensureRlbGroupState(glow.getTuningState());
+      tuningState = normalizePanelTuningState(glow.getTuningState());
     } else {
-      tuningState = ensureRlbGroupState(loadRlbTuningState());
+      tuningState = normalizePanelTuningState(loadRlbTuningState());
       glow?.applyTuning?.(tuningState);
     }
 
@@ -1218,16 +1341,29 @@ export function createRlbShaderTuningPanel(options = {}) {
     }
 
     panelOpen = true;
-    refreshUi({ restoreScroll: false });
     panel.hidden = false;
+    refreshUi({ restoreScroll: false });
     getGlow()?.setPreviewActive?.(true);
     getGlow()?.setNameLabelsVisible?.(true);
     applyLive();
+
+    // Percentage heights (popup body) stay 0 if laid out while [hidden]/display:none.
+    requestAnimationFrame(() => {
+      if (!panelOpen) {
+        return;
+      }
+
+      refreshUi({ restoreScroll: true });
+    });
   };
 
   const closePanel = () => {
     panelOpen = false;
-    panel.hidden = true;
+
+    if (!options.embeddedMode) {
+      panel.hidden = true;
+    }
+
     focusedLightId = null;
     getGlow()?.setHoveredLight?.(null);
     getGlow()?.setFocusedLight?.(null);
@@ -1238,7 +1374,9 @@ export function createRlbShaderTuningPanel(options = {}) {
   const syncVisibility = () => {
     const available = options.isAvailable?.() !== false;
 
-    toggleButton.hidden = !available;
+    if (toggleButton) {
+      toggleButton.hidden = !available;
+    }
 
     if (!available) {
       closePanel();
@@ -1250,7 +1388,7 @@ export function createRlbShaderTuningPanel(options = {}) {
     }
   };
 
-  toggleButton.addEventListener("click", () => {
+  toggleButton?.addEventListener("click", () => {
     if (panel.hidden) {
       openPanel();
       return;

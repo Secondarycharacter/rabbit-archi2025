@@ -225,11 +225,12 @@ body.walk-mode-active .project-overview {
 
 .hud__bottom {
   bottom: 20px;
+  display: none !important;
 }
 
 .hud__top strong {
   display: block;
-  font-size: 18px;
+  font-size: 22.5px;
   letter-spacing: 0.08em;
 }
 
@@ -244,11 +245,13 @@ body.walk-mode-active .project-overview {
   display: none !important;
 }
 
-body.local-dev .hud__actions .local-dev-only {
+body.local-dev .hud__actions .local-dev-only,
+body.is-editor-mode .hud__actions .local-dev-only {
   display: inline-block !important;
 }
 
-body.local-dev aside.debug-panel.local-dev-only {
+body.local-dev aside.debug-panel.local-dev-only,
+body.is-editor-mode aside.debug-panel.local-dev-only {
   display: block;
 }
 
@@ -306,6 +309,32 @@ aside.debug-panel.local-dev-only[hidden] {
   pointer-events: auto;
 }
 
+body.guide-tour-lock .hud__actions,
+body.guide-tour-lock .sun-panel,
+body.guide-tour-lock .debug-panel,
+body.guide-tour-lock .overview-admin-trigger,
+body.guide-tour-lock .overview-admin-panel,
+body.guide-tour-lock .editor-mode-badge,
+body.guide-tour-lock .model-switcher,
+body.guide-orbit-lock .hud__actions,
+body.guide-orbit-lock .sun-panel,
+body.guide-orbit-lock .debug-panel,
+body.guide-orbit-lock .overview-admin-trigger,
+body.guide-orbit-lock .overview-admin-panel,
+body.guide-orbit-lock .editor-mode-badge,
+body.guide-orbit-lock .model-switcher {
+  pointer-events: none !important;
+}
+
+body.guide-orbit-lock::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
+  pointer-events: auto;
+  cursor: default;
+}
+
 .hud__center {
   position: absolute;
   left: 50%;
@@ -332,7 +361,7 @@ aside.debug-panel.local-dev-only[hidden] {
 .project-overview h2 {
   margin: 0 0 14px;
   font-family: "Nanum Gothic", Arial, sans-serif;
-  font-size: 12pt;
+  font-size: 15pt;
   font-weight: 800;
   line-height: 1.3;
 }
@@ -346,7 +375,7 @@ aside.debug-panel.local-dev-only[hidden] {
   padding: 14px 16px;
   border-radius: 12px;
   background: rgba(0, 0, 0, 0.15);
-  font-size: 10pt;
+  font-size: 12.5pt;
   line-height: 1.18;
 }
 
@@ -354,7 +383,7 @@ aside.debug-panel.local-dev-only[hidden] {
 .project-overview dd {
   margin: 0;
   font-family: "Nanum Gothic", Arial, sans-serif;
-  font-size: 10pt;
+  font-size: 12.5pt;
   font-weight: 400;
   line-height: 1.18;
 }
@@ -370,16 +399,8 @@ aside.debug-panel.local-dev-only[hidden] {
   white-space: pre-line;
 }
 
-.hud__stats {
-  display: flex;
-  gap: 12px;
-}
-
-.hud__stats span,
 #statusMessage {
-  border-radius: 12px;
-  padding: 8px 12px;
-  background: rgba(0, 0, 0, 0.45);
+  display: none !important;
 }
 
 .tour-reset-fade {
@@ -445,7 +466,7 @@ aside.debug-panel.local-dev-only[hidden] {
 .overview-admin-trigger {
   position: fixed;
   right: 24px;
-  bottom: 24px;
+  bottom: 72px;
   z-index: 130;
   width: 46px;
   height: 34px;
@@ -458,45 +479,360 @@ aside.debug-panel.local-dev-only[hidden] {
 }
 
 .overview-admin-panel {
+  --oa-fs-title: 15px;
+  --oa-fs-section: 13px;
+  --oa-fs-label: 11px;
+  --oa-fs-body: 12px;
+  --oa-fs-hint: 10.5px;
+  --oa-fs-button: 11px;
   position: fixed;
   right: 24px;
-  bottom: 70px;
+  bottom: 118px;
   z-index: 140;
+  display: flex;
+  flex-direction: column;
   width: min(520px, calc(100vw - 48px));
-  max-height: min(720px, calc(100vh - 110px));
-  overflow: auto;
+  max-height: min(720px, calc(100vh - 160px));
+  overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.24);
   border-radius: 12px;
-  padding: 10px;
   background: rgba(5, 9, 17, 0.94);
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
   color: #fff;
-  font-size: 11px;
+  font-size: var(--oa-fs-body);
+  line-height: 1.35;
   pointer-events: auto;
 }
 
-.overview-admin-panel header,
-.overview-admin-actions {
+.overview-admin-panel[hidden] {
+  display: none !important;
+}
+
+.basic-settings {
+  --bs-fs-title: 13px;
+  --bs-fs-label: 11px;
+  --bs-fs-body: 12px;
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 135;
+  width: min(280px, calc(100vw - 48px));
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 14px;
+  background: rgba(6, 10, 18, 0.92);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
+  color: #fff;
+  pointer-events: auto;
+  overflow: hidden;
+}
+
+.basic-settings__toggle {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0;
+  padding: 10px 14px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
+
+.basic-settings__toggle-label {
+  font-size: var(--bs-fs-title);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.basic-settings__toggle-icon {
+  font-size: 12px;
+  opacity: 0.75;
+  transition: transform 0.18s ease;
+}
+
+.basic-settings.is-open .basic-settings__toggle-icon {
+  transform: rotate(180deg);
+}
+
+.basic-settings__body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 14px 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.basic-settings__body[hidden] {
+  display: none !important;
+}
+
+.basic-settings__field {
+  display: grid;
+  grid-template-columns: 48px 1fr minmax(40px, auto) auto;
+  gap: 6px 8px;
+  align-items: center;
+  margin-top: 2px;
+}
+
+.basic-settings__field.is-muted input[type="range"] {
+  opacity: 0.45;
+}
+
+.basic-settings__field.is-muted strong {
+  opacity: 0.55;
+}
+
+.basic-settings__field-label {
+  font-size: var(--bs-fs-label);
+  opacity: 0.82;
+  cursor: pointer;
+}
+
+.basic-settings__field input[type="range"] {
+  width: 100%;
+  min-width: 0;
+  accent-color: #7eb0ff;
+}
+
+.basic-settings__field strong {
+  font-size: var(--bs-fs-label);
+  font-weight: 600;
+  text-align: right;
+  white-space: nowrap;
+  opacity: 0.9;
+}
+
+.basic-settings__mute {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  font-size: 10.5px;
+  white-space: nowrap;
+  cursor: pointer;
+  opacity: 0.9;
+}
+
+.basic-settings__mute input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: #7eb0ff;
+}
+
+.basic-settings__check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0 0;
+  font-size: var(--bs-fs-body);
+  cursor: pointer;
+}
+
+.basic-settings__check input {
+  width: 15px;
+  height: 15px;
+  accent-color: #7eb0ff;
+}
+
+.control-tips {
+  --ct-fs-title: 16px;
+  --ct-fs-subtitle: 12px;
+  --ct-fs-key: 14px;
+  --ct-fs-desc: 13px;
+  --ct-fs-pending: 12px;
+  --ct-color: #111;
+  --ct-color-muted: #666;
+  --ct-color-pending: #9a9a9a;
+  --ct-col-gap: 16px;
+  --ct-row-gap: 4px;
+  position: fixed;
+  left: 20px;
+  bottom: 24px;
+  z-index: 120;
+  width: max-content;
+  max-width: min(440px, calc(100vw - 40px));
+  max-height: min(60vh, 520px);
+  overflow: auto;
+  padding: 12px 16px;
+  border: none;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.75);
+  box-shadow: none;
+  color: var(--ct-color);
+  pointer-events: none;
+  scrollbar-width: thin;
+}
+
+.control-tips[hidden] {
+  display: none !important;
+}
+
+.control-tips__block {
+  display: grid;
+  grid-template-columns: max-content max-content;
+  column-gap: var(--ct-col-gap);
+  row-gap: var(--ct-row-gap);
+  align-items: baseline;
+}
+
+.control-tips__title {
+  grid-column: 1 / -1;
+  margin: 0 0 4px;
+  font-size: var(--ct-fs-title);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--ct-color);
+}
+
+.control-tips__subtitle {
+  grid-column: 1 / -1;
+  margin: 8px 0 0;
+  font-size: var(--ct-fs-subtitle);
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ct-color-muted);
+}
+
+.control-tips__list {
+  display: contents;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.control-tips__list li {
+  display: contents;
+  color: var(--ct-color);
+}
+
+.control-tips__key {
+  grid-column: 1;
+  font-size: var(--ct-fs-key);
+  font-weight: 650;
+  color: var(--ct-color);
+  white-space: nowrap;
+}
+
+.control-tips__desc {
+  grid-column: 2;
+  font-size: var(--ct-fs-desc);
+  font-weight: 400;
+  color: var(--ct-color);
+  white-space: nowrap;
+}
+
+.control-tips__list li.is-pending,
+.control-tips__list li.is-pending .control-tips__key,
+.control-tips__list li.is-pending .control-tips__desc {
+  color: var(--ct-color-pending);
+  opacity: 1;
+}
+
+.control-tips__list li.is-pending em {
+  font-style: normal;
+  font-size: var(--ct-fs-pending);
+  color: var(--ct-color-pending);
+}
+
+.control-tips__block.is-active .control-tips__title {
+  color: var(--ct-color);
+}
+
+.control-tips__block:not(.is-active),
+.control-tips__block[hidden] {
+  display: none !important;
+}
+
+body.guide-tour-lock .basic-settings,
+body.guide-orbit-lock .basic-settings,
+body.guide-tour-lock .control-tips,
+body.guide-orbit-lock .control-tips {
+  pointer-events: none !important;
+  opacity: 0.35;
+}
+
+.overview-admin-panel__header {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 6px;
+  gap: 8px;
+  padding: 10px 12px 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(5, 9, 17, 0.98);
+}
+
+.overview-admin-panel__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 10px 12px 12px;
+  overscroll-behavior: contain;
 }
 
 .overview-admin-panel h2 {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--oa-fs-title);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1.25;
 }
 
-#overviewAdminCloseButton,
-#overviewAdminAddRowButton,
-.overview-admin-panel button[type="submit"] {
+.overview-admin-section {
+  margin: 0 0 14px;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.overview-admin-section__title {
+  margin: 0 0 8px;
+  font-size: var(--oa-fs-section);
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.overview-admin-field {
+  display: grid;
+  gap: 4px;
+  margin: 0 0 8px;
+}
+
+.overview-admin-field > span {
+  font-size: var(--oa-fs-label);
+  line-height: 1.2;
+  opacity: 0.82;
+}
+
+.overview-admin-hint {
+  margin: 0;
+  color: rgba(173, 200, 255, 0.86);
+  font-size: var(--oa-fs-hint);
+  line-height: 1.35;
+}
+
+.overview-admin-status {
+  margin: 0;
+  color: #adc8ff;
+  font-size: var(--oa-fs-hint);
+  line-height: 1.35;
+}
+
+.overview-admin-panel button {
   border: 1px solid rgba(255, 255, 255, 0.32);
   border-radius: 999px;
   padding: 5px 10px;
   background: rgba(36, 52, 86, 0.92);
   color: #fff;
   cursor: pointer;
+  font-size: var(--oa-fs-button);
+  line-height: 1.2;
 }
 
 #overviewAdminCloseButton {
@@ -505,58 +841,52 @@ aside.debug-panel.local-dev-only[hidden] {
   padding: 0;
   font-size: 20px;
   line-height: 28px;
-}
-
-.overview-admin-passcode {
-  display: grid;
-  gap: 3px;
-  margin: 7px 0 5px;
-  font-size: 10px;
+  flex: 0 0 auto;
 }
 
 .overview-admin-panel input,
 .overview-admin-panel textarea {
   width: 100%;
+  box-sizing: border-box;
   border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: 8px;
-  padding: 1.5px 7px;
+  padding: 5px 8px;
   background: rgba(255, 255, 255, 0.08);
   color: #fff;
   font-family: inherit;
-  font-size: 12px;
-  line-height: 18px;
+  font-size: var(--oa-fs-body);
+  line-height: 1.35;
 }
 
 .overview-admin-row {
   display: grid;
   grid-template-columns: 110px 1fr auto;
-  gap: 4px;
-  margin-top: 3px;
+  gap: 6px;
+  margin-top: 6px;
 }
 
 .overview-admin-row textarea {
-  min-height: 23px;
+  min-height: 28px;
   resize: vertical;
 }
 
 .overview-admin-row button {
   align-self: start;
-  border: 0;
   border-radius: 8px;
-  padding: 4px 7px;
+  border-color: transparent;
   background: rgba(150, 50, 50, 0.82);
-  color: #fff;
-  cursor: pointer;
 }
 
 .overview-admin-actions {
-  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 10px;
 }
 
-#overviewAdminStatus {
-  margin: 6px 0 0;
-  color: #adc8ff;
-  font-size: 10px;
+.overview-admin-password-form .overview-admin-actions {
+  justify-content: flex-start;
 }
 
 .debug-panel {
@@ -690,6 +1020,13 @@ aside.debug-panel.local-dev-only[hidden] {
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
+}
+
+/* Keep 조작방법 / 기본설정 with HUD: they sit above the loading overlay (z>30),
+   so hide them until LOADING finishes instead of showing over the progress screen. */
+body:has(#metaverseLoading:not(.is-hidden)) .basic-settings,
+body:has(#metaverseLoading:not(.is-hidden)) .control-tips {
+  display: none !important;
 }
 
 .metaverse-loading__content {
@@ -1366,15 +1703,42 @@ aside.debug-panel.local-dev-only[hidden] {
 
 .guide-dialog-choices[hidden],
 .guide-dialog-bubble[hidden],
-.guide-dialog-subtitle[hidden] {
+.guide-dialog-subtitle[hidden],
+.editor-event-prompt[hidden] {
   display: none !important;
+}
+
+.editor-event-prompt {
+  position: fixed;
+  left: 50%;
+  bottom: 96px;
+  z-index: 2440;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 10px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  background: rgba(8, 12, 20, 0.88);
+  color: #e8eef8;
+  font-size: 14px;
+  line-height: 1.4;
+  pointer-events: none;
+  letter-spacing: 0.02em;
+}
+
+#editorEventDialog.guide-dialog-bubble {
+  left: 50%;
+  top: auto;
+  bottom: 148px;
+  transform: translateX(-50%);
 }
 
 /* Guest manager panel */
 .npc-manager-panel {
   position: fixed;
   top: 72px;
-  left: 24px;
+  right: 24px;
+  left: auto;
   z-index: 2600;
   width: min(980px, calc(100vw - 48px));
   max-height: calc(100vh - 96px);
@@ -1386,6 +1750,19 @@ aside.debug-panel.local-dev-only[hidden] {
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
   color: #e8eef8;
   overflow: hidden;
+  pointer-events: auto;
+  --nm-fs-title: 15px;
+  --nm-fs-section: 14px;
+  --nm-fs-sub: 12.5px;
+  --nm-fs-label: 11px;
+  --nm-fs-body: 12px;
+  --nm-fs-meta: 10.5px;
+  --nm-fs-hint: 10.5px;
+  --nm-control-pad-y: 2px;
+  --nm-control-pad-x: 6px;
+  --nm-control-line: 1.25;
+  font-size: var(--nm-fs-body);
+  line-height: 1.35;
 }
 
 .npc-manager-panel[hidden] {
@@ -1410,7 +1787,9 @@ aside.debug-panel.local-dev-only[hidden] {
 .npc-manager-panel__header h2 {
   margin: 0;
   flex: 1;
-  font-size: 15px;
+  font-size: var(--nm-fs-title);
+  font-weight: 700;
+  letter-spacing: 0.01em;
 }
 
 .npc-manager-panel__close {
@@ -1438,6 +1817,264 @@ aside.debug-panel.local-dev-only[hidden] {
   padding: 12px;
 }
 
+.guide-manager-panel .npc-manager-panel__editor {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.guide-manager-editor-layout {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  gap: 10px;
+  overflow: hidden;
+}
+
+.guide-manager-section--common {
+  flex: 3 1 0;
+  min-height: 0;
+  max-height: none;
+  overflow: auto;
+  margin-bottom: 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.guide-manager-section--script {
+  flex: 7 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 0;
+  overflow: hidden;
+}
+
+.guide-manager-section__fixed-title {
+  flex: 0 0 auto;
+  margin: 0 0 6px;
+  font-size: var(--gm-fs-section);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1.25;
+}
+
+.guide-manager-script-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.guide-manager-event-form {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.guide-manager-event-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex: 0 0 auto;
+  margin: 0;
+}
+
+.guide-manager-event-head__heading {
+  margin: 0;
+  font-size: var(--gm-fs-sub);
+  font-weight: 650;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.guide-manager-readonly-pose {
+  font-size: var(--gm-fs-meta);
+  line-height: 1.3;
+  margin: 0;
+  opacity: 0.72;
+}
+
+.guide-manager-section--event {
+  flex: 0 0 auto;
+  margin-bottom: 0;
+}
+
+.guide-manager-section--dialogues {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 0;
+}
+
+.guide-manager-script-body .guide-manager-lines__toolbar {
+  flex: 0 0 auto;
+  margin-bottom: 0;
+}
+
+.guide-manager-script-body .guide-manager-lines__toolbar h4 {
+  margin: 0;
+  font-size: var(--gm-fs-sub);
+  font-weight: 650;
+}
+
+.guide-manager-script-body .guide-manager-dialog-list {
+  flex: 1 1 auto;
+  min-height: 120px;
+}
+
+.guide-manager-common-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.guide-manager-common-prompts {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.guide-manager-common-prompt h4 {
+  margin: 0 0 4px;
+  font-size: var(--gm-fs-label);
+  opacity: 0.9;
+}
+
+.guide-manager-common-prompt__stack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.guide-manager-common-prompt__stack .npc-manager-field {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+}
+
+.guide-manager-common-prompt__stack .npc-manager-field > span {
+  flex: none;
+  min-width: 0;
+  font-size: var(--gm-fs-label);
+  opacity: 0.8;
+}
+
+.guide-manager-common-prompt__stack .npc-manager-field textarea {
+  width: 100%;
+  min-height: calc(var(--gm-control-line) * 2em + (var(--gm-control-pad-y) * 2) + 2px);
+  resize: vertical;
+  font: inherit;
+  color: inherit;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 5px;
+  padding: var(--gm-control-pad-y) var(--gm-control-pad-x);
+  line-height: var(--gm-control-line);
+}
+
+.guide-manager-section--common > h3 {
+  font-size: var(--gm-fs-section);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.guide-manager-orbit-action-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: minmax(40px, 1fr);
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.guide-manager-orbit-action-grid button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  min-height: 40px;
+  margin: 0;
+  padding: 6px 8px;
+  text-align: center;
+  white-space: normal;
+  line-height: 1.25;
+  font-size: var(--gm-fs-label);
+  box-sizing: border-box;
+}
+
+.guide-manager-field-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.guide-manager-field-block__label {
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+.guide-manager-clip-sequence {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.guide-manager-clip-sequence__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.guide-manager-clip-row {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto auto auto;
+  gap: 6px;
+  align-items: center;
+}
+
+.guide-manager-clip-row__index {
+  font-size: 11px;
+  opacity: 0.7;
+  text-align: center;
+}
+
+.guide-manager-clip-row select,
+.guide-manager-clip-sequence__add select {
+  width: 100%;
+  min-width: 0;
+  font: inherit;
+  color: inherit;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 5px;
+  padding: var(--gm-control-pad-y) var(--gm-control-pad-x);
+  line-height: var(--gm-control-line);
+  font-size: var(--gm-fs-body);
+  min-height: 0;
+  height: calc(var(--gm-control-line) * 1em + (var(--gm-control-pad-y) * 2) + 2px);
+}
+
+.guide-manager-clip-sequence__add {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: center;
+}
+
+.guide-manager-clip-row button[disabled] {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
 .npc-manager-panel__list {
   border-right: 1px solid rgba(255, 255, 255, 0.1);
 }
@@ -1449,6 +2086,17 @@ aside.debug-panel.local-dev-only[hidden] {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.npc-manager-panel:not(.guide-manager-panel) .npc-manager-panel__footer button,
+.npc-manager-panel:not(.guide-manager-panel) .npc-manager-panel__list-toolbar button,
+.npc-manager-panel:not(.guide-manager-panel) .npc-manager-dialog-toolbar button,
+.npc-manager-panel:not(.guide-manager-panel) .npc-manager-dialog-actions button,
+.npc-manager-panel:not(.guide-manager-panel) .npc-manager-dialog-list button {
+  font-size: var(--nm-fs-label);
+  padding: 4px 8px;
+  line-height: 1.2;
+  border-radius: 6px;
 }
 
 .npc-manager-panel button,
@@ -1476,11 +2124,102 @@ aside.debug-panel.local-dev-only[hidden] {
   background: rgba(180, 60, 60, 0.25) !important;
 }
 
+.npc-manager-form__heading {
+  margin: 0 0 10px;
+  font-size: var(--nm-fs-section);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.npc-manager-section {
+  margin: 0 0 14px;
+  padding: 10px 10px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.npc-manager-section__title {
+  margin: 0 0 8px;
+  font-size: var(--nm-fs-sub);
+  font-weight: 650;
+  line-height: 1.25;
+}
+
+.npc-manager-section--flow {
+  border-color: rgba(90, 150, 255, 0.22);
+}
+
+.npc-manager-panel:not(.guide-manager-panel) .npc-manager-field {
+  font-size: var(--nm-fs-body);
+}
+
+.npc-manager-panel:not(.guide-manager-panel) .npc-manager-field > span {
+  font-size: var(--nm-fs-label);
+  line-height: 1.2;
+  opacity: 0.82;
+}
+
+.npc-manager-panel:not(.guide-manager-panel) .npc-manager-field input[type="text"],
+.npc-manager-panel:not(.guide-manager-panel) .npc-manager-field input[type="number"],
+.npc-manager-panel:not(.guide-manager-panel) .npc-manager-field select,
+.npc-manager-panel:not(.guide-manager-panel) .npc-manager-field textarea {
+  padding: var(--nm-control-pad-y) var(--nm-control-pad-x);
+  line-height: var(--nm-control-line);
+  font-size: var(--nm-fs-body);
+  border-radius: 5px;
+}
+
+.npc-manager-panel:not(.guide-manager-panel) .guide-manager-hint,
+.npc-manager-panel:not(.guide-manager-panel) .npc-manager-empty {
+  font-size: var(--nm-fs-hint);
+  opacity: 0.85;
+}
+
 .npc-manager-summary table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 11px;
+  font-size: var(--nm-fs-meta);
   margin-bottom: 12px;
+}
+
+.npc-manager-summary tr[data-event-id] {
+  cursor: pointer;
+}
+
+.guide-manager-event-list__title {
+  margin: 0;
+  font-size: var(--gm-fs-sub);
+  font-weight: 650;
+}
+
+.guide-manager-event-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.guide-manager-event-toolbar__actions {
+  display: flex;
+  gap: 6px;
+}
+
+.guide-manager-event-toolbar__actions button[disabled] {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.guide-manager-dialog-set__actions {
+  margin-left: auto;
+  display: flex;
+  gap: 4px;
+}
+
+.guide-manager-dialog-set__actions button[disabled] {
+  opacity: 0.35;
+  cursor: not-allowed;
 }
 
 .npc-manager-summary th,
@@ -1534,6 +2273,7 @@ aside.debug-panel.local-dev-only[hidden] {
 
 .npc-manager-field input[type="text"],
 .npc-manager-field input[type="number"],
+.npc-manager-field select,
 .npc-manager-field textarea {
   width: 100%;
   box-sizing: border-box;
@@ -1560,15 +2300,189 @@ aside.debug-panel.local-dev-only[hidden] {
   }
 }
 
+.npc-manager-summary tr[data-guest-id] {
+  cursor: pointer;
+}
+
+.npc-manager-guest-list__title {
+  margin: 12px 0 8px;
+  font-size: var(--nm-fs-sub);
+  font-weight: 650;
+}
+
 .guide-manager-panel {
   width: min(1180px, 96vw);
+  --gm-fs-title: 15px;
+  --gm-fs-section: 14px;
+  --gm-fs-sub: 12.5px;
+  --gm-fs-label: 11px;
+  --gm-fs-body: 12px;
+  --gm-fs-meta: 10.5px;
+  --gm-fs-hint: 10.5px;
+  --gm-control-pad-y: 2px;
+  --gm-control-pad-x: 6px;
+  --gm-control-line: 1.25;
+  font-size: var(--gm-fs-body);
+  line-height: 1.35;
+}
+
+.guide-manager-panel .npc-manager-panel__header h2 {
+  font-size: var(--gm-fs-title);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.guide-manager-panel .npc-manager-panel__footer button,
+.guide-manager-panel .npc-manager-panel__list-toolbar button,
+.guide-manager-panel .guide-manager-dialog-toolbar button,
+.guide-manager-panel .guide-manager-event-toolbar__actions button,
+.guide-manager-panel .guide-manager-inline-actions button,
+.guide-manager-panel .guide-manager-clip-row button,
+.guide-manager-panel .guide-manager-clip-sequence__add button {
+  font-size: var(--gm-fs-label);
+  padding: 4px 8px;
+  line-height: 1.2;
+  border-radius: 6px;
+}
+
+.guide-manager-panel .npc-manager-field,
+.guide-manager-panel .guide-manager-dialog-set__field {
+  font-size: var(--gm-fs-body);
+}
+
+.guide-manager-panel .npc-manager-field > span,
+.guide-manager-panel .guide-manager-dialog-set__field > span,
+.guide-manager-panel .guide-manager-field-block__label,
+.guide-manager-panel .guide-manager-base-select span {
+  font-size: var(--gm-fs-label);
+  line-height: 1.2;
+  opacity: 0.82;
+}
+
+.guide-manager-panel .npc-manager-field input[type="text"],
+.guide-manager-panel .npc-manager-field input[type="number"],
+.guide-manager-panel .npc-manager-field select,
+.guide-manager-panel .npc-manager-field textarea,
+.guide-manager-panel .guide-manager-dialog-set__field textarea,
+.guide-manager-panel .guide-manager-clip-row select,
+.guide-manager-panel .guide-manager-clip-sequence__add select,
+.guide-manager-panel .guide-manager-base-select select {
+  padding: var(--gm-control-pad-y) var(--gm-control-pad-x);
+  line-height: var(--gm-control-line);
+  font-size: var(--gm-fs-body);
+  border-radius: 5px;
+  min-height: 0;
+}
+
+.guide-manager-panel textarea {
+  min-height: calc(var(--gm-control-line) * 1em + (var(--gm-control-pad-y) * 2) + 2px);
+  field-sizing: fixed;
+  max-height: 9.5em;
+  overflow-y: auto;
+  resize: vertical;
+}
+
+.guide-manager-panel .guide-manager-common-prompt__stack .npc-manager-field textarea,
+.guide-manager-panel .guide-manager-dialog-set__field textarea {
+  field-sizing: fixed;
+  min-height: calc(var(--gm-control-line) * 2em + (var(--gm-control-pad-y) * 2) + 2px);
+}
+
+.guide-manager-panel input[type="text"],
+.guide-manager-panel input[type="number"],
+.guide-manager-panel select {
+  height: calc(var(--gm-control-line) * 1em + (var(--gm-control-pad-y) * 2) + 2px);
 }
 
 .guide-manager-global-form h3,
 .guide-manager-section h3,
 .guide-manager-section h4 {
-  margin: 0 0 8px;
-  font-size: 13px;
+  margin: 0 0 6px;
+  font-size: var(--gm-fs-sub);
+  font-weight: 650;
+  line-height: 1.25;
+}
+
+.guide-manager-section--common > h3,
+.guide-manager-section__fixed-title {
+  margin: 0 0 6px;
+  font-size: var(--gm-fs-section);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1.25;
+}
+
+.guide-manager-event-head h3 {
+  margin: 0;
+  flex: 0 0 auto;
+  font-size: var(--gm-fs-section);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1.25;
+}
+
+.guide-manager-event-head__title {
+  margin: 0;
+  flex: 1 1 auto;
+  text-align: left;
+  font-size: calc(var(--gm-fs-section) - 1px);
+  font-weight: 650;
+  opacity: 0.92;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.25;
+}
+
+.guide-manager-lines__toolbar h3,
+.guide-manager-event-list__title {
+  font-size: var(--gm-fs-sub);
+  font-weight: 650;
+}
+
+.guide-manager-common-prompt h4,
+.guide-manager-orbit-pose-col__title {
+  margin: 0 0 4px;
+  font-size: var(--gm-fs-label);
+  font-weight: 650;
+  opacity: 0.9;
+  line-height: 1.2;
+}
+
+.guide-manager-details__title {
+  font-size: var(--gm-fs-sub);
+  font-weight: 650;
+}
+
+.guide-manager-hint,
+.guide-manager-hint--global {
+  margin: 6px 0 0;
+  font-size: var(--gm-fs-hint);
+  opacity: 0.7;
+  line-height: 1.35;
+}
+
+.guide-manager-badge {
+  font-size: var(--gm-fs-meta);
+  padding: 1px 6px;
+  line-height: 1.2;
+}
+
+.guide-manager-dialog-set__head strong {
+  font-size: var(--gm-fs-sub);
+  font-weight: 650;
+  line-height: 1.2;
+}
+
+.guide-manager-readonly-pose {
+  font-size: var(--gm-fs-meta);
+  line-height: 1.3;
+  margin: 0;
+  opacity: 0.72;
+}
+
+.npc-manager-summary table {
+  font-size: var(--gm-fs-meta);
 }
 
 .guide-manager-grid {
@@ -1577,19 +2491,272 @@ aside.debug-panel.local-dev-only[hidden] {
   gap: 8px;
 }
 
+.guide-manager-global-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.guide-manager-global-form .guide-manager-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 12px;
+}
+
+.guide-manager-global-form .npc-manager-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  grid-template-columns: none;
+  min-width: 0;
+}
+
+.guide-manager-global-form .npc-manager-field > span {
+  flex: 0 1 auto;
+  max-width: 58%;
+  line-height: 1.3;
+  word-break: keep-all;
+}
+
+.guide-manager-global-form .npc-manager-field input,
+.guide-manager-global-form .npc-manager-field select,
+.guide-manager-global-form .npc-manager-field textarea {
+  flex: 1 1 72px;
+  width: auto;
+  min-width: 72px;
+  max-width: 160px;
+  padding: var(--gm-control-pad-y) var(--gm-control-pad-x);
+  line-height: var(--gm-control-line);
+  font-size: var(--gm-fs-body);
+  border-radius: 5px;
+}
+
+.guide-manager-global-form .npc-manager-field textarea {
+  max-width: none;
+  min-height: calc(var(--gm-control-line) * 2em + (var(--gm-control-pad-y) * 2) + 2px);
+}
+
+.guide-manager-global-form .npc-manager-field input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  max-width: 16px;
+  flex: 0 0 16px;
+  margin: 0;
+  justify-self: start;
+  accent-color: #5a96ff;
+}
+
+.guide-manager-global-form .guide-manager-details {
+  margin-top: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.guide-manager-global-form .guide-manager-details summary {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  width: max-content;
+  max-width: 100%;
+  margin: 0 0 8px;
+  padding: 2px 0;
+  font-size: 12px;
+  font-weight: 600;
+  list-style: none;
+  cursor: pointer;
+}
+
+.guide-manager-global-form .guide-manager-details summary::-webkit-details-marker,
+.guide-manager-global-form .guide-manager-details summary::marker {
+  display: none;
+  content: none;
+}
+
+.guide-manager-details__title {
+  min-width: 0;
+  flex: 0 1 auto;
+  line-height: 1.35;
+}
+
+.guide-manager-details__check {
+  box-sizing: border-box;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.guide-manager-details[open] > summary .guide-manager-details__check {
+  background: #5a96ff;
+  border-color: #7eb0ff;
+  box-shadow: inset 0 0 0 2px rgba(8, 12, 20, 0.9);
+}
+
+.guide-manager-global-form .guide-manager-details[open] summary {
+  margin-bottom: 8px;
+}
+
+.guide-manager-base-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.55rem;
+}
+
+.guide-manager-base-select {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+  flex: 1 1 180px;
+}
+
+.guide-manager-base-select span {
+  white-space: nowrap;
+  font-size: 0.85em;
+  opacity: 0.85;
+}
+
+.guide-manager-base-select select {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.guide-manager-orbit-list {
+  --orbit-item-row: 2.05rem;
+  --orbit-item-gap: 0.28rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--orbit-item-gap);
+  margin: 0.5rem 0 0.75rem;
+  /* Show up to 3 sequence rows; overflow scrolls with a right scrollbar. */
+  max-height: calc((var(--orbit-item-row) * 3) + (var(--orbit-item-gap) * 2));
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 2px;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(140, 180, 220, 0.65) rgba(255, 255, 255, 0.08);
+}
+
+.guide-manager-orbit-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.guide-manager-orbit-list::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+}
+
+.guide-manager-orbit-list::-webkit-scrollbar-thumb {
+  background: rgba(120, 170, 220, 0.55);
+  border-radius: 8px;
+}
+
+.guide-manager-orbit-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(140, 190, 240, 0.75);
+}
+
+.guide-manager-orbit-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  min-height: var(--orbit-item-row, 2.05rem);
+  height: var(--orbit-item-row, 2.05rem);
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  text-align: left;
+  padding: 0.12rem 0.55rem;
+  line-height: 1.15;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.2);
+  color: inherit;
+  cursor: pointer;
+}
+
+.guide-manager-orbit-item.is-selected {
+  border-color: rgba(80, 180, 255, 0.65);
+  background: rgba(40, 110, 170, 0.35);
+}
+
+.guide-manager-orbit-item strong {
+  font-size: 0.9em;
+  font-weight: 600;
+  line-height: 1.15;
+}
+
+.guide-manager-orbit-item span {
+  opacity: 0.75;
+  font-size: 0.8em;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+.guide-manager-global-form .guide-manager-inline-actions {
+  margin-top: 8px;
+  padding-left: 0;
+}
+
+.npc-manager-field--check {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  width: max-content;
+  grid-template-columns: none;
+}
+
+.npc-manager-field--check input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  flex: 0 0 16px;
+  accent-color: #5a96ff;
+}
+
+.npc-scene-editor-inspector .npc-manager-field--check {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding-right: 4px;
+}
+
+.npc-scene-editor-inspector .npc-manager-field--check span {
+  min-width: 0;
+}
+
+.npc-scene-editor-inspector .npc-manager-field--check input[type="checkbox"] {
+  justify-self: end;
+  margin-right: 2px;
+}
+
 .guide-manager-dialog-list {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  max-height: min(52vh, 620px);
+  flex: 1 1 auto;
+  min-height: 180px;
   overflow: auto;
   padding-right: 4px;
 }
 
 .guide-manager-dialog-set {
   border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 10px;
-  padding: 10px 12px;
+  border-radius: 8px;
+  padding: 8px 10px;
   background: rgba(0, 0, 0, 0.18);
 }
 
@@ -1598,11 +2765,11 @@ aside.debug-panel.local-dev-only[hidden] {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .guide-manager-dialog-set__head button {
-  margin-left: auto;
+  margin-left: 0;
 }
 
 .guide-manager-dialog-set__pair {
@@ -1614,28 +2781,30 @@ aside.debug-panel.local-dev-only[hidden] {
 .guide-manager-dialog-set__field {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 
 .guide-manager-dialog-set__field span {
-  font-size: 11px;
+  font-size: var(--gm-fs-label);
   opacity: 0.8;
+  line-height: 1.2;
 }
 
 .guide-manager-dialog-set__field textarea {
   width: 100%;
-  min-height: 56px;
+  min-height: calc(var(--gm-control-line) * 2em + (var(--gm-control-pad-y) * 2) + 2px);
   resize: vertical;
   font: inherit;
   color: inherit;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 6px;
-  padding: 8px;
+  border-radius: 5px;
+  padding: var(--gm-control-pad-y) var(--gm-control-pad-x);
+  line-height: var(--gm-control-line);
 }
 
 .guide-manager-dialog-set__field--en textarea {
-  min-height: 44px;
+  min-height: calc(var(--gm-control-line) * 1.5em + (var(--gm-control-pad-y) * 2) + 2px);
   opacity: 0.92;
 }
 
@@ -1643,6 +2812,32 @@ aside.debug-panel.local-dev-only[hidden] {
   margin-top: 8px;
   display: grid;
   gap: 6px;
+}
+
+.guide-manager-line-speed__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.guide-manager-line-speed__controls select[name="lineTextSpeedMode"] {
+  flex: 0 0 auto;
+  min-width: 5.5rem;
+  max-width: 7.5rem;
+}
+
+.guide-manager-line-speed__controls input[name="lineTextSpeed"] {
+  flex: 1 1 72px;
+  min-width: 72px;
+  max-width: 120px;
+}
+
+.guide-manager-line-speed__controls input[name="lineTextSpeed"].is-using-default,
+.guide-manager-line-speed__controls input[name="lineTextSpeed"]:disabled {
+  opacity: 0.72;
+  cursor: default;
 }
 
 .guide-manager-lines__toolbar {
@@ -1655,7 +2850,7 @@ aside.debug-panel.local-dev-only[hidden] {
 
 .guide-manager-lines__toolbar h3 {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--gm-fs-sub);
 }
 
 .guide-manager-badges {
@@ -1665,20 +2860,25 @@ aside.debug-panel.local-dev-only[hidden] {
   margin-bottom: 8px;
 }
 
+.guide-manager-dialog-set__head .guide-manager-badges {
+  margin-bottom: 0;
+}
+
 .guide-manager-badge {
   display: inline-block;
-  padding: 2px 8px;
+  padding: 1px 6px;
   border-radius: 999px;
   background: rgba(255, 210, 90, 0.18);
   color: #ffd25a;
-  font-size: 11px;
+  font-size: var(--gm-fs-meta);
+  line-height: 1.2;
 }
 
 .guide-manager-hint {
-  margin: 8px 0 0;
-  font-size: 11px;
-  opacity: 0.72;
-  line-height: 1.45;
+  margin: 6px 0 0;
+  font-size: var(--gm-fs-hint);
+  opacity: 0.7;
+  line-height: 1.35;
 }
 
 .guide-manager-inline-actions {
@@ -1688,7 +2888,1168 @@ aside.debug-panel.local-dev-only[hidden] {
   margin-top: 8px;
 }
 
+.guide-manager-orbit-pose-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+  margin: 0.55rem 0 0.75rem;
+}
+
+.guide-manager-orbit-pose-col {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 0.55rem 0.6rem 0.65rem;
+  background: rgba(0, 0, 0, 0.16);
+  min-width: 0;
+}
+
+.guide-manager-orbit-pose-col--camera {
+  border-color: rgba(90, 170, 230, 0.35);
+  background: rgba(40, 90, 130, 0.18);
+}
+
+.guide-manager-orbit-pose-col--target {
+  border-color: rgba(120, 200, 150, 0.35);
+  background: rgba(40, 110, 70, 0.16);
+}
+
+.guide-manager-orbit-pose-col__title {
+  margin: 0 0 0.45rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  opacity: 0.92;
+}
+
+.guide-manager-orbit-pose-col__fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.guide-manager-orbit-pose-col__fields .npc-manager-field {
+  margin: 0;
+}
+
+@media (max-width: 720px) {
+  .guide-manager-orbit-pose-split {
+    grid-template-columns: 1fr;
+  }
+}
+
 .guide-manager-section {
   margin-bottom: 16px;
+}
+
+.guide-manager-details {
+  margin-top: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.guide-manager-details summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.guide-manager-details[open] summary {
+  margin-bottom: 10px;
+}
+
+/* Pastel tone blocks — guide manager subsections (after base details/dialog styles) */
+.guide-manager-panel .guide-manager-details--tone-speed,
+.guide-manager-panel .guide-manager-details--tone-orbit,
+.guide-manager-panel .guide-manager-details--tone-talking,
+.guide-manager-panel .guide-manager-details--tone-prompts,
+.guide-manager-panel .guide-manager-field-block--tone-closing,
+.guide-manager-panel .guide-manager-event-meta--tone-event,
+.guide-manager-panel .guide-manager-dialog-set--tone-line {
+  border-color: rgba(var(--gm-tone), 0.42);
+  border-left: 3px solid rgba(var(--gm-tone), 0.88);
+  background:
+    linear-gradient(160deg, rgba(var(--gm-tone), 0.22), rgba(var(--gm-tone), 0.08));
+}
+
+.guide-manager-panel .guide-manager-details--tone-speed {
+  --gm-tone: 168, 198, 230;
+}
+
+.guide-manager-panel .guide-manager-details--tone-orbit {
+  --gm-tone: 196, 178, 230;
+}
+
+.guide-manager-panel .guide-manager-details--tone-talking {
+  --gm-tone: 232, 196, 168;
+}
+
+.guide-manager-panel .guide-manager-details--tone-prompts {
+  --gm-tone: 170, 214, 186;
+}
+
+.guide-manager-panel .guide-manager-field-block--tone-closing {
+  --gm-tone: 158, 214, 208;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px solid rgba(var(--gm-tone), 0.42);
+  border-left: 3px solid rgba(var(--gm-tone), 0.88);
+  border-radius: 8px;
+}
+
+.guide-manager-panel .guide-manager-section--tone-common {
+  --gm-tone: 170, 214, 186;
+  padding: 8px 10px 10px;
+  border: 1px solid rgba(var(--gm-tone), 0.28);
+  border-radius: 10px;
+  border-left: 3px solid rgba(var(--gm-tone), 0.75);
+  border-bottom: 1px solid rgba(var(--gm-tone), 0.28);
+  background:
+    linear-gradient(160deg, rgba(var(--gm-tone), 0.12), rgba(var(--gm-tone), 0.04));
+}
+
+.guide-manager-panel .guide-manager-section--tone-script {
+  --gm-tone: 230, 198, 150;
+  padding: 8px 10px 10px;
+  border: 1px solid rgba(var(--gm-tone), 0.28);
+  border-radius: 10px;
+  border-left: 3px solid rgba(var(--gm-tone), 0.8);
+  background:
+    linear-gradient(160deg, rgba(var(--gm-tone), 0.12), rgba(var(--gm-tone), 0.04));
+}
+
+.guide-manager-panel .guide-manager-event-meta--tone-event {
+  --gm-tone: 168, 198, 230;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px solid rgba(var(--gm-tone), 0.42);
+  border-left: 3px solid rgba(var(--gm-tone), 0.88);
+  border-radius: 8px;
+  margin: 0;
+}
+
+.guide-manager-panel .guide-manager-dialog-set--tone-line {
+  --gm-tone: 232, 196, 168;
+}
+
+.guide-manager-panel .guide-manager-details[class*="--tone-"] .guide-manager-details__title,
+.guide-manager-panel .guide-manager-section--tone-common > h3,
+.guide-manager-panel .guide-manager-section--tone-script > .guide-manager-section__fixed-title,
+.guide-manager-panel .guide-manager-field-block--tone-closing .guide-manager-field-block__label {
+  color: rgba(255, 255, 255, 0.96);
+}
+
+.guide-manager-panel .guide-manager-details[class*="--tone-"] .guide-manager-details__check {
+  border-color: rgba(var(--gm-tone), 0.7);
+}
+
+.guide-manager-panel .guide-manager-details[class*="--tone-"][open] > summary .guide-manager-details__check {
+  background: rgba(var(--gm-tone), 0.95);
+  border-color: rgba(255, 255, 255, 0.55);
+  box-shadow: inset 0 0 0 2px rgba(8, 12, 20, 0.9);
+}
+
+.guide-manager-panel .guide-manager-details--tone-orbit .guide-manager-orbit-item {
+  border-color: rgba(var(--gm-tone), 0.28);
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.guide-manager-panel .guide-manager-details--tone-orbit .guide-manager-orbit-item.is-selected {
+  border-color: rgba(var(--gm-tone), 0.7);
+  background: rgba(var(--gm-tone), 0.22);
+}
+
+.guide-manager-panel .guide-manager-details--tone-talking .guide-manager-field-block,
+.guide-manager-panel .guide-manager-details--tone-prompts .guide-manager-common-prompt {
+  border: 1px solid rgba(var(--gm-tone), 0.22);
+  border-radius: 8px;
+  padding: 6px 8px;
+  background: rgba(0, 0, 0, 0.16);
+}
+
+.guide-manager-panel .guide-manager-section--tone-common .guide-manager-details--tone-prompts,
+.guide-manager-panel .guide-manager-section--tone-common .guide-manager-field-block--tone-closing {
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.12);
+}
+
+.guide-manager-hint--global {
+  margin-top: 10px;
+  font-size: 11px;
+  opacity: 0.75;
+}
+
+.editor-mode-badge {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 12000;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(255, 120, 40, 0.92);
+  color: #111;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  pointer-events: none;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+}
+
+.editor-mode-badge[hidden] {
+  display: none !important;
+}
+
+.editor-mode-tabs {
+  position: fixed;
+  top: 44px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 12001;
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(12, 16, 22, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+}
+
+.editor-mode-tabs[hidden] {
+  display: none !important;
+}
+
+.editor-mode-tabs__btn {
+  border: none;
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.72);
+  background: transparent;
+}
+
+.editor-mode-tabs__btn.is-active {
+  color: #111;
+  background: rgba(255, 120, 40, 0.95);
+}
+
+.editor-mode-tabs__btn:hover:not(.is-active) {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+body.editor-popup-window {
+  margin: 0;
+  min-height: 100vh;
+  background: #080c14;
+  color: #e8eef8;
+  overflow: hidden;
+}
+
+.editor-popup-window__header {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas:
+    "title tabs"
+    "hint hint";
+  gap: 8px 16px;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(10, 14, 22, 0.98);
+}
+
+.editor-popup-window__title {
+  grid-area: title;
+  margin: 0;
+  font-size: 15px;
+}
+
+.editor-popup-window__tabs {
+  grid-area: tabs;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.editor-popup-window__hint {
+  grid-area: hint;
+  margin: 0;
+  font-size: 11px;
+  opacity: 0.65;
+}
+
+.editor-popup-window__status {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  margin: 0;
+  padding: 10px 16px;
+  border-radius: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(12, 20, 36, 0.98);
+  font-size: 12px;
+  line-height: 1.4;
+  z-index: 25;
+  box-sizing: border-box;
+  min-height: 40px;
+  pointer-events: none;
+}
+
+/* Keep Guide/Guest footers (적용·저장·위치 미리보기) above the status strip */
+body.editor-popup-window:has(#editorPopupStatus:not([hidden])) .npc-manager-panel,
+body.editor-popup-window:has(#editorPopupStatus:not([hidden])) .editor-popup-rlb-panel,
+body.editor-popup-window:has(#editorPopupStatus:not([hidden])) .rlb-tuning-panel.editor-popup-rlb-panel {
+  bottom: 44px;
+}
+
+.editor-popup-window__fallback {
+  padding: 32px;
+}
+
+body.editor-popup-window .npc-manager-panel {
+  position: fixed;
+  top: 88px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: auto;
+  max-height: none;
+  border-radius: 0;
+  border-left: 0;
+  border-right: 0;
+  border-bottom: 0;
+  box-shadow: none;
+}
+
+body.editor-popup-window .editor-popup-rlb-panel,
+body.editor-popup-window .rlb-tuning-panel.editor-popup-rlb-panel {
+  position: fixed;
+  top: 88px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  width: auto;
+  height: auto;
+  max-height: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px 8px;
+  border-radius: 0;
+  border-left: 0;
+  border-right: 0;
+  border-bottom: 0;
+  box-shadow: none;
+  overflow: hidden;
+}
+
+body.editor-popup-window .rlb-tuning-layout {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 12px;
+  overflow: hidden;
+}
+
+body.editor-popup-window .rlb-tuning-lights {
+  flex: 0 0 min(360px, 36%);
+  width: min(360px, 36%);
+  min-width: 240px;
+  min-height: 0;
+  max-height: none;
+}
+
+body.editor-popup-window .rlb-tuning-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  max-height: none;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  background: rgba(8, 14, 26, 0.88);
+}
+
+body.editor-popup-window .rlb-tuning-status {
+  flex: 0 0 auto;
+  margin: 0;
+}
+
+.editor-popup-window__tabs .editor-mode-tabs__btn {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  padding: 8px 14px;
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
+
+.editor-popup-window__tabs .editor-mode-tabs__btn.is-active {
+  color: #111;
+  background: rgba(255, 120, 40, 0.95);
+}
+
+/* Rabbit Metaverse Editor — in-scene NPC placement (PHASE 1) */
+body.npc-scene-editor-active #gameCanvas {
+  cursor: crosshair;
+}
+
+body.npc-scene-editor-active .hud__actions .local-dev-only:not(#editorModeButton) {
+  pointer-events: none;
+  opacity: 0.45;
+}
+
+.npc-scene-editor-shell {
+  position: fixed;
+  inset: 0;
+  z-index: 11000;
+  pointer-events: none;
+  color: #eef3ff;
+  font-size: 13px;
+}
+
+.npc-scene-editor-shell[hidden] {
+  display: none !important;
+}
+
+.npc-scene-editor-top,
+.npc-scene-editor-list,
+.npc-scene-editor-inspector,
+.npc-scene-editor-status {
+  pointer-events: auto;
+  background: rgba(8, 14, 26, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(8px);
+}
+
+.npc-scene-editor-top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  gap: 12px;
+}
+
+.npc-scene-editor-top__brand {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.npc-scene-editor-top__mode {
+  font-size: 11px;
+  opacity: 0.75;
+}
+
+.npc-scene-editor-top__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.npc-scene-editor-dirty {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #1a1200;
+  background: #ffcc66;
+}
+
+.npc-scene-editor-play-test {
+  font-weight: 700;
+  color: #0d1f14 !important;
+  background: #7ddea3 !important;
+  border-color: #4caf78 !important;
+}
+
+.npc-scene-editor-layers {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.npc-scene-editor-layers button {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  padding: 6px 8px;
+}
+
+.npc-scene-editor-layers button.is-active {
+  background: rgba(51, 221, 102, 0.22);
+  border-color: rgba(51, 221, 102, 0.55);
+}
+
+.npc-scene-editor-list__create {
+  display: flex;
+  gap: 6px;
+}
+
+.npc-scene-editor-list__create select {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  font: inherit;
+  padding: 6px 8px;
+}
+
+.npc-scene-editor-collision {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 0 12px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border-left: 4px solid #5fd68a;
+  background: rgba(95, 214, 138, 0.12);
+  font-size: 12px;
+}
+
+.npc-scene-editor-collision.is-warn {
+  border-left-color: #e0c35a;
+  background: rgba(224, 195, 90, 0.14);
+}
+
+.npc-scene-editor-collision.is-error {
+  border-left-color: #e07070;
+  background: rgba(224, 112, 112, 0.16);
+}
+
+.npc-scene-editor-collision-dot {
+  flex: 0 0 auto;
+  font-size: 10px;
+  opacity: 0.85;
+  color: #5fd68a;
+}
+
+.npc-scene-editor-collision-dot.is-warn {
+  color: #e0c35a;
+}
+
+.npc-scene-editor-collision-dot.is-error {
+  color: #e07070;
+}
+
+.npc-scene-editor-top__actions button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.npc-scene-editor-danger {
+  border-color: rgba(224, 112, 112, 0.55) !important;
+  color: #ffb3b3 !important;
+}
+
+.npc-scene-editor-top__actions button,
+.npc-scene-editor-actions button,
+.npc-scene-editor-rotate-row button,
+.npc-scene-editor-list__btn,
+.npc-scene-editor-list__create button {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  padding: 6px 10px;
+}
+
+.npc-scene-editor-list {
+  position: absolute;
+  top: 56px;
+  left: 8px;
+  bottom: 36px;
+  width: 260px;
+  overflow: auto;
+  padding: 10px;
+}
+
+.npc-scene-editor-inspector {
+  position: absolute;
+  top: 56px;
+  right: 8px;
+  bottom: 36px;
+  width: 300px;
+  padding: 12px;
+  /* Explicit axes — do not use overflow shorthand alone (select unlock can clear it). */
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  --so-fs-title: 14px;
+  --so-fs-section: 13px;
+  --so-fs-sub: 12px;
+  --so-fs-label: 11px;
+  --so-fs-body: 12px;
+  --so-fs-meta: 10.5px;
+  --so-fs-hint: 10.5px;
+  --so-control-pad-y: 3px;
+  --so-control-pad-x: 6px;
+  font-size: var(--so-fs-body);
+  line-height: 1.35;
+}
+
+.npc-scene-editor-list__head h2 {
+  margin: 0 0 8px;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+}
+
+.npc-scene-editor-status {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  min-height: 24px;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.npc-scene-editor-list__head {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.npc-scene-editor-inspector > h2 {
+  margin: 0 0 10px;
+  font-size: var(--so-fs-title);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.25;
+}
+
+.npc-scene-editor-inspector .npc-scene-editor-section h3 {
+  margin: 0 0 8px;
+  font-size: var(--so-fs-section);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  line-height: 1.25;
+}
+
+.npc-scene-editor-inspector .npc-scene-editor-subsection h4,
+.npc-scene-editor-inspector .npc-scene-editor-dialog-camera h4 {
+  margin: 0 0 6px;
+  font-size: var(--so-fs-sub);
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  line-height: 1.25;
+  opacity: 0.95;
+}
+
+.npc-scene-editor-inspector .npc-scene-editor-section label,
+.npc-scene-editor-inspector .npc-manager-field--check span {
+  font-size: var(--so-fs-label);
+  line-height: 1.2;
+  opacity: 0.88;
+}
+
+.npc-scene-editor-inspector .npc-scene-editor-section label input,
+.npc-scene-editor-inspector .npc-scene-editor-section label select,
+.npc-scene-editor-inspector .npc-scene-editor-section label textarea,
+.npc-scene-editor-inspector .npc-scene-editor-sequence-list select,
+.npc-scene-editor-inspector .npc-scene-editor-waypoint-list select {
+  font-size: var(--so-fs-body);
+  line-height: 1.25;
+  padding: var(--so-control-pad-y) var(--so-control-pad-x);
+}
+
+.npc-scene-editor-inspector .npc-scene-editor-fields {
+  font-size: var(--so-fs-meta);
+}
+
+.npc-scene-editor-inspector .npc-scene-editor-fields dt {
+  opacity: 0.72;
+  font-size: var(--so-fs-label);
+}
+
+.npc-scene-editor-inspector .npc-scene-editor-fields dd {
+  font-size: var(--so-fs-body);
+}
+
+.npc-scene-editor-inspector .guide-manager-hint,
+.npc-scene-editor-inspector .npc-scene-editor-empty {
+  font-size: var(--so-fs-hint);
+  line-height: 1.3;
+  opacity: 0.82;
+}
+
+.npc-scene-editor-inspector .npc-scene-editor-collision {
+  font-size: var(--so-fs-meta);
+}
+
+.npc-scene-editor-inspector .npc-scene-editor-collision strong {
+  font-size: var(--so-fs-label);
+  font-weight: 650;
+}
+
+.npc-scene-editor-inspector .npc-scene-editor-actions button,
+.npc-scene-editor-inspector .npc-scene-editor-rotate-row button,
+.npc-scene-editor-inspector .npc-scene-editor-subsection > button,
+.npc-scene-editor-inspector .npc-scene-editor-waypoint-list button {
+  font-size: var(--so-fs-label);
+  padding: 4px 8px;
+  line-height: 1.2;
+}
+
+.npc-scene-editor-inspector .npc-scene-editor-sequence-list__index,
+.npc-scene-editor-inspector .npc-scene-editor-dialog-camera [data-role$="Val"] {
+  font-size: var(--so-fs-meta);
+  opacity: 0.85;
+}
+
+.npc-scene-editor-inspector .npc-scene-editor-waypoint-list label {
+  font-size: var(--so-fs-label);
+}
+
+.npc-scene-editor-section--focus {
+  margin-top: 10px;
+  padding: 10px 10px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.npc-scene-editor-section--compact {
+  margin-bottom: 8px;
+  padding: 8px 10px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+}
+
+.npc-scene-editor-section--compact .guide-manager-hint,
+.npc-scene-editor-section--focus > .guide-manager-hint {
+  margin: 0 0 8px;
+}
+
+/* Pastel tone blocks — readable on dark inspector */
+.npc-scene-editor-inspector .npc-scene-editor-section--tone-model {
+  --so-tone: 168, 198, 230;
+  border-color: rgba(var(--so-tone), 0.42);
+  border-left: 3px solid rgba(var(--so-tone), 0.85);
+  background:
+    linear-gradient(160deg, rgba(var(--so-tone), 0.22), rgba(var(--so-tone), 0.08));
+}
+
+.npc-scene-editor-inspector .npc-scene-editor-section--tone-transform {
+  --so-tone: 170, 214, 186;
+  border-color: rgba(var(--so-tone), 0.42);
+  border-left: 3px solid rgba(var(--so-tone), 0.85);
+  background:
+    linear-gradient(160deg, rgba(var(--so-tone), 0.22), rgba(var(--so-tone), 0.08));
+}
+
+.npc-scene-editor-inspector .npc-scene-editor-section--tone-camera {
+  --so-tone: 196, 178, 230;
+  border-color: rgba(var(--so-tone), 0.45);
+  border-left: 3px solid rgba(var(--so-tone), 0.9);
+  background:
+    linear-gradient(160deg, rgba(var(--so-tone), 0.24), rgba(var(--so-tone), 0.09));
+}
+
+.npc-scene-editor-inspector .npc-scene-editor-section--tone-anim {
+  --so-tone: 232, 196, 168;
+  border-color: rgba(var(--so-tone), 0.45);
+  border-left: 3px solid rgba(var(--so-tone), 0.9);
+  background:
+    linear-gradient(160deg, rgba(var(--so-tone), 0.24), rgba(var(--so-tone), 0.09));
+}
+
+.npc-scene-editor-inspector .npc-scene-editor-section--tone-patrol {
+  --so-tone: 158, 214, 208;
+  border-color: rgba(var(--so-tone), 0.45);
+  border-left: 3px solid rgba(var(--so-tone), 0.9);
+  background:
+    linear-gradient(160deg, rgba(var(--so-tone), 0.24), rgba(var(--so-tone), 0.09));
+}
+
+.npc-scene-editor-inspector .npc-scene-editor-section--tone-model h3,
+.npc-scene-editor-inspector .npc-scene-editor-section--tone-transform h3,
+.npc-scene-editor-inspector .npc-scene-editor-section--tone-camera h3,
+.npc-scene-editor-inspector .npc-scene-editor-section--tone-anim h3,
+.npc-scene-editor-inspector .npc-scene-editor-section--tone-patrol h3 {
+  color: rgba(255, 255, 255, 0.96);
+}
+
+.npc-scene-editor-inspector .npc-scene-editor-section[class*="--tone-"] .npc-scene-editor-subsection {
+  border-color: rgba(var(--so-tone), 0.28);
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.npc-scene-editor-inspector .npc-scene-editor-section--tone-camera .npc-scene-editor-dialog-camera {
+  border-color: rgba(var(--so-tone), 0.28);
+  background: rgba(0, 0, 0, 0.16);
+}
+
+.npc-scene-editor-subsection {
+  margin: 8px 0 0;
+  padding: 8px 8px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.npc-scene-editor-subsection + .npc-scene-editor-subsection {
+  margin-top: 8px;
+}
+
+.npc-scene-editor-list__items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.npc-scene-editor-list__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.npc-scene-editor-list__item.is-selected .npc-scene-editor-list__btn {
+  background: rgba(51, 221, 102, 0.22);
+  border-color: rgba(51, 221, 102, 0.55);
+}
+
+.npc-scene-editor-list__btn {
+  flex: 1;
+  text-align: left;
+}
+
+.npc-scene-editor-list__meta {
+  font-size: 10px;
+  opacity: 0.65;
+}
+
+.npc-scene-editor-fields {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: 4px 8px;
+  margin: 0 0 12px;
+}
+
+.npc-scene-editor-fields dt {
+  opacity: 0.7;
+}
+
+.npc-scene-editor-rotate-row button.is-active {
+  background: rgba(51, 221, 102, 0.25);
+  border-color: rgba(51, 221, 102, 0.65);
+}
+
+.npc-scene-editor-waypoint-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+  max-height: 160px;
+  overflow: auto;
+}
+
+.npc-scene-editor-sequence-list {
+  list-style: none;
+  margin: 8px 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+  max-height: 220px;
+  overflow: auto;
+}
+
+.npc-scene-editor-sequence-list li {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: 4px 8px;
+  align-items: center;
+  padding: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+}
+
+.npc-scene-editor-sequence-list__index {
+  opacity: 0.7;
+  font-size: 11px;
+}
+
+.npc-scene-editor-sequence-list .npc-scene-editor-rotate-row {
+  grid-column: 1 / -1;
+}
+
+.npc-scene-editor-voice-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px;
+  align-items: center;
+}
+
+.npc-scene-editor-dialog-camera {
+  display: grid;
+  gap: 5px;
+  margin: 6px 0 8px;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.npc-scene-editor-dialog-camera h4 {
+  margin: 0;
+  font-size: 12px;
+}
+
+.npc-scene-editor-dialog-camera label {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px;
+  align-items: center;
+  font-size: 11px;
+}
+
+.npc-scene-editor-dialog-camera .npc-scene-editor-slider-row {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) 40px;
+  gap: 6px;
+  align-items: center;
+  width: 100%;
+}
+
+.npc-scene-editor-dialog-camera .npc-scene-editor-slider-row__label {
+  font-size: var(--so-fs-label);
+  line-height: 1.2;
+  opacity: 0.88;
+  white-space: nowrap;
+}
+
+.npc-scene-editor-dialog-camera .npc-scene-editor-slider-row input[type="range"] {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  grid-column: auto;
+}
+
+.npc-scene-editor-dialog-camera .npc-scene-editor-slider-row input[type="number"] {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.npc-scene-editor-dialog-camera .npc-scene-editor-slider-row__value {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-size: var(--so-fs-meta);
+  opacity: 0.85;
+  white-space: nowrap;
+}
+
+.npc-scene-editor-dialog-camera .npc-scene-editor-slider-row__value--muted {
+  opacity: 0.55;
+}
+
+.npc-scene-editor-dialog-camera input[type="range"] {
+  width: 100%;
+}
+
+.npc-scene-editor-offset-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.npc-scene-editor-offset-actions button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.npc-scene-editor-dialog-preview {
+  display: grid;
+  gap: 6px;
+  margin-top: 4px;
+  width: 100%;
+}
+
+.npc-scene-editor-dialog-preview__screen {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 8px 18px rgba(0, 0, 0, 0.35);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent 28%),
+    #07090d;
+  overflow: hidden;
+}
+
+.npc-scene-editor-dialog-preview__screen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  box-shadow: inset 0 0 24px rgba(0, 0, 0, 0.35);
+}
+
+.npc-scene-editor-dialog-preview canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
+  background: #05070a;
+}
+
+.npc-scene-editor-tts-actions {
+  margin-top: 4px;
+}
+
+.npc-scene-editor-tts-preview-btn {
+  font-weight: 600;
+}
+
+.guide-manager-dialog-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.npc-scene-editor-optional-file {
+  opacity: 0.75;
+  font-size: 11px;
+}
+
+.npc-scene-editor-dialogue-line {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 10px;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+}
+
+.npc-scene-editor-waypoint-list li {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 4px;
+  align-items: stretch;
+  padding: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+}
+
+.npc-scene-editor-waypoint-list li.is-selected {
+  border-color: rgba(244, 211, 94, 0.7);
+}
+
+.npc-scene-editor-waypoint-list li > button[data-action="patrol-select-wp"] {
+  text-align: left;
+}
+
+.npc-scene-editor-waypoint-list label {
+  display: grid;
+  grid-template-columns: 36px 1fr;
+  gap: 6px;
+  align-items: center;
+  font-size: 11px;
+}
+
+.npc-scene-editor-waypoint-list select {
+  width: 100%;
+}
+
+.npc-scene-editor-fields dd {
+  margin: 0;
+}
+
+.npc-scene-editor-section label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.npc-scene-editor-check {
+  flex-direction: row !important;
+  align-items: center;
+  gap: 8px !important;
+}
+
+.npc-scene-editor-rotate-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.npc-scene-editor-empty {
+  opacity: 0.7;
+  margin: 0;
+}
+
+.npc-scene-editor-actions {
+  margin-top: 12px;
+}
+
+/* Unified light dropdowns: white surface + dark text (readable on dark panels) */
+.npc-scene-editor-shell select,
+.npc-manager-panel select,
+body.editor-popup-window select {
+  background-color: #ffffff !important;
+  color: #111111 !important;
+  border-color: rgba(0, 0, 0, 0.28) !important;
+  color-scheme: light;
+}
+
+.npc-scene-editor-shell select option,
+.npc-manager-panel select option,
+body.editor-popup-window select option {
+  background-color: #ffffff;
+  color: #111111;
+}
+
+.npc-scene-editor-shell select:disabled,
+.npc-manager-panel select:disabled,
+body.editor-popup-window select:disabled {
+  background-color: #ececec !important;
+  color: #555555 !important;
+  opacity: 0.9;
 }
 

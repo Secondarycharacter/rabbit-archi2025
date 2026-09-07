@@ -14,6 +14,14 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    match /metaverseGuideTours/{projectId} {
+      allow read, write: if true;
+    }
+
+    match /metaverseGuestBundles/{projectId} {
+      allow read, write: if true;
+    }
+
     match /homepageChatUsers/{userId} {
       allow read, write: if true;
     }

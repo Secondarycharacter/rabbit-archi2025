@@ -19,8 +19,9 @@ import {
   makeRlbLightId,
   remapRlbGroupMemberIds,
   resolveRlbLightSourceName,
-  saveRlbTuningState
-} from "./rlb-shader-tuning.js?v=rlb-shader-proximity-20260820-group-v50";
+  saveRlbTuningState,
+  syncRlbTypeGroupToCatalog
+} from "./rlb-shader-tuning.js?v=rlb-range-restore-20260907j";
 import {
   bakeRlbOccluderAabbs,
   bakeRlbPortalAabbs,
@@ -29,7 +30,7 @@ import {
   collectRlbSpillSamplePoints,
   RLB_SHADER_MAX_OCCLUDERS,
   selectNearestRlbOccluderAabbs
-} from "./rlb-spill-occlusion.js?v=rlb-shader-proximity-20260818-group-v40";
+} from "./rlb-spill-occlusion.js?v=rlb-range-restore-20260907j";
 import {
   attachRlbProximityShaderPluginsChunked,
   attachRlbProximityShaderPluginsSync,
@@ -40,7 +41,7 @@ import {
   resolveRlbLightWorldDirection,
   updateRlbProximityShaderLights,
   RLB_SHADER_MAX_LIGHTS
-} from "./rlb-proximity-shader-plugin.js?v=rlb-shader-proximity-20260819-group-v46";
+} from "./rlb-proximity-shader-plugin.js?v=rlb-range-restore-20260907j";
 
 const SPILL_SAMPLE_REFRESH_FRAMES = 45;
 const SPILL_OCCLUSION_REFRESH_FRAMES = 45;
@@ -196,6 +197,22 @@ function maybeRefreshLightOcclusionWeights(
   const lightPositions = (lightEntries || [])
     .map((entry) => entry?.position)
     .filter(Boolean);
+
+  // Only score occluders against nearby fixtures — full lists × wall AABBs hitch indoors.
+  if (focus && lightPositions.length > 12) {
+    lightPositions.sort((left, right) => {
+      const leftDx = left.x - focus.x;
+      const leftDy = left.y - focus.y;
+      const leftDz = left.z - focus.z;
+      const rightDx = right.x - focus.x;
+      const rightDy = right.y - focus.y;
+      const rightDz = right.z - focus.z;
+      return (leftDx * leftDx + leftDy * leftDy + leftDz * leftDz)
+        - (rightDx * rightDx + rightDy * rightDy + rightDz * rightDz);
+    });
+    lightPositions.length = 12;
+  }
+
   const weights = new Map();
   lifecycle.occluderAabbs = selectNearestRlbOccluderAabbs(
     occluderAabbCache,
@@ -324,8 +341,12 @@ function getPrimaryRlbMaterialName(mesh) {
   return getMaterialNamesFromMesh(mesh).find((name) => isRlbLightFixtureMaterialName(name)) || null;
 }
 
+/** Same-type fixtures closer than this share one spill source (Angji GLB clones). */
+const RLB_LIGHT_DEDUPE_DISTANCE = 0.85;
+
 function collectRlbLightEntries(BABYLON, meshes) {
   const entries = [];
+  let skippedDuplicates = 0;
 
   meshes.forEach((mesh) => {
     if (!mesh || mesh.isDisposed?.() || mesh.isEnabled?.() === false || !isRlbLightFixtureMesh(mesh)) {
@@ -342,15 +363,47 @@ function collectRlbLightEntries(BABYLON, meshes) {
     };
     const origin = resolveRlbLightWorldPosition(BABYLON, entry) || getMeshWorldCenter(BABYLON, mesh);
 
-    if (origin) {
-      entry.position = origin;
-      entry.lightId = makeRlbLightId(entry);
-      if (!entry.direction) {
-        entry.direction = resolveRlbLightWorldDirection(BABYLON, entry);
-      }
-      entries.push(entry);
+    if (!origin) {
+      return;
     }
+
+    // Angji OutdoorLight ships clone meshes at (nearly) the same pose
+    // (e.g. 3DGeom-3196 + 3212). Bounding centers can differ by a few cm so
+    // exact string keys miss them — distance-cluster same type instead.
+    const duplicate = entries.find((existing) => {
+      if (existing.rlbType !== rlbType || !existing.position) {
+        return false;
+      }
+
+      const dx = existing.position.x - origin.x;
+      const dy = existing.position.y - origin.y;
+      const dz = existing.position.z - origin.z;
+      return (dx * dx + dy * dy + dz * dz) <= (RLB_LIGHT_DEDUPE_DISTANCE * RLB_LIGHT_DEDUPE_DISTANCE);
+    });
+
+    if (duplicate) {
+      skippedDuplicates += 1;
+      if (mesh.metadata && typeof mesh.metadata === "object") {
+        mesh.metadata.rlbLightDedupeSkip = true;
+      } else {
+        mesh.metadata = { rlbLightDedupeSkip: true };
+      }
+      return;
+    }
+
+    entry.position = origin;
+    entry.lightId = makeRlbLightId(entry);
+
+    if (!entry.direction) {
+      entry.direction = resolveRlbLightWorldDirection(BABYLON, entry);
+    }
+
+    entries.push(entry);
   });
+
+  if (skippedDuplicates > 0) {
+    logRlbGlow(`deduped ${skippedDuplicates} co-located fixture mesh(es)`);
+  }
 
   return entries;
 }
@@ -609,15 +662,29 @@ export function setupAngjiRlbProximityGlow(BABYLON, scene, modelState, options =
   const tuningState = glowOptions.tuningState || loadRlbTuningState();
   glowOptions.tuningState = ensureRlbGroupState(tuningState);
   const lightEntries = collectRlbLightEntries(BABYLON, meshes);
+  const catalog = buildRlbLightCatalog(lightEntries);
   const remappedGroupMembers = remapRlbGroupMemberIds(
     glowOptions.tuningState,
-    buildRlbLightCatalog(lightEntries)
+    catalog
+  );
+  const outdoorSynced = syncRlbTypeGroupToCatalog(
+    glowOptions.tuningState,
+    "OutdoorLight",
+    catalog
   );
 
-  if (remappedGroupMembers > 0) {
+  if (remappedGroupMembers > 0 || outdoorSynced > 0) {
     saveRlbTuningState(glowOptions.tuningState);
-    logRlbGlow(`restored ${remappedGroupMembers} grouped lights after id remap`);
+    logRlbGlow(
+      `restored ${remappedGroupMembers} grouped lights`
+      + (outdoorSynced > 0 ? `, synced ${outdoorSynced} OutdoorLight(s) into 잔디등 group` : "")
+    );
   }
+
+  console.info(
+    `[rlb-glow] build=rlb-range-restore-20260907j lights=${lightEntries.length}`
+    + ` outdoor=${catalog.filter((item) => item.type === "OutdoorLight").length}`
+  );
 
   const spillOcclusionEnabled = glowOptions.spillOcclusion !== false;
   const occluderMeshes = spillOcclusionEnabled
@@ -696,6 +763,11 @@ export function setupAngjiRlbProximityGlow(BABYLON, scene, modelState, options =
       return;
     }
 
+    // Co-located GLB clones: only the kept spill source keeps fixture emissive.
+    if (mesh.metadata?.rlbLightDedupeSkip) {
+      return;
+    }
+
     seenFixtureMaterials.add(material);
 
     const rlbType = resolveRlbFixtureTypeFromMesh(mesh) || "Default";
@@ -766,6 +838,7 @@ export function setupAngjiRlbProximityGlow(BABYLON, scene, modelState, options =
       spillOcclusion: spillOcclusionEnabled,
       lightOcclusionWeights: spillOcclusionEnabled ? lifecycle.lightOcclusionWeights : null,
       occluderAabbs: spillOcclusionEnabled ? lifecycle.occluderAabbs : null,
+      occluderAabbCache: spillOcclusionEnabled ? lifecycle.occluderAabbCache : null,
       portalAabbs: spillOcclusionEnabled ? lifecycle.portalAabbs : null,
       getLightProfile: (entry) => getRlbProfileForLightEntry(entry, tuning),
       isLightEntryEnabled: (entry) => isRlbLightEntryEnabled(entry, tuning),
@@ -799,7 +872,7 @@ export function setupAngjiRlbProximityGlow(BABYLON, scene, modelState, options =
     }
 
     lifecycle.nameLabelsLoading = true;
-    import("./rlb-light-name-labels.js?v=rlb-shader-proximity-20260820-group-v49")
+    import("./rlb-light-name-labels.js?v=rlb-range-restore-20260907j")
       .then((mod) => {
         if (lifecycle.disposed || lifecycle.nameLabels || typeof mod.createRlbLightNameLabelLayer !== "function") {
           return;
@@ -935,7 +1008,19 @@ export function setupAngjiRlbProximityGlow(BABYLON, scene, modelState, options =
 
   const notifyNightMode = (isNight) => {
     lifecycle.isNight = Boolean(isNight);
-    return runUpdate();
+    // Editor Save writes localStorage; reload so walk/night picks up spill toggles
+    // even if in-memory glow state was created earlier from the baked preset.
+    glowOptions.tuningState = ensureRlbGroupState(loadRlbTuningState());
+    const active = runUpdate();
+    logRlbGlow(
+      `night=${Boolean(isNight)} retuned from storage`
+      + ` packed=${active}`
+      + ` typesOff=${Object.entries(glowOptions.tuningState?.types || {})
+        .filter(([, profile]) => profile?.shaderEnabled === false)
+        .map(([name]) => name)
+        .join("|") || "none"}`
+    );
+    return active;
   };
 
   if (lifecycle.shaderReady || overlayEnabled) {

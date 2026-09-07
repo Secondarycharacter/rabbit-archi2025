@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Metaverse Architecture Tour</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="./styles/main.css?v=npc-dialog-preview-canvas-20260903">
+  <link rel="stylesheet" href="./styles/main.css?v=post-load-chrome-20260907">
 </head>
 <body>
   <main class="game-shell">
@@ -51,10 +51,6 @@
 
       <div class="hud__bottom">
         <p id="statusMessage">Loading building model...</p>
-        <div class="hud__stats">
-          <span id="healthLabel">Human scale</span>
-          <span id="monsterLabel">Model collision</span>
-        </div>
       </div>
     </section>
 
@@ -70,25 +66,123 @@
       </label>
     </aside>
 
+    <aside class="control-tips" id="controlTips" hidden aria-label="조작방법 팁">
+      <section class="control-tips__block" data-tips-mode="orbit">
+        <h3 class="control-tips__title">조작방법</h3>
+        <h4 class="control-tips__subtitle">마우스</h4>
+        <ul class="control-tips__list">
+          <li><span class="control-tips__key">휠(클릭)</span><span class="control-tips__desc">회전</span></li>
+          <li><span class="control-tips__key">휠(회전)</span><span class="control-tips__desc">확대·축소</span></li>
+          <li><span class="control-tips__key">Shift + 휠(클릭)</span><span class="control-tips__desc">이동</span></li>
+        </ul>
+      </section>
+      <section class="control-tips__block" data-tips-mode="tour">
+        <h3 class="control-tips__title">조작방법</h3>
+        <h4 class="control-tips__subtitle">키보드</h4>
+        <ul class="control-tips__list">
+          <li><span class="control-tips__key">WASD</span><span class="control-tips__desc">이동</span></li>
+          <li><span class="control-tips__key">Shift</span><span class="control-tips__desc">달리기</span></li>
+          <li><span class="control-tips__key">Space</span><span class="control-tips__desc">점프</span></li>
+          <li><span class="control-tips__key">E</span><span class="control-tips__desc">상호작용</span></li>
+          <li class="is-pending"><span class="control-tips__key">Q</span><span class="control-tips__desc">다이얼메뉴 <em>(미구현)</em></span></li>
+          <li class="is-pending"><span class="control-tips__key">R</span><span class="control-tips__desc">재장전 <em>(미구현)</em></span></li>
+          <li class="is-pending"><span class="control-tips__key">I</span><span class="control-tips__desc">인벤토리 <em>(미구현)</em></span></li>
+          <li class="is-pending"><span class="control-tips__key">1~5</span><span class="control-tips__desc">아이템 <em>(미구현)</em></span></li>
+          <li><span class="control-tips__key">ESC</span><span class="control-tips__desc">취소 · 커서 표시</span></li>
+        </ul>
+        <h4 class="control-tips__subtitle">마우스</h4>
+        <ul class="control-tips__list">
+          <li><span class="control-tips__key">마우스</span><span class="control-tips__desc">시선</span></li>
+          <li><span class="control-tips__key">휠(회전)</span><span class="control-tips__desc">확대·축소</span></li>
+          <li class="is-pending"><span class="control-tips__key">좌클릭</span><span class="control-tips__desc">발사 <em>(미구현)</em></span></li>
+          <li class="is-pending"><span class="control-tips__key">우클릭</span><span class="control-tips__desc">특수기능 <em>(미구현)</em></span></li>
+        </ul>
+      </section>
+    </aside>
+
+    <aside class="basic-settings" id="basicSettings" aria-label="기본설정">
+      <button class="basic-settings__toggle" id="basicSettingsToggle" type="button" aria-expanded="false">
+        <span class="basic-settings__toggle-label">기본설정</span>
+        <span class="basic-settings__toggle-icon" aria-hidden="true">▾</span>
+      </button>
+      <div class="basic-settings__body" id="basicSettingsBody" hidden>
+        <div class="basic-settings__field" data-audio-channel="bgm">
+          <label class="basic-settings__field-label" for="basicSettingsBgm">배경음</label>
+          <input id="basicSettingsBgm" type="range" min="0" max="100" step="1" value="85">
+          <strong id="basicSettingsBgmValue">85%</strong>
+          <label class="basic-settings__mute" for="basicSettingsBgmMute" title="음소거">
+            <input id="basicSettingsBgmMute" type="checkbox" aria-label="배경음 음소거">
+            <span>음소거</span>
+          </label>
+        </div>
+        <div class="basic-settings__field" data-audio-channel="voice">
+          <label class="basic-settings__field-label" for="basicSettingsVoice">목소리</label>
+          <input id="basicSettingsVoice" type="range" min="0" max="100" step="1" value="100">
+          <strong id="basicSettingsVoiceValue">100%</strong>
+          <label class="basic-settings__mute" for="basicSettingsVoiceMute" title="음소거">
+            <input id="basicSettingsVoiceMute" type="checkbox" aria-label="목소리 음소거">
+            <span>음소거</span>
+          </label>
+        </div>
+        <label class="basic-settings__check" for="basicSettingsTips">
+          <input id="basicSettingsTips" type="checkbox" checked>
+          <span>조작방법 팁</span>
+        </label>
+      </div>
+    </aside>
+
     <button class="overview-admin-trigger" id="overviewAdminButton" type="button" aria-label="건축개요 관리">,,,</button>
 
     <aside class="overview-admin-panel" id="overviewAdminPanel" hidden>
-      <header>
+      <header class="overview-admin-panel__header">
         <h2>건축개요 관리</h2>
         <button id="overviewAdminCloseButton" type="button" aria-label="Close">×</button>
       </header>
-      <label class="overview-admin-passcode" for="overviewAdminPasscode">
-        <span>관리자 비밀번호</span>
-        <input id="overviewAdminPasscode" type="password" autocomplete="current-password">
-      </label>
-      <form id="overviewAdminForm" hidden>
-        <div id="overviewAdminRows"></div>
-        <div class="overview-admin-actions">
-          <button id="overviewAdminAddRowButton" type="button">항목 추가</button>
-          <button type="submit">저장</button>
-        </div>
-      </form>
-      <p id="overviewAdminStatus">Firebase 설정 전에는 이 브라우저에 임시 저장됩니다.</p>
+      <div class="overview-admin-panel__body">
+        <section class="overview-admin-section" id="overviewAdminUnlockSection">
+          <h3 class="overview-admin-section__title">잠금 해제</h3>
+          <label class="overview-admin-field" for="overviewAdminPasscode">
+            <span>관리자 비밀번호</span>
+            <input id="overviewAdminPasscode" type="password" autocomplete="current-password">
+          </label>
+          <p class="overview-admin-hint">비밀번호를 입력하면 개요 편집과 비밀번호 변경이 열립니다.</p>
+        </section>
+
+        <section class="overview-admin-section" id="overviewAdminEditSection" hidden>
+          <h3 class="overview-admin-section__title">개요 항목</h3>
+          <form id="overviewAdminForm">
+            <div id="overviewAdminRows"></div>
+            <div class="overview-admin-actions">
+              <button id="overviewAdminAddRowButton" type="button">항목 추가</button>
+              <button type="submit">저장</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="overview-admin-section" id="overviewAdminPasswordSection" hidden>
+          <h3 class="overview-admin-section__title">비밀번호 변경</h3>
+          <form id="overviewAdminPasswordForm" class="overview-admin-password-form">
+            <label class="overview-admin-field" for="overviewAdminPassCurrent">
+              <span>기존 비밀번호</span>
+              <input id="overviewAdminPassCurrent" name="current" type="password" autocomplete="current-password">
+            </label>
+            <label class="overview-admin-field" for="overviewAdminPassNext">
+              <span>변경할 비밀번호</span>
+              <input id="overviewAdminPassNext" name="next" type="password" autocomplete="new-password">
+            </label>
+            <label class="overview-admin-field" for="overviewAdminPassConfirm">
+              <span>변경할 비밀번호 확인</span>
+              <input id="overviewAdminPassConfirm" name="confirm" type="password" autocomplete="new-password">
+            </label>
+            <div class="overview-admin-actions">
+              <button type="submit">비밀번호 변경</button>
+            </div>
+          </form>
+          <p class="overview-admin-hint">변경한 비밀번호는 이 브라우저에 저장되며, 다음 잠금 해제부터 새 비밀번호를 사용합니다.</p>
+        </section>
+
+        <p id="overviewAdminStatus" class="overview-admin-status">Firebase 설정 전에는 이 브라우저에 임시 저장됩니다.</p>
+      </div>
     </aside>
 
 
@@ -151,7 +245,7 @@
   <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
   <script src="https://cdn.babylonjs.com/addons/babylonjs.addons.min.js"></script>
   <script src="./lib/babylonjs-fbx-loader.js"></script>
-  <script type="module" src="./src/first-person-tour.js?v=sole-plant-20260905"></script>
+  <script type="module" src="./src/first-person-tour.js?v=editor-local-only-20260907"></script>
   <script>
     (function () {
       const isEmbedded = new URLSearchParams(window.location.search).get('embed') === '1';

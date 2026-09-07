@@ -13,6 +13,15 @@ metaverse/data/npc/guests.local-overlay.json
 .DS_Store
 Thumbs.db
 
-# GLB backups: keep only the previous version locally (see metaverse/scripts/backup-models-before-commit.ps1)
-metaverse/assets/models/backup/*
-!metaverse/assets/models/backup/.gitkeep
+# GUIDE base backups (local only; current base stays tracked)
+metaverse/data/guide/backups/
+metaverse/data/guide/angji-guide-tour.versions.json
+
+# Model / scratch backups and local tooling output
+metaverse/assets/models/backup/
+metaverse/_tmp_*/
+metaverse/_tmp_*
+metaverse/src/.rlb-preset-captured
+Untitled
+_audit_gcs.diff
+preview-github.html

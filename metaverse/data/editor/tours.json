@@ -1,0 +1,246 @@
+{
+  "version": "1.0",
+  "projectId": "angji",
+  "tours": [
+    {
+      "id": "tour_000",
+      "name": "GUIDE 등장 및 사이트 현황",
+      "type": "tour",
+      "sourceEventId": "00",
+      "duration": 10,
+      "script": {
+        "ko": "안녕하세요. 앵지밭골 시니어형 체육관에 오신 것을 환영합니다.",
+        "en": "Hello. Welcome to the Angjibatgol Senior Sports Center.",
+        "voice": ""
+      },
+      "transform": {
+        "position": {
+          "x": -44.89,
+          "y": 21.95,
+          "z": 29.8
+        },
+        "rotationY": 268.8031495856257
+      }
+    },
+    {
+      "id": "tour_001",
+      "name": "정해진 자리에서 시작된 고민",
+      "type": "tour",
+      "sourceEventId": "01",
+      "duration": 10,
+      "script": {
+        "ko": "사실 체육관이 들어설 위치는 크게 고민할 수 있는 조건이 아니었습니다.",
+        "en": "In fact, there was little freedom in choosing the location of the sports center.",
+        "voice": ""
+      },
+      "transform": {
+        "position": {
+          "x": -83.07,
+          "y": 70.14,
+          "z": -206.53
+        },
+        "rotationY": 558.6338502525526
+      }
+    },
+    {
+      "id": "tour_002",
+      "name": "주변과 연결하는 배치",
+      "type": "tour",
+      "sourceEventId": "02",
+      "duration": 10,
+      "script": {
+        "ko": "체육관을 이곳에 넣으면서 가장 중요하게 생각한 것은 주변의 풍경을 막지 않는 것이었습니다.",
+        "en": "The most important consideration was to avoid blocking the surrounding landscape.",
+        "voice": ""
+      },
+      "transform": {
+        "position": {
+          "x": -64.94,
+          "y": 79.62,
+          "z": -206.8
+        },
+        "rotationY": 175.86366563745486
+      }
+    },
+    {
+      "id": "tour_003",
+      "name": "사람을 연결하는 동선",
+      "type": "tour",
+      "sourceEventId": "03",
+      "duration": 10,
+      "script": {
+        "ko": "이번에는 동선에 대한 이야기를 해볼게요.",
+        "en": "Now, let's look at the circulation.",
+        "voice": ""
+      },
+      "transform": {
+        "position": {
+          "x": -30.56999969482422,
+          "y": 21.8700008392334,
+          "z": 12.630000114440918
+        },
+        "rotationY": -3.9554480896942885
+      }
+    },
+    {
+      "id": "tour_004",
+      "name": "커뮤니티 홀, 건물의 중심",
+      "type": "tour",
+      "sourceEventId": "04",
+      "duration": 10,
+      "script": {
+        "ko": "이제 건물 안으로 들어왔습니다.",
+        "en": "Now we are inside the building.",
+        "voice": ""
+      },
+      "transform": {
+        "position": {
+          "x": -5.57,
+          "y": 22.17,
+          "z": 5.84
+        },
+        "rotationY": -422.6308584223491
+      }
+    },
+    {
+      "id": "tour_005",
+      "name": "실내와 외부를 하나로",
+      "type": "tour",
+      "sourceEventId": "05",
+      "duration": 10,
+      "script": {
+        "ko": "여기에서 밖을 바라보세요.",
+        "en": "Look outside from here.",
+        "voice": ""
+      },
+      "transform": {
+        "position": {
+          "x": 10.77,
+          "y": 22.17,
+          "z": -4.31
+        },
+        "rotationY": -419.64001873176625
+      }
+    },
+    {
+      "id": "tour_006",
+      "name": "하나의 공간, 다양한 활동",
+      "type": "tour",
+      "sourceEventId": "06",
+      "duration": 10,
+      "script": {
+        "ko": "이 체육관은 운동만을 위한 공간이 아닙니다.",
+        "en": "This sports center is not only for exercise.",
+        "voice": ""
+      },
+      "transform": {
+        "position": {
+          "x": -4.27,
+          "y": 22.17,
+          "z": -13.56
+        },
+        "rotationY": 143.4514431669042
+      }
+    },
+    {
+      "id": "tour_007",
+      "name": "하나의 공간, 다양한 활동",
+      "type": "tour",
+      "sourceEventId": "06",
+      "duration": 10,
+      "script": {
+        "ko": "이 체육관은 운동만을 위한 공간이 아닙니다.",
+        "en": "This sports center is not only for exercise.",
+        "voice": ""
+      },
+      "transform": {
+        "position": {
+          "x": -4.27,
+          "y": 22.17,
+          "z": -13.56
+        },
+        "rotationY": 143.4514431669042
+      }
+    },
+    {
+      "id": "tour_008",
+      "name": "그루터기, 건축의 모습이 되다",
+      "type": "tour",
+      "sourceEventId": "07",
+      "duration": 10,
+      "script": {
+        "ko": "지금부터는 이 건물의 모습을 살펴보겠습니다.",
+        "en": "Now, let's look at the character of the building itself.",
+        "voice": ""
+      },
+      "transform": {
+        "position": {
+          "x": -23.13,
+          "y": 22.018676138959364,
+          "z": -9.58
+        },
+        "rotationY": -449.6286297289135
+      }
+    },
+    {
+      "id": "tour_009",
+      "name": "빛과 바람을 담은 건축",
+      "type": "tour",
+      "sourceEventId": "08",
+      "duration": 10,
+      "script": {
+        "ko": "이번에는 건물 안으로 들어오는 자연을 살펴보겠습니다.",
+        "en": "Now, let's see how nature enters the building.",
+        "voice": ""
+      },
+      "transform": {
+        "position": {
+          "x": 7.739999771118164,
+          "y": 26.218678359619567,
+          "z": 1.9900000095367432
+        },
+        "rotationY": 62.45897033209564
+      }
+    },
+    {
+      "id": "tour_010",
+      "name": "형태가 환경이 되다",
+      "type": "tour",
+      "sourceEventId": "09",
+      "duration": 10,
+      "script": {
+        "ko": "이 건물의 역경사 형태를 자세히 살펴보세요.",
+        "en": "Take a closer look at the building's reverse-sloped form.",
+        "voice": ""
+      },
+      "transform": {
+        "position": {
+          "x": -6.25,
+          "y": 22.02,
+          "z": 26.07
+        },
+        "rotationY": 338.33157802475114
+      }
+    },
+    {
+      "id": "tour_011",
+      "name": "정해진 조건에서 새로운 관계로",
+      "type": "tour",
+      "sourceEventId": "10",
+      "duration": 10,
+      "script": {
+        "ko": "처음 이곳에서 무엇부터 살펴봤는지 기억하시나요?",
+        "en": "Do you remember what we looked at first?",
+        "voice": ""
+      },
+      "transform": {
+        "position": {
+          "x": -44.89,
+          "y": 21.95,
+          "z": 29.8
+        },
+        "rotationY": 268.8031495856257
+      }
+    }
+  ]
+}

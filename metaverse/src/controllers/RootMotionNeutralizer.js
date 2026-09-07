@@ -1108,7 +1108,10 @@ export function createRootMotionNeutralizer(BABYLON, asset) {
       });
     }
 
-    if (options.pinNodes === true) {
+    // Per-frame dance travel: pin Idle carriers only (bones keep authored gesture motion).
+    // Dance end / clip handoff: also reset hips-style translation bones so the mesh
+    // cannot sit away from guest.root while the GUIDE label stays on the root.
+    if (options.pinNodes === true && options.resetBones !== true) {
       if (options.syncSample) {
         commitRootMotionSample();
       }
@@ -1154,6 +1157,7 @@ export function createRootMotionNeutralizer(BABYLON, asset) {
     resetFootPlantOffset,
     consumePlanarRootMotionDelta,
     commitRootMotionSample,
-    resetRootMotionSample
+    resetRootMotionSample,
+    getPlanarCarrierWorldPosition: getCarrierWorldPosition
   };
 }

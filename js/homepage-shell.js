@@ -94,7 +94,6 @@ const metaversePreviewHint = document.getElementById('metaversePreviewHint');
 const metaverseOverview = document.getElementById('metaverseOverview');
 const metaverseChat = document.getElementById('metaverseChat');
 const metaverseFrame = document.getElementById('metaverseFrame');
-const metaverseFullscreenButton = document.getElementById('metaverseFullscreenButton');
 const extraLayout = document.getElementById('extraLayout');
 const extraOverview = document.getElementById('extraOverview');
 const extraChat = document.getElementById('extraChat');
@@ -393,9 +392,19 @@ function isClickableInH1(project) {
 }
 
 function setActiveView(name) {
+  const leavingMetaverse = Boolean(
+    views.metaverse?.classList.contains('is-active') && name !== 'metaverse'
+  );
+
   Object.entries(views).forEach(([key, element]) => {
     element.classList.toggle('is-active', key === name);
   });
+
+  // Drop the WebGL iframe when leaving metaverse. Night guest/RLB thrash otherwise
+  // keeps running in a hidden iframe and the next entry can hang on LOADING.
+  if (leavingMetaverse && metaverseFrame) {
+    metaverseFrame.src = 'about:blank';
+  }
 }
 
 function setCategory(category) {
@@ -1862,15 +1871,6 @@ function triggerEmbeddedAdmin() {
   }
 }
 
-function toggleMetaverseFullscreen() {
-  const target = views.metaverse;
-  if (!document.fullscreenElement) {
-    target.requestFullscreen?.();
-  } else {
-    document.exitFullscreen?.();
-  }
-}
-
 function getKstDateKey(date = new Date()) {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: 'Asia/Seoul',
@@ -2114,7 +2114,6 @@ function bindEvents() {
   });
 
   h2AdminTrigger.addEventListener('click', triggerEmbeddedAdmin);
-  metaverseFullscreenButton.addEventListener('click', toggleMetaverseFullscreen);
   h1ListViewport.addEventListener('wheel', onH1Wheel, { passive: false });
   bindH1ScrollbarDrag();
 
@@ -2141,7 +2140,7 @@ function bindEvents() {
   window.addEventListener('resize', () => syncMetaversePreviewLayout({ force: true }));
   window.addEventListener('resize', syncExtraPreviewLayout);
   document.addEventListener('pointerover', (event) => {
-    const clickable = event.target.closest('.is-clickable, .h2-menu-item, .h2-admin-trigger, .h0-preview-media, .h0-metaverse-toolbar button, .h0-extra-download-link');
+    const clickable = event.target.closest('.is-clickable, .h2-menu-item, .h2-admin-trigger, .h0-preview-media, .h0-extra-download-link');
     document.body.classList.toggle('is-pointer', Boolean(clickable));
   });
 }

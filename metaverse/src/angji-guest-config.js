@@ -4,7 +4,7 @@ export const ANGJI_NIGHT_DEVI_ASSET_ROOT = "./assets/Enemy/";
 export const ANGJI_NIGHT_DEVI_FILE = "01 Devi/Devi.glb";
 export const ANGJI_NIGHT_MARIE_FILE = "05 Edition/01 Marie Antoinette Fox/Edition_Marie.glb";
 export const ANGJI_NIGHT_MARIE_GUEST_ID = "Mark-Night-Marie";
-export const ANGJI_GUEST_CONFIG_VERSION = "angji-guest-night-marie-extra-20260719";
+export const ANGJI_GUEST_CONFIG_VERSION = "angji-mark19-waypoint-anim-20260903";
 
 export const ANGJI_PRIORITY_GUEST_IDS = ["Mark-1", "Mark-2"];
 export const ANGJI_SIMULTANEOUS_GUEST_IDS = ["Mark-4", "Mark-5", "Mark-6"];
@@ -53,11 +53,17 @@ export const ANGJI_NIGHT_DEVI_BEHAVIOR = {
 };
 
 export function toAngjiNightGuestSpawn(spawn) {
-  return {
+  // Keep day initial placement height/floor policy. Night swaps Idle + Devi mesh,
+  // so sit-clip-based Y lift would otherwise drop to 0 and enemies float/sink.
+  const daySitLift = getAngjiGuestPositionYOffset(spawn);
+  const nightSpawn = {
     id: spawn.id,
     position: { ...spawn.position },
     rotationY: spawn.rotationY,
     scaleMultiplier: spawn.scaleMultiplier,
+    targetHeight: spawn.targetHeight,
+    preferExternalFloor: spawn.preferExternalFloor,
+    positionYOverride: spawn.positionYOverride,
     devLabel: spawn.devLabel,
     file: ANGJI_NIGHT_DEVI_FILE,
     assetRoot: ANGJI_NIGHT_DEVI_ASSET_ROOT,
@@ -68,6 +74,14 @@ export function toAngjiNightGuestSpawn(spawn) {
       clipAliases: ["Idle", "IDLE", "Armature|Idle", "mixamo.com"]
     }
   };
+
+  if (typeof spawn.sitYOffsetOverride === "number") {
+    nightSpawn.sitYOffsetOverride = spawn.sitYOffsetOverride;
+  } else if (daySitLift) {
+    nightSpawn.sitYOffsetOverride = daySitLift;
+  }
+
+  return nightSpawn;
 }
 
 export function getAngjiNightExtraGuestSpawns() {
@@ -103,9 +117,9 @@ export function isAngjiDanceAnimationClip(clipName) {
   return ANGJI_DANCE_CLIP_PATTERN.test(String(clipName || ""));
 }
 
-export function shouldAngjiGuestAllowDanceRootMotion(spawnId) {
-  return isAngjiGuestId(spawnId)
-    && !ANGJI_DANCE_ROOT_MOTION_EXCLUDED_GUEST_IDS.includes(spawnId);
+/** @deprecated Kept for callers; dance root travel is allowed for all guests including Mark-4/5/6. */
+export function shouldAngjiGuestAllowDanceRootMotion(_spawnId) {
+  return true;
 }
 
 const ANGJI_RESERVED_GUEST_IDS = new Set([
@@ -258,18 +272,25 @@ const SIT_CLIP_PATTERN = /sit|seat/i;
 
 /** Patrol loop for Mark-19 (new area Mark-1~12 coordinates). */
 const ANGJI_MARK19_PATROL_WAYPOINTS = [
-  { x: 18.37, y: 22.17, z: 2.18 },
-  { x: 18.55, y: 22.17, z: 2.61 },
-  { x: 18.54, y: 22.17, z: 3.23 },
-  { x: 18.22, y: 22.17, z: 3.56 },
-  { x: 17.47, y: 22.17, z: 3.8 },
-  { x: 16.77, y: 22.17, z: 3.7 },
-  { x: 14.08, y: 22.17, z: -0.17 },
-  { x: 13.73, y: 22.17, z: -0.72 },
-  { x: 13.76, y: 22.17, z: -1.24 },
-  { x: 14.19, y: 22.17, z: -1.66 },
-  { x: 14.9, y: 22.17, z: -1.98 },
-  { x: 15.77, y: 22.17, z: -1.58 }
+  { x: 18.37, y: 22.17, z: 2.18, moveClip: "Walking" },
+  { x: 18.55, y: 22.17, z: 2.61, moveClip: "Walking" },
+  { x: 18.54, y: 22.17, z: 3.23, moveClip: "Walking" },
+  { x: 18.22, y: 22.17, z: 3.56, moveClip: "Walking" },
+  { x: 17.47, y: 22.17, z: 3.8, moveClip: "Walking" },
+  { x: 16.77, y: 22.17, z: 3.7, moveClip: "Walking" },
+  { x: 14.08, y: 22.17, z: -0.17, moveClip: "Walking" },
+  { x: 13.73, y: 22.17, z: -0.72, moveClip: "Walking" },
+  { x: 13.76, y: 22.17, z: -1.24, moveClip: "Walking" },
+  { x: 14.19, y: 22.17, z: -1.66, moveClip: "Walking" },
+  { x: 14.9, y: 22.17, z: -1.98, moveClip: "Walking" },
+  {
+    x: 15.77,
+    y: 22.17,
+    z: -1.58,
+    moveClip: "Walking",
+    arrivalClip: "Dance_Hiphop1",
+    arrivalCount: 1
+  }
 ];
 
 export function getAngjiGuestPositionYOffset(spawn) {
@@ -469,8 +490,8 @@ export const ANGJI_GUEST_MARKS = [
     animation: {
       type: "sequence",
       clips: [
-        "Idle_Breath",
-        "Idle_Breath",
+        "Idle",
+        "Idle",
         "Sport_Golf_Driver",
         "Sport_Golf_Driver",
         "Sport_Golf_Badshot"

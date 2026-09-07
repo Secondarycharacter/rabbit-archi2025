@@ -1,0 +1,1254 @@
+{
+  "version": "1.0",
+  "projectId": "angji",
+  "npcs": [
+    {
+      "id": "Angji-Guide",
+      "name": "GUIDE",
+      "type": "guide",
+      "deleted": false,
+      "model": {
+        "path": "00 Guide/Guide.glb"
+      },
+      "transform": {
+        "position": {
+          "x": -44.89,
+          "y": 21.934544557172217,
+          "z": 29.8
+        },
+        "rotationY": 268.8031495856257,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Idle",
+        "loop": true,
+        "clips": [
+          "Idle"
+        ],
+        "pivots": {}
+      },
+      "movement": null
+    },
+    {
+      "id": "Mark-1",
+      "name": "Mark-1",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "01 Happycats/01 Skeleton_Dancer/Happycats_Skeleton_Dancer.glb"
+      },
+      "transform": {
+        "position": {
+          "x": -13.799412727355957,
+          "y": 22.091469033440042,
+          "z": 6.273743629455566
+        },
+        "rotationY": -42.907076631494235,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Idle",
+        "loop": true,
+        "clips": [
+          "Idle"
+        ],
+        "pivots": {}
+      },
+      "movement": null
+    },
+    {
+      "id": "Mark-2",
+      "name": "Mark-2",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "01 Happycats/04 Happycat_Ninja/Happycats_Ninja_Samba Dancer.glb"
+      },
+      "transform": {
+        "position": {
+          "x": -11.14,
+          "y": 22.018676137809905,
+          "z": 15.83
+        },
+        "rotationY": 628.8326393119811,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Idle",
+        "loop": true,
+        "clips": [
+          "Idle"
+        ],
+        "pivots": {}
+      },
+      "movement": null
+    },
+    {
+      "id": "Mark-3",
+      "name": "Mark-3",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "02 Shrooms/01 Shroom_Hip Hop Dancer/Shroom_Hip Hop Dancer.glb"
+      },
+      "transform": {
+        "position": {
+          "x": 5.115595817565918,
+          "y": 22.2401180267334,
+          "z": -0.3220854103565216
+        },
+        "rotationY": -133.0604460075866,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": -0.18440440337171804,
+        "y": 0.07143974195051328,
+        "z": 0.09791459819657317
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Seat_Clapping",
+        "loop": true,
+        "clips": [
+          "Seat_Clapping"
+        ],
+        "pivots": {
+          "Seat_Clapping": {
+            "useCustom": true,
+            "x": -0.18469639069512844,
+            "y": 0.07143974195051328,
+            "z": -0.03197124068418539
+          }
+        }
+      },
+      "movement": null
+    },
+    {
+      "id": "Mark-4",
+      "name": "Mark-4",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "04 Monkey/01 Monkey1/Monkey_Thriller Dancer_Ver1.glb"
+      },
+      "transform": {
+        "position": {
+          "x": -16.098726272583008,
+          "y": 22.468677520751953,
+          "z": -2.5245718955993652
+        },
+        "rotationY": 119.21013536014881,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "sequence",
+        "type": "sequence",
+        "default": "Dance_Thriller0",
+        "loop": true,
+        "clips": [
+          "Dance_Thriller0",
+          "Dance_Thriller1",
+          "Dance_Thriller2",
+          "Dance_Thriller3",
+          "Dance_Thriller4"
+        ],
+        "pivots": {}
+      },
+      "movement": null
+    },
+    {
+      "id": "Mark-5",
+      "name": "Mark-5",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "04 Monkey/02 Monkey2/Monkey_Thriller Dancer_Ver2.glb"
+      },
+      "transform": {
+        "position": {
+          "x": -18.161880493164062,
+          "y": 22.468677520751953,
+          "z": -5.962584495544434
+        },
+        "rotationY": 114.7778550976011,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "sequence",
+        "type": "sequence",
+        "default": "Dance_Thriller0",
+        "loop": true,
+        "clips": [
+          "Dance_Thriller0",
+          "Dance_Thriller1",
+          "Dance_Thriller2",
+          "Dance_Thriller3",
+          "Dance_Thriller4"
+        ],
+        "pivots": {}
+      },
+      "movement": null
+    },
+    {
+      "id": "Mark-6",
+      "name": "Mark-6",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "04 Monkey/02 Monkey2/Monkey_Thriller Dancer_Ver2.glb"
+      },
+      "transform": {
+        "position": {
+          "x": -14.471735000610352,
+          "y": 22.468677520751953,
+          "z": 1.0732386112213135
+        },
+        "rotationY": 121.1948718932227,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "sequence",
+        "type": "sequence",
+        "default": "Dance_Thriller0",
+        "loop": true,
+        "clips": [
+          "Dance_Thriller0",
+          "Dance_Thriller1",
+          "Dance_Thriller2",
+          "Dance_Thriller3",
+          "Dance_Thriller4"
+        ],
+        "pivots": {}
+      },
+      "movement": null
+    },
+    {
+      "id": "Mark-7",
+      "name": "Mark-7",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "02 Shrooms/04 Shroom_Gangnam style Dancer/Shroom_Gangnam style Dancer.glb"
+      },
+      "transform": {
+        "position": {
+          "x": -2.359999895095825,
+          "y": 22.067829132080078,
+          "z": -0.3199999928474426
+        },
+        "rotationY": 555.3049654628426,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Sit_Clap",
+        "loop": true,
+        "clips": [
+          "Sit_Clap"
+        ],
+        "pivots": {
+          "Sit_Clap": {
+            "useCustom": true,
+            "x": 1.0490417468034252e-7,
+            "y": -0.10084915270666528,
+            "z": 7.152557379708213e-9
+          }
+        }
+      },
+      "movement": null
+    },
+    {
+      "id": "Mark-8",
+      "name": "Mark-8",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "02 Shrooms/05 Shroom_Swing Dancer/Shroom_Swing Dancer.glb"
+      },
+      "transform": {
+        "position": {
+          "x": 5.3835301507820965,
+          "y": 22.080873489379883,
+          "z": -4.321022966999939
+        },
+        "rotationY": 563.102921054573,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Sitting Talking",
+        "loop": true,
+        "clips": [
+          "Sitting Talking"
+        ],
+        "pivots": {
+          "Sitting Talking": {
+            "useCustom": true,
+            "x": -0.44646984921790356,
+            "y": -0.20780479557808107,
+            "z": -0.001022966999938646
+          }
+        }
+      },
+      "movement": null
+    },
+    {
+      "id": "Mark-9",
+      "name": "Mark-9",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "05 Edition/01 Marie Antoinette Fox/Edition_Marie.glb"
+      },
+      "transform": {
+        "position": {
+          "x": -5.08,
+          "y": 22.21,
+          "z": 16.32
+        },
+        "rotationY": 844.9866971030355,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "sequence",
+        "type": "sequence",
+        "default": "Dance_Samba1",
+        "loop": true,
+        "clips": [
+          "Dance_Samba1",
+          "Dance_Samba2",
+          "Dance_Samba3",
+          "Dance_Samba4",
+          "Dance_Samba5",
+          "Dance_Samba6",
+          "Dance_Samba7",
+          "Dance_Samba8"
+        ],
+        "pivots": {}
+      },
+      "movement": null
+    },
+    {
+      "id": "Mark-10",
+      "name": "Mark-10",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "02 Shrooms/05 Shroom_Swing Dancer/Shroom_Swing Dancer.glb"
+      },
+      "transform": {
+        "position": {
+          "x": -5.76,
+          "y": 22.2,
+          "z": 13.77
+        },
+        "rotationY": 97.86119140834461,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "sequence",
+        "type": "sequence",
+        "default": "Swing Dancing (1)",
+        "loop": true,
+        "clips": [
+          "Swing Dancing (1)",
+          "Swing Dancing (2)",
+          "Swing Dancing (3)",
+          "Swing Dancing (4)",
+          "Swing Dancing (5)"
+        ],
+        "pivots": {}
+      },
+      "movement": null
+    },
+    {
+      "id": "Mark-11",
+      "name": "Mark-11",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "01 Happycats/04 Happycat_Ninja/Happycats_Ninja_Samba Dancer.glb"
+      },
+      "transform": {
+        "position": {
+          "x": -2.79,
+          "y": 22.2,
+          "z": 18.89
+        },
+        "rotationY": 174.45418946143306,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "sequence",
+        "type": "sequence",
+        "default": "Samba Dancing01",
+        "loop": true,
+        "clips": [
+          "Samba Dancing01",
+          "Samba Dancing02",
+          "Samba Dancing03",
+          "Samba Dancing04",
+          "Samba Dancing05",
+          "Samba Dancing06",
+          "Samba Dancing07"
+        ],
+        "pivots": {}
+      },
+      "movement": null
+    },
+    {
+      "id": "Mark-12",
+      "name": "Mark-12",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "02 Shrooms/04 Shroom_Gangnam style Dancer/Shroom_Gangnam style Dancer.glb"
+      },
+      "transform": {
+        "position": {
+          "x": 0.32,
+          "y": 22.2,
+          "z": 12.39
+        },
+        "rotationY": 338.8243217285636,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "sequence",
+        "type": "sequence",
+        "default": "Dance_Gangnam Style",
+        "loop": true,
+        "clips": [
+          "Dance_Gangnam Style",
+          "Dance_Locking Hip Hop"
+        ],
+        "pivots": {}
+      },
+      "movement": null
+    },
+    {
+      "id": "Mark-13",
+      "name": "Mark-13",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "02 Shrooms/01 Shroom_Hip Hop Dancer/Shroom_Hip Hop Dancer.glb"
+      },
+      "transform": {
+        "position": {
+          "x": -24.70335578918457,
+          "y": 22.0186767578125,
+          "z": -9.835206031799316
+        },
+        "rotationY": 156.3350343091175,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Idle",
+        "loop": true,
+        "clips": [
+          "Idle"
+        ],
+        "pivots": {}
+      },
+      "movement": {
+        "type": "patrol",
+        "clip": "Run_Jogging",
+        "speed": 0.1,
+        "patrolTargets": [
+          {
+            "x": -22.632188919776567,
+            "y": 22.01867613905052,
+            "z": -11.995581578896523
+          },
+          {
+            "x": -13.593011052810326,
+            "y": 22.01867613928654,
+            "z": -16.867403530630213
+          },
+          {
+            "x": 4.028835793881822,
+            "y": 23.195966950574295,
+            "z": -27.571291784299873
+          },
+          {
+            "x": 6.340327988183569,
+            "y": 23.35922932234014,
+            "z": -28.931820540751236
+          },
+          {
+            "x": 7.370113327366066,
+            "y": 23.3686775408639,
+            "z": -29.14759284445447
+          },
+          {
+            "x": 8.20818080539463,
+            "y": 23.368677540826283,
+            "z": -28.30964288312189
+          },
+          {
+            "x": 22.536477064652658,
+            "y": 23.36867753957432,
+            "z": -0.421241091776424
+          },
+          {
+            "x": 23.718905694723798,
+            "y": 23.368677539463356,
+            "z": 2.4230733379161773
+          },
+          {
+            "x": 23.25572666424648,
+            "y": 23.14479493406227,
+            "z": 4.713507385245593
+          },
+          {
+            "x": 21.072705465270342,
+            "y": 22.98429605622784,
+            "z": 6.988444405078294
+          },
+          {
+            "x": -2.4441764978654987,
+            "y": 22.018676137385675,
+            "z": 25.278744652107818
+          },
+          {
+            "x": -4.099114145289404,
+            "y": 22.018676137370704,
+            "z": 25.804790085460045
+          },
+          {
+            "x": -5.851936659256373,
+            "y": 22.01867613739472,
+            "z": 25.269780449693485
+          },
+          {
+            "x": -23.68028450012207,
+            "y": 22.018676138844548,
+            "z": -7.022718906402588
+          },
+          {
+            "x": -24.70335578918457,
+            "y": 22.018676138970918,
+            "z": -9.835206031799316
+          }
+        ],
+        "snapToFloor": true,
+        "snapToFloorSegments": [
+          {
+            "fromMark": 3,
+            "toMark": 4
+          },
+          {
+            "fromMark": 6,
+            "toMark": 8
+          }
+        ],
+        "easeSpeed": false
+      }
+    },
+    {
+      "id": "Mark-14",
+      "name": "Mark-14",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "01 Happycats/01 Skeleton_Dancer/Happycats_Skeleton_Dancer.glb"
+      },
+      "transform": {
+        "position": {
+          "x": -66.93,
+          "y": 21.652120381307384,
+          "z": 12.6
+        },
+        "rotationY": 203.3484510698805,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "sequence",
+        "type": "sequence",
+        "default": "Idle",
+        "loop": true,
+        "clips": [
+          "Idle",
+          "Idle",
+          "Sport_Golf_Driver",
+          "Sport_Golf_Driver",
+          "Sport_Golf_Badshot"
+        ],
+        "pivots": {}
+      },
+      "movement": null
+    },
+    {
+      "id": "Mark-15",
+      "name": "Mark-15",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "01 Happycats/02_Happycat_Ultra_General/Happycats_Ultra_gen.glb"
+      },
+      "transform": {
+        "position": {
+          "x": 47.62,
+          "y": 23.768677541287495,
+          "z": -38.39
+        },
+        "rotationY": 265.1075718070319,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0.4,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Sit_Footswing",
+        "loop": true,
+        "clips": [
+          "Sit_Footswing"
+        ],
+        "pivots": {}
+      },
+      "movement": null
+    },
+    {
+      "id": "Mark-16",
+      "name": "Mark-16",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "02 Shrooms/01 Shroom_Hip Hop Dancer/Shroom_Hip Hop Dancer.glb"
+      },
+      "transform": {
+        "position": {
+          "x": 29.22,
+          "y": 23.37,
+          "z": -13.46
+        },
+        "rotationY": 205.27358926152002,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Idle",
+        "loop": true,
+        "clips": [
+          "Idle"
+        ],
+        "pivots": {}
+      },
+      "movement": {
+        "type": "patrol",
+        "clip": "Walking",
+        "speed": 0.2,
+        "patrolTargets": [
+          {
+            "x": 22.02,
+            "y": 23.37,
+            "z": -16.56
+          },
+          {
+            "x": 26.29,
+            "y": 23.37,
+            "z": -19.34
+          },
+          {
+            "x": 29.22,
+            "y": 23.37,
+            "z": -13.46
+          }
+        ],
+        "clips": [
+          "Walking",
+          "Run_Fast"
+        ],
+        "randomClip": true,
+        "arrivalClip": "Idle",
+        "arrivalHoldMs": 3000,
+        "arrivalLookAt": {
+          "x": 18.66,
+          "y": 23.37,
+          "z": -29.74
+        },
+        "snapToFloor": true,
+        "easeSpeed": true
+      }
+    },
+    {
+      "id": "Mark-17",
+      "name": "Mark-17",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "02 Shrooms/04 Shroom_Gangnam style Dancer/Shroom_Gangnam style Dancer.glb"
+      },
+      "transform": {
+        "position": {
+          "x": 24.488169002088238,
+          "y": 23.37,
+          "z": -23.463629179019428
+        },
+        "rotationY": 101.4742225366346,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Idle",
+        "loop": true,
+        "clips": [
+          "Idle"
+        ],
+        "pivots": {}
+      },
+      "movement": {
+        "type": "patrol",
+        "clip": "Walking",
+        "speed": 0.2,
+        "patrolTargets": [
+          {
+            "x": 25.16,
+            "y": 23.37,
+            "z": -23.6
+          },
+          {
+            "x": 19.84,
+            "y": 23.37,
+            "z": -22.34
+          },
+          {
+            "x": 17.49,
+            "y": 23.37,
+            "z": -28.15
+          }
+        ],
+        "clips": [
+          "Walking",
+          "Run_Fast"
+        ],
+        "randomClip": true,
+        "arrivalClip": "Idle",
+        "arrivalHoldMs": 3000,
+        "arrivalLookAt": {
+          "x": 29.56,
+          "y": 23.37,
+          "z": -10.3
+        },
+        "snapToFloor": true,
+        "easeSpeed": true
+      }
+    },
+    {
+      "id": "Mark-18",
+      "name": "Mark-18",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "01 Happycats/04 Happycat_Ninja/Happycats_Ninja_Samba Dancer.glb"
+      },
+      "transform": {
+        "position": {
+          "x": 41.98,
+          "y": 23.37,
+          "z": -44.43
+        },
+        "rotationY": 125.98195999336541,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Idle",
+        "loop": true,
+        "clips": [
+          "Idle"
+        ],
+        "pivots": {}
+      },
+      "movement": {
+        "type": "patrol",
+        "clip": "Run_Goofy",
+        "speed": 0.05,
+        "patrolTargets": [
+          {
+            "x": 48.55901976217203,
+            "y": 23.75487289428711,
+            "z": -47.673883559816566
+          },
+          {
+            "x": 53.331585431213526,
+            "y": 23.37,
+            "z": -51.21412847300327
+          },
+          {
+            "x": 56.238950509313916,
+            "y": 23.37,
+            "z": -51.86598491550454
+          },
+          {
+            "x": 57.035596098190744,
+            "y": 23.37,
+            "z": -48.94023269239871
+          },
+          {
+            "x": 56.00703611915326,
+            "y": 23.37,
+            "z": -41.7793013639096
+          },
+          {
+            "x": 56.55324515501138,
+            "y": 23.37,
+            "z": -33.65728358392215
+          },
+          {
+            "x": 46.61505499826081,
+            "y": 23.37,
+            "z": -27.105256317379883
+          },
+          {
+            "x": 44.74081076344506,
+            "y": 23.37,
+            "z": -27.934955926155702
+          },
+          {
+            "x": 45.76526218506715,
+            "y": 23.37,
+            "z": -34.28955337765197
+          },
+          {
+            "x": 44.61880836490236,
+            "y": 23.37,
+            "z": -42.386740109645906
+          },
+          {
+            "x": 41.98,
+            "y": 23.37,
+            "z": -44.43
+          }
+        ],
+        "cycleRestClip": "Idle",
+        "cycleRestCount": 2,
+        "snapToFloor": true,
+        "easeSpeed": false
+      }
+    },
+    {
+      "id": "Mark-19",
+      "name": "N01",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "01 Happycats/01 Skeleton_Dancer/Happycats_Skeleton_Dancer.glb"
+      },
+      "transform": {
+        "position": {
+          "x": 15.77,
+          "y": 22.16867828483481,
+          "z": -1.58
+        },
+        "rotationY": -325.96714880582795,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Idle",
+        "loop": true,
+        "clips": [
+          "Idle"
+        ],
+        "pivots": {}
+      },
+      "movement": {
+        "type": "patrol",
+        "clip": "Walking",
+        "speed": 0.12,
+        "patrolTargets": [
+          {
+            "x": 18.37,
+            "y": 22.168678284666015,
+            "z": 2.18,
+            "moveClip": "Walking"
+          },
+          {
+            "x": 18.55,
+            "y": 22.16867828464669,
+            "z": 2.61,
+            "moveClip": "Walking"
+          },
+          {
+            "x": 18.54,
+            "y": 22.168678284618863,
+            "z": 3.23,
+            "moveClip": "Walking"
+          },
+          {
+            "x": 18.22,
+            "y": 22.168678284604084,
+            "z": 3.56,
+            "moveClip": "Walking"
+          },
+          {
+            "x": 17.47,
+            "y": 22.168678284593312,
+            "z": 3.8,
+            "moveClip": "Walking"
+          },
+          {
+            "x": 16.77,
+            "y": 22.168678284597803,
+            "z": 3.7,
+            "moveClip": "Walking"
+          },
+          {
+            "x": 14.08,
+            "y": 22.168678284771914,
+            "z": -0.17,
+            "moveClip": "Walking"
+          },
+          {
+            "x": 13.73,
+            "y": 22.168678284796613,
+            "z": -0.72,
+            "moveClip": "Walking"
+          },
+          {
+            "x": 13.76,
+            "y": 22.168678284819947,
+            "z": -1.24,
+            "moveClip": "Walking"
+          },
+          {
+            "x": 14.19,
+            "y": 22.168678284838848,
+            "z": -1.66,
+            "moveClip": "Walking"
+          },
+          {
+            "x": 14.9,
+            "y": 22.1686782848532,
+            "z": -1.98,
+            "moveClip": "Walking"
+          },
+          {
+            "x": 15.77,
+            "y": 22.16867828483481,
+            "z": -1.58,
+            "moveClip": "Walking",
+            "arrivalClip": "Dance_Hiphop1",
+            "arrivalCount": 1
+          }
+        ],
+        "cycleRestClip": "Dance_Hiphop1",
+        "cycleRestCount": 1,
+        "snapToFloor": true,
+        "easeSpeed": true
+      }
+    },
+    {
+      "id": "Mark-20",
+      "name": "N13",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "03 rabbit04_Staff01/rabbit_Staff01.glb"
+      },
+      "transform": {
+        "position": {
+          "x": 12.100673553958076,
+          "y": 22.168678284626715,
+          "z": 3.254335416092566
+        },
+        "rotationY": -940.8941024299841,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "IDLE",
+        "loop": true,
+        "clips": [
+          "IDLE"
+        ],
+        "pivots": {}
+      },
+      "movement": null
+    },
+    {
+      "id": "Mark-21",
+      "name": "N14",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "05 Edition/01 Marie Antoinette Fox/Edition_Marie.glb"
+      },
+      "transform": {
+        "position": {
+          "x": 12.600000381469727,
+          "y": 21.86661720275879,
+          "z": 8.989999771118164
+        },
+        "rotationY": 130.37996012369044,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Sit_Footcross",
+        "loop": true,
+        "clips": [
+          "Sit_Footcross"
+        ],
+        "pivots": {
+          "Sit_Footcross": {
+            "useCustom": true,
+            "x": 3.8146972691777137e-7,
+            "y": -0.4220610816014947,
+            "z": -2.2888183615066282e-7
+          }
+        }
+      },
+      "movement": null
+    },
+    {
+      "id": "Mark-22",
+      "name": "N15",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "02 Shrooms/04 Shroom_Gangnam style Dancer/Shroom_Gangnam style Dancer.glb"
+      },
+      "transform": {
+        "position": {
+          "x": 9.720635640317882,
+          "y": 22.16867828476373,
+          "z": -0.4213684546216385
+        },
+        "rotationY": 41.32413101654803,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0.22913921241407387,
+        "y": 0,
+        "z": -0.2404997857496325
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Sit_Idle",
+        "loop": true,
+        "clips": [
+          "Sit_Idle"
+        ],
+        "pivots": {}
+      },
+      "movement": null
+    }
+  ]
+}

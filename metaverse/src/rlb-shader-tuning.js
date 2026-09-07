@@ -10,9 +10,11 @@ import {
   RLB_TUNING_TYPE_ORDER,
   resolveRlbSpillShapeCode
 } from "./rlb-fixture-types.js";
-import { RLB_ANGJI_NIGHT_PRESET } from "./rlb-angji-night-preset.js?v=rlb-shader-proximity-20260820-group-v50";
+import { RLB_ANGJI_NIGHT_PRESET } from "./rlb-angji-night-preset.js?v=rlb-range-restore-20260907j";
 
 export const RLB_TUNING_STORAGE_KEY = "angji-rlb-shader-tuning-v9";
+export const RLB_PRESET_BUILD_KEY = "angji-rlb-preset-build";
+export const RLB_PRESET_BUILD = "rlb-range-restore-20260907j";
 const RLB_TUNING_STORAGE_FALLBACK_KEYS = [
   "angji-rlb-shader-tuning-v10",
   "angji-rlb-shader-tuning-v8",
@@ -318,6 +320,51 @@ export function rebuildRlbLightGroups(tuningState) {
   return state;
 }
 
+/**
+ * Put every catalog light of a type into that type's primary group and mirror
+ * the group profile onto types[typeName], so ungrouped leftovers cannot drift.
+ */
+export function syncRlbTypeGroupToCatalog(tuningState, typeName, catalogItems) {
+  const state = ensureRlbGroupState(tuningState);
+  const type = String(typeName || "");
+  const ofType = (Array.isArray(catalogItems) ? catalogItems : [])
+    .filter((item) => item?.type === type && item?.id);
+
+  if (!type || ofType.length < 1) {
+    return 0;
+  }
+
+  let group = Object.values(state.groups).find((entry) => entry?.typeName === type) || null;
+
+  if (!group) {
+    group = createRlbLightGroup(
+      state,
+      type,
+      type === "OutdoorLight" ? "01 잔디등" : `${type} 그룹`,
+      ofType.map((item) => item.id)
+    );
+  }
+
+  const before = new Set(group.memberIds || []);
+  const nextIds = ofType.map((item) => item.id);
+  group.memberIds = nextIds;
+
+  if (group.profile && state.types?.[type]) {
+    state.types[type] = cloneRlbProfile(group.profile);
+  }
+
+  rebuildRlbLightGroups(state);
+
+  let added = 0;
+  nextIds.forEach((id) => {
+    if (!before.has(id)) {
+      added += 1;
+    }
+  });
+
+  return added;
+}
+
 export function getRlbGroupsForType(tuningState, typeName) {
   const state = ensureRlbGroupState(tuningState);
   return Object.values(state.groups).filter((group) => group?.typeName === typeName);
@@ -327,7 +374,30 @@ export function resolveRlbGroupForLight(entry, tuningState) {
   const state = ensureRlbGroupState(tuningState);
   const lightId = entry?.lightId || makeRlbLightId(entry);
   const groupId = state.lightGroups?.[lightId];
-  const group = groupId ? state.groups?.[groupId] : null;
+  let group = groupId ? state.groups?.[groupId] : null;
+
+  // Position in lightId can drift after origin fixes; fall back to mesh name so
+  // OutdoorLight #N cannot silently leave its group while the panel still shows
+  // the shared group profile.
+  if (!group && entry?.mesh) {
+    const meshName = String(entry.mesh.name || entry.mesh.id || "").trim();
+    const typeName = entry.rlbType || null;
+
+    if (meshName) {
+      group = Object.values(state.groups).find((candidate) => {
+        if (!candidate || (typeName && candidate.typeName && candidate.typeName !== typeName)) {
+          return false;
+        }
+
+        return (candidate.memberIds || []).some((memberId) => {
+          const parsed = parseRlbLightId(memberId);
+          return parsed?.meshName === meshName
+            || String(memberId).includes(`|${meshName}|`)
+            || String(memberId).endsWith(`|${meshName}`);
+        });
+      }) || null;
+    }
+  }
 
   if (!group || (entry?.rlbType && group.typeName && group.typeName !== entry.rlbType)) {
     return null;
@@ -562,6 +632,21 @@ function maybeCaptureLocalTuningPreset(raw) {
     return;
   }
 
+  // Optional local capture daemon (port 8766). Off by default — otherwise every
+  // save/load spam "ERR_CONNECTION_REFUSED" in DevTools when the daemon is not running.
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const enabled = params.get("rlbCapture") === "1"
+      || params.get("rlbCapture") === "true"
+      || window.localStorage?.getItem("angji-rlb-capture") === "1";
+
+    if (!enabled) {
+      return;
+    }
+  } catch {
+    return;
+  }
+
   fetch("http://127.0.0.1:8766/rlb-preset", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -598,9 +683,25 @@ export function loadRlbTuningState() {
   }
 
   try {
+    const params = new URLSearchParams(window.location.search);
+    const forceReset = params.get("rlbReset") === "1" || params.get("rlbReset") === "true";
+    const storedBuild = localStorage.getItem(RLB_PRESET_BUILD_KEY);
+    const buildStale = storedBuild !== RLB_PRESET_BUILD;
+
+    if (forceReset || buildStale) {
+      localStorage.removeItem(RLB_TUNING_STORAGE_KEY);
+      RLB_TUNING_STORAGE_FALLBACK_KEYS.forEach((key) => localStorage.removeItem(key));
+      localStorage.setItem(RLB_PRESET_BUILD_KEY, RLB_PRESET_BUILD);
+      console.info(
+        `[rlb-tune] using baked night preset (${forceReset ? "rlbReset" : `build ${RLB_PRESET_BUILD}`})`
+      );
+      return bakedNightPresetState();
+    }
+
     const stored = readStoredTuningRaw();
 
     if (!stored.raw) {
+      localStorage.setItem(RLB_PRESET_BUILD_KEY, RLB_PRESET_BUILD);
       return bakedNightPresetState();
     }
 
@@ -654,6 +755,50 @@ export function isRlbTypeShaderEnabled(typeName, tuningState) {
   return profile.shaderEnabled !== false;
 }
 
+/**
+ * Type-level spill master switch. Group profiles inherit this gate so unchecking
+ * a type tab turns off every grouped light of that type (not only ungrouped ones).
+ */
+export function setRlbTypeShaderEnabled(tuningState, typeName, enabled) {
+  const state = ensureRlbGroupState(tuningState || createDefaultRlbTuningState());
+  const profile = state.types[typeName] || state.types.Default || createBaseTypeProfile();
+
+  if (!state.types[typeName]) {
+    state.types[typeName] = profile;
+  }
+
+  profile.shaderEnabled = Boolean(enabled);
+
+  getRlbGroupsForType(state, typeName).forEach((group) => {
+    if (!group.profile || typeof group.profile !== "object") {
+      group.profile = createBaseTypeProfile();
+    }
+
+    group.profile.shaderEnabled = Boolean(enabled);
+  });
+
+  return state;
+}
+
+/** Global spill master switch for every type + group profile. */
+export function setAllRlbShaderEnabled(tuningState, enabled) {
+  const state = ensureRlbGroupState(tuningState || createDefaultRlbTuningState());
+
+  Object.keys(state.types || {}).forEach((typeName) => {
+    setRlbTypeShaderEnabled(state, typeName, enabled);
+  });
+
+  Object.values(state.groups || {}).forEach((group) => {
+    if (!group?.profile || typeof group.profile !== "object") {
+      return;
+    }
+
+    group.profile.shaderEnabled = Boolean(enabled);
+  });
+
+  return state;
+}
+
 export function isRlbLightEntryEnabled(entry, tuningState) {
   return getRlbProfileForLightEntry(entry, tuningState).shaderEnabled !== false;
 }
@@ -665,7 +810,10 @@ export function getRlbProfileForLightEntry(entry, tuningState) {
   const typeProfile = tuning.types[typeName] || tuning.types.Default || createBaseTypeProfile();
   const profileSource = group?.profile || typeProfile;
   const global = tuning.global || {};
-  const shaderEnabled = profileSource.shaderEnabled !== false;
+  // Type switch is a master gate; group can still disable a subset when type is on.
+  const typeEnabled = typeProfile.shaderEnabled !== false;
+  const groupEnabled = group ? group.profile?.shaderEnabled !== false : true;
+  const shaderEnabled = typeEnabled && groupEnabled;
 
   const innerRadius = clampNumber(
     profileSource.innerRadius ?? global.innerRadius,

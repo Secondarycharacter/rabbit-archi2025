@@ -4,9 +4,10 @@
 
 export const RLB_SPILL_OCCLUSION_MARGIN = 0.12;
 export const RLB_SPILL_OCCLUSION_SAMPLE_CAP = 24;
-export const RLB_SHADER_MAX_OCCLUDERS = 48;
+/** Keep in sync with rlb-proximity-shader-plugin.js RLB_SHADER_MAX_OCCLUDERS. */
+export const RLB_SHADER_MAX_OCCLUDERS = 32;
 export const RLB_SHADER_MAX_PORTALS = 24;
-export const RLB_OCCLUDER_SLAB_THICKNESS = 2.4;
+export const RLB_OCCLUDER_SLAB_THICKNESS = 2.5;
 
 function normalizeRlbMaterialName(name) {
   return String(name || "").trim().toLowerCase().replace(/[\s_-]+/g, "");
@@ -54,6 +55,9 @@ export function isRlbOpaqueWallMaterialName(name) {
     normalized.includes("wallwood")
     || normalized.includes("wallpaint")
     || normalized.includes("wallpainr")
+    || normalized.includes("walltile")
+    || normalized.includes("concretewall")
+    || normalized.includes("drywall")
     || normalized.startsWith("0m2wall")
   );
 }
@@ -111,6 +115,10 @@ export function collectRlbVisualWallOccluderMeshes(meshes) {
 
     if (mesh.metadata?.angjiCollisionLayer) {
       return false;
+    }
+
+    if (mesh.metadata?.angjiWallSurface) {
+      return true;
     }
 
     return meshHasOpaqueWallMaterial(mesh);
@@ -296,7 +304,7 @@ function aabbExtent(bounds) {
   ];
 }
 
-function shrinkRlbSlabAabb(bounds, inset = 0.16) {
+function shrinkRlbSlabAabb(bounds, inset = 0.10) {
   if (!bounds?.min || !bounds?.max) {
     return bounds;
   }
@@ -311,7 +319,8 @@ function shrinkRlbSlabAabb(bounds, inset = 0.16) {
     thinIndex = 2;
   }
 
-  const halfInset = Math.min(inset, Math.max(0, extent[thinIndex] * 0.35));
+  // Mild inset only — aggressive shrink made wall slabs miss ray tests and leak spill.
+  const halfInset = Math.min(inset, Math.max(0, extent[thinIndex] * 0.18));
   const min = [...bounds.min];
   const max = [...bounds.max];
   min[thinIndex] += halfInset;
@@ -348,20 +357,76 @@ function aabbDistanceSqToPoint(bounds, point) {
   return dx * dx + dy * dy + dz * dz;
 }
 
+function clamp01(value) {
+  return Math.min(1, Math.max(0, value));
+}
+
+/** Squared distance from AABB to segment AB (light → focus). */
+function aabbDistanceSqToSegment(bounds, a, b) {
+  if (!a || !b) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  const abx = b.x - a.x;
+  const aby = b.y - a.y;
+  const abz = b.z - a.z;
+  const abLenSq = abx * abx + aby * aby + abz * abz;
+
+  if (abLenSq < 1e-8) {
+    return aabbDistanceSqToPoint(bounds, a);
+  }
+
+  let best = Number.POSITIVE_INFINITY;
+
+  for (let step = 0; step <= 4; step += 1) {
+    const t = step / 4;
+    best = Math.min(best, aabbDistanceSqToPoint(bounds, {
+      x: a.x + abx * t,
+      y: a.y + aby * t,
+      z: a.z + abz * t
+    }));
+  }
+
+  const cx = (bounds.min[0] + bounds.max[0]) * 0.5;
+  const cy = (bounds.min[1] + bounds.max[1]) * 0.5;
+  const cz = (bounds.min[2] + bounds.max[2]) * 0.5;
+  const t = clamp01(((cx - a.x) * abx + (cy - a.y) * aby + (cz - a.z) * abz) / abLenSq);
+  best = Math.min(best, aabbDistanceSqToPoint(bounds, {
+    x: a.x + abx * t,
+    y: a.y + aby * t,
+    z: a.z + abz * t
+  }));
+
+  return best;
+}
+
 function scoreOccluderBounds(bounds, focus, lightPositions) {
   let best = aabbDistanceSqToPoint(bounds, focus);
 
-  (lightPositions || []).forEach((point) => {
+  // Cap light-segment scoring — full fixture lists made indoor updates hitch.
+  const lights = Array.isArray(lightPositions) ? lightPositions : [];
+  const lightCap = Math.min(lights.length, 12);
+
+  for (let index = 0; index < lightCap; index += 1) {
+    const point = lights[index];
+
     if (!point) {
-      return;
+      continue;
     }
 
     const lightDist = aabbDistanceSqToPoint(bounds, point);
     const focusDist = focus
       ? ((point.x - focus.x) ** 2) + ((point.y - focus.y) ** 2) + ((point.z - focus.z) ** 2)
       : 0;
-    best = Math.min(best, lightDist + focusDist * 0.28);
-  });
+
+    // Prefer slabs sitting between a light and the camera/focus — these stop room leaks.
+    if (focus) {
+      const between = aabbDistanceSqToSegment(bounds, point, focus);
+      best = Math.min(best, between * 0.35);
+    }
+
+    best = Math.min(best, lightDist * 0.85 + focusDist * 0.2);
+  }
 
   return best;
 }

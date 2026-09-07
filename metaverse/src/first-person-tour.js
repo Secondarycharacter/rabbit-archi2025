@@ -1,4 +1,16 @@
 import { FIREBASE_CONFIG, OVERVIEW_ADMIN_PASSCODE } from "./firebase-config.js?v=tps-jump-nocol-20260629";
+import {
+  getAudioSettings,
+  getBgmVolume,
+  setBgmVolume,
+  setVoiceVolume,
+  setBgmMuted,
+  setVoiceMuted,
+  setControlTipsEnabled,
+  setBasicSettingsExpanded,
+  areControlTipsEnabled,
+  isBasicSettingsExpanded
+} from "./metaverse-audio-settings.js?v=audio-mute-20260906";
 import { createTpsSystem } from "./controllers/createTpsSystem.js?v=sole-plant-20260905";
 import {
   CONTROLLER_SETTINGS,
@@ -13,23 +25,24 @@ import {
 } from "./character-tps-bindings.js?v=guide-tour-input-lock-20260903";
 import {
   createNpcInteractionSystem
-} from "./npc-interaction-system.js?v=npc-dialog-pitch-tilt-20260903";
+} from "./npc-interaction-system.js?v=interact-key-e-20260906";
 import {
   createAngjiGuideTourSystem
-} from "./angji-guide-tour-system.js?v=guide-esc-label-20260905";
-import { createEditorMode } from "./editor-mode/editor-mode.js?v=editor-close-sync-20260903";
-import { createNpcSceneEditor } from "./editor-mode/npc-scene-editor.js?v=editor-marker-xz-drag-20260905";
+} from "./angji-guide-tour-system.js?v=guide-no-green-tint-20260907";
+import { createEditorMode } from "./editor-mode/editor-mode.js?v=editor-local-only-20260907";
+import { createNpcSceneEditor } from "./editor-mode/npc-scene-editor.js?v=patrol-wp-floor-snap-20260907";
 import {
   applyNpcSceneToGuests,
   buildEditorSpawnFromTemplate,
   degreesToRadians,
   getActiveNpcRecords,
+  isEditorCreatedNpcId,
   loadEffectiveNpcScene
-} from "./editor-mode/npc-scene-editor-data.js?v=guide-idle-fix-20260905";
-import { applyEditorToursToGuideData } from "./editor-mode/scene-marker-data.js?v=guide-tour-bidirectional-20260903";
-import { createSceneMarkerGameplay } from "./editor-mode/scene-marker-gameplay.js?v=npc-phase4-dialogue-20260903";
-import { publishTourData } from "./angji-guide-tour-data.js?v=guide-tour-sync-20260903";
-import { ANGJI_GUIDE_SPAWN } from "./angji-guide-tour-config.js?v=guide-tour-sync-20260903";
+} from "./editor-mode/npc-scene-editor-data.js?v=preserve-active-patrol-20260907";
+import { applyEditorToursToGuideData } from "./editor-mode/scene-marker-data.js?v=tour-undo-focus-20260905";
+import { createSceneMarkerGameplay } from "./editor-mode/scene-marker-gameplay.js?v=interact-key-e-20260906";
+import { publishTourData } from "./angji-guide-tour-data.js?v=restore-common-dialogues-20260907";
+import { ANGJI_GUIDE_SPAWN } from "./angji-guide-tour-config.js?v=line-hold-0-20260906";
 import {
   getDisplayNameMap,
   loadRuntimeGuestBundle,
@@ -37,13 +50,13 @@ import {
   resolveInteractionConfigs,
   loadConversationProgress,
   subscribeGuestBundleUpdates
-} from "./npc-guest-data.js?v=npc-dialog-camera-20260903";
+} from "./npc-guest-data.js?v=npc-conversation-events-20260905";
 import { createGuestPlacementTool } from "./guest-placement-tool.js?v=orbit-cam-capture-20260725";
 import {
   attachHistoryDisplayBoards,
   disposeHistoryDisplayBoards,
   setHistoryDisplayBoardsEnabled
-} from "./history-display-board.js?v=chungju-display-mesh-20260805";
+} from "./history-display-board.js?v=player-root-block-20260907";
 import {
   getAngjiIndoorBackgroundGuestSpawns,
   getAngjiOutdoorBackgroundGuestSpawns,
@@ -67,8 +80,9 @@ import {
   isAngjiOutdoorGuestId,
   mapAngjiGuestSpawnsForMode,
   toAngjiNightGuestSpawn,
-  ANGJI_GUEST_MARKS
-} from "./angji-guest-config.js?v=sequence-loop-all-20260905";
+  ANGJI_GUEST_MARKS,
+  ANGJI_NIGHT_DEVI_FILE
+} from "./angji-guest-config.js?v=dance-floor-snap-20260907";
 import {
   getJinjuOutdoorBackgroundGuestSpawns,
   getJinjuFixedGuestSpawns,
@@ -108,10 +122,15 @@ import {
   getJinjuRooftopGuestRevealDelayMs,
   getJinjuRooftopSequentialGuestSpawns
 } from "./jinju-rooftop-guest-config.js?v=jinju-rooftop-marie-sit-clips-20260705";
-import { createGuestCharacterSystem, shouldSnapPatrolFloorAtTarget } from "./guest-character-system.js?v=seq-home-lock-20260905";
-import { applyLocalDevToolsVisibility, isLocalDevEnvironment, isEditorToolsVisible } from "./local-dev.js?v=local-dev-20260819";
+import { createGuestCharacterSystem, shouldSnapPatrolFloorAtTarget } from "./guest-character-system.js?v=patrol-random-clip-fix-20260907";
+import { createAngjiGuestCastController } from "./angji-guest-cast.js?v=preserve-active-patrol-20260907";
+import { applyLocalDevToolsVisibility, isLocalDevEnvironment, isEditorToolsVisible } from "./local-dev.js?v=editor-local-only-20260907";
 import { isGuestDevLabelOccluded } from "./guest-dev-label.js?v=guide-label-20260905";
-import { setupAngjiRlbProximityGlow, shouldSkipMaterialFreeze } from "./rlb-proximity-glow.js?v=rlb-shader-proximity-20260820-group-v50";
+import { setupAngjiRlbProximityGlow, shouldSkipMaterialFreeze } from "./rlb-proximity-glow.js?v=rlb-range-restore-20260907j";
+import {
+  createRlbNightDiag,
+  shouldAutoRunRlbNightDiag
+} from "./rlb-night-diag.js?v=rlb-range-restore-20260907j";
 
 function ensureAngjiRlbProximityGlow(BABYLON, scene, modelState, getCamera) {
   if (!isAngjiProjectConfig(modelState?.config)) {
@@ -149,16 +168,24 @@ function getModelLoadFileName(config) {
   const version = config?.modelCacheVersion || DEFAULT_MODEL_CACHE_VERSION;
   return `${config.file}?v=${version}`;
 }
-const ENEMY_ROOT = "./assets/guest/";
+/** Local-dev fireball target only (not night Devi guests). Asset must exist under Enemy/. */
+const ENEMY_ROOT = "./assets/Enemy/";
 const AUDIO_BGM_ROOT = new URL("../assets/audio/bgm/", import.meta.url).href;
 const TOUR_BGM_FADE_MS = 3000;
-const TOUR_BGM_VOLUME = 1;
 const TOUR_BGM_ENABLED = true;
 const NIGHT_TOUR_BGM_FILE = "BGM_Night01.mp3";
 const NIGHT_CRY_SFX_FILE = "EFT_Crying.mp3";
 const NIGHT_CRY_MIN_INTERVAL_MS = 20000;
 const NIGHT_CRY_MAX_INTERVAL_MS = 30000;
 const NIGHT_CRY_VOLUME = 0.85;
+
+function getTourBgmTargetVolume() {
+  return Math.max(0, Math.min(1, getBgmVolume()));
+}
+
+function getNightCryTargetVolume() {
+  return Math.max(0, Math.min(1, NIGHT_CRY_VOLUME * getBgmVolume()));
+}
 
 function canUseTourBgm() {
   // Night/day tour audio should play on production (homepage -> metaverse), not only localhost.
@@ -250,7 +277,7 @@ const MODEL_CONFIGS = [
       useShaderProximity: true,
       useOverlayFallback: false,
       shaderPriorityOnly: true,
-      shaderMaxLights: 320,
+      shaderMaxLights: 64,
       spillOcclusion: true,
       activeOnlyAtNight: true,
       logShaderMaterialNames: false
@@ -634,7 +661,7 @@ const MATERIAL_REFLECTION_SETTINGS = {
 /** Angji default: fixed count of Light_Down02 twinkle/spot lights. */
 const DOWN02_TWINKLE_COUNT = 3;
 const ENEMY_SETTINGS = {
-  file: "enemy01.glb",
+  file: "01 Devi/Devi.glb",
   modelFile: "Angji.glb",
   spawnDelayMs: 5000,
   fadeInMs: 1000,
@@ -663,8 +690,6 @@ const loadingProgressBar = document.getElementById("loadingProgressBar");
 const statusMessage = document.getElementById("statusMessage");
 const projectTitle = document.getElementById("projectTitle");
 const floorLabel = document.getElementById("floorLabel");
-const healthLabel = document.getElementById("healthLabel");
-const monsterLabel = document.getElementById("monsterLabel");
 const tourModeButton = document.getElementById("tourModeButton");
 const orbitViewButton = document.getElementById("orbitViewButton");
 const nightModeButton = document.getElementById("nightModeButton");
@@ -696,13 +721,19 @@ const overviewAdminButton = document.getElementById("overviewAdminButton");
 const overviewAdminPanel = document.getElementById("overviewAdminPanel");
 const overviewAdminCloseButton = document.getElementById("overviewAdminCloseButton");
 const overviewAdminPasscode = document.getElementById("overviewAdminPasscode");
+const overviewAdminUnlockSection = document.getElementById("overviewAdminUnlockSection");
+const overviewAdminEditSection = document.getElementById("overviewAdminEditSection");
+const overviewAdminPasswordSection = document.getElementById("overviewAdminPasswordSection");
 const overviewAdminForm = document.getElementById("overviewAdminForm");
+const overviewAdminPasswordForm = document.getElementById("overviewAdminPasswordForm");
 const overviewAdminRows = document.getElementById("overviewAdminRows");
 const overviewAdminAddRowButton = document.getElementById("overviewAdminAddRowButton");
 const overviewAdminStatus = document.getElementById("overviewAdminStatus");
 const localDevToolsEnabled = applyLocalDevToolsVisibility();
 const PROJECT_OVERVIEWS_PATH = "./data/project-overviews.json";
 const OVERVIEW_LOCAL_STORAGE_KEY = "metaverseProjectOverviews";
+const OVERVIEW_ADMIN_PASSCODE_STORAGE_KEY = "metaverseOverviewAdminPasscode";
+const OVERVIEW_ADMIN_PASSCODE_MIN_LENGTH = 4;
 const FIRESTORE_OVERVIEW_COLLECTION = "metaverseProjectOverviews";
 const projectOverviewStore = new Map();
 const overviewFirebaseState = {
@@ -717,6 +748,8 @@ let loadingTargetProgress = 0;
 let loadingDisplayedProgress = 0;
 let loadingProgressFrameId = null;
 let loadingRevealPending = false;
+let loadingFailsafeTimerId = null;
+const LOADING_REVEAL_FAILSAFE_MS = 45000;
 
 const LOADING_PROGRESS = {
   engineReady: 0.06,
@@ -787,6 +820,35 @@ function reportModelLoadProgress(completedSteps, totalSteps) {
 function requestLoadingReveal() {
   loadingRevealPending = true;
   setLoadingTargetProgress(1);
+
+  if (loadingFailsafeTimerId !== null) {
+    window.clearTimeout(loadingFailsafeTimerId);
+    loadingFailsafeTimerId = null;
+  }
+}
+
+function armLoadingRevealFailsafe() {
+  if (loadingFailsafeTimerId !== null) {
+    window.clearTimeout(loadingFailsafeTimerId);
+  }
+
+  loadingFailsafeTimerId = window.setTimeout(() => {
+    loadingFailsafeTimerId = null;
+
+    if (!metaverseLoading || metaverseLoading.classList.contains("is-hidden")) {
+      return;
+    }
+
+    console.warn(
+      `[loading] failsafe reveal after ${LOADING_REVEAL_FAILSAFE_MS}ms`
+      + ` (progress=${loadingDisplayedProgress.toFixed(2)} target=${loadingTargetProgress.toFixed(2)})`
+    );
+    loadingRevealPending = true;
+    loadingTargetProgress = 1;
+    loadingDisplayedProgress = 1;
+    updateLoadingProgressBar();
+    hideLoadingOverlay();
+  }, LOADING_REVEAL_FAILSAFE_MS);
 }
 
 function startLoadingOverlay() {
@@ -801,9 +863,15 @@ function startLoadingOverlay() {
 
   metaverseLoading.classList.remove("is-hidden");
   metaverseLoading.setAttribute("aria-busy", "true");
+  armLoadingRevealFailsafe();
 }
 
 function hideLoadingOverlay() {
+  if (loadingFailsafeTimerId !== null) {
+    window.clearTimeout(loadingFailsafeTimerId);
+    loadingFailsafeTimerId = null;
+  }
+
   if (loadingProgressFrameId !== null) {
     window.cancelAnimationFrame(loadingProgressFrameId);
     loadingProgressFrameId = null;
@@ -824,8 +892,6 @@ canvas.tabIndex = 0;
 
 projectTitle.textContent = "First Person Architecture Tour";
 floorLabel.textContent = "Orbit View";
-healthLabel.textContent = "Human scale";
-monsterLabel.textContent = "Object collision";
 statusMessage.textContent = "Loading architecture tour...";
 
 function isPlacementToolEnabled() {
@@ -922,13 +988,37 @@ function normalizeOverview(overview) {
 
   const rows = Array.isArray(overview.rows)
     ? overview.rows
-      .map((row) => [String(row?.[0] || "").trim(), String(row?.[1] || "").trim()])
+      .map((row) => {
+        // Support legacy pair rows and Firestore-safe { label, value } objects.
+        if (Array.isArray(row)) {
+          return [String(row?.[0] || "").trim(), String(row?.[1] || "").trim()];
+        }
+
+        return [
+          String(row?.label ?? row?.key ?? "").trim(),
+          String(row?.value ?? row?.text ?? "").trim()
+        ];
+      })
       .filter(([label]) => label)
     : [];
 
   return {
     title: String(overview.title || "■ 설계개요"),
     rows
+  };
+}
+
+/** Firestore rejects nested arrays — persist rows as objects. */
+function toFirestoreOverview(overview) {
+  const normalized = normalizeOverview(overview);
+
+  if (!normalized) {
+    return null;
+  }
+
+  return {
+    title: normalized.title,
+    rows: normalized.rows.map(([label, value]) => ({ label, value }))
   };
 }
 
@@ -1042,6 +1132,10 @@ async function saveProjectOverview(config, overview) {
   const overviewId = getOverviewId(config);
   const normalizedOverview = normalizeOverview(overview);
 
+  if (!overviewId || !normalizedOverview) {
+    throw new Error("저장할 프로젝트 개요가 없습니다.");
+  }
+
   setProjectOverview(config, normalizedOverview);
   saveLocalOverviewOverrides();
 
@@ -1050,7 +1144,17 @@ async function saveProjectOverview(config, overview) {
   }
 
   const { db, firestore } = overviewFirebaseState;
-  await firestore.setDoc(firestore.doc(db, FIRESTORE_OVERVIEW_COLLECTION, overviewId), normalizedOverview, { merge: true });
+
+  if (!db || !firestore?.setDoc || !firestore?.doc) {
+    return "로컬에 저장했습니다. (Firestore 연결이 완전하지 않습니다)";
+  }
+
+  const payload = toFirestoreOverview(normalizedOverview);
+  await firestore.setDoc(
+    firestore.doc(db, FIRESTORE_OVERVIEW_COLLECTION, overviewId),
+    payload,
+    { merge: true }
+  );
   return "Firebase Firestore에 저장했습니다.";
 }
 
@@ -1102,9 +1206,17 @@ function renderOverviewAdminEditor(config) {
   currentOverviewConfig = config || null;
   overviewAdminRows.replaceChildren();
 
+  if (!isOverviewAdminUnlocked) {
+    overviewAdminEditSection.hidden = true;
+    overviewAdminPasswordSection.hidden = true;
+    return;
+  }
+
+  overviewAdminEditSection.hidden = false;
+  overviewAdminPasswordSection.hidden = false;
+
   if (!currentOverviewConfig) {
     overviewAdminStatus.textContent = "편집할 프로젝트 개요가 없습니다.";
-    overviewAdminForm.hidden = true;
     return;
   }
 
@@ -1112,7 +1224,6 @@ function renderOverviewAdminEditor(config) {
   overview.rows.forEach(([label, value]) => {
     addOverviewAdminRow(label, value);
   });
-  overviewAdminForm.hidden = false;
 }
 
 function addOverviewAdminRow(label = "", value = "") {
@@ -1147,8 +1258,237 @@ function getOverviewFromAdminForm() {
   };
 }
 
+function getEffectiveOverviewAdminPasscode() {
+  try {
+    const saved = String(localStorage.getItem(OVERVIEW_ADMIN_PASSCODE_STORAGE_KEY) || "").trim();
+
+    if (saved) {
+      return saved;
+    }
+  } catch {
+    // Ignore storage access errors and fall back to default.
+  }
+
+  return String(OVERVIEW_ADMIN_PASSCODE || "");
+}
+
+function setOverviewAdminPasscode(nextPasscode) {
+  const value = String(nextPasscode || "").trim();
+  localStorage.setItem(OVERVIEW_ADMIN_PASSCODE_STORAGE_KEY, value);
+}
+
+function syncOverviewAdminUnlockUi() {
+  if (overviewAdminUnlockSection) {
+    overviewAdminUnlockSection.hidden = isOverviewAdminUnlocked;
+  }
+
+  if (overviewAdminEditSection) {
+    overviewAdminEditSection.hidden = !isOverviewAdminUnlocked;
+  }
+
+  if (overviewAdminPasswordSection) {
+    overviewAdminPasswordSection.hidden = !isOverviewAdminUnlocked;
+  }
+}
+
+function unlockOverviewAdminIfReady() {
+  const entered = String(overviewAdminPasscode?.value || "");
+  const expected = getEffectiveOverviewAdminPasscode();
+
+  if (!entered || entered !== expected) {
+    return false;
+  }
+
+  isOverviewAdminUnlocked = true;
+  syncOverviewAdminUnlockUi();
+  overviewAdminStatus.textContent = "관리자모드가 열렸습니다.";
+  renderOverviewAdminEditor(currentOverviewConfig);
+  return true;
+}
+
+function validateOverviewAdminPasswordChange(current, next, confirm) {
+  const effective = getEffectiveOverviewAdminPasscode();
+
+  if (!current) {
+    return "기존 비밀번호를 입력해 주세요.";
+  }
+
+  if (current !== effective) {
+    return "기존 비밀번호가 일치하지 않습니다.";
+  }
+
+  if (!next) {
+    return "변경할 비밀번호를 입력해 주세요.";
+  }
+
+  if (next.length < OVERVIEW_ADMIN_PASSCODE_MIN_LENGTH) {
+    return `변경할 비밀번호는 ${OVERVIEW_ADMIN_PASSCODE_MIN_LENGTH}자 이상이어야 합니다.`;
+  }
+
+  if (next === current) {
+    return "기존 비밀번호와 다른 비밀번호를 입력해 주세요.";
+  }
+
+  if (next !== confirm) {
+    return "변경할 비밀번호와 확인 값이 일치하지 않습니다.";
+  }
+
+  return "";
+}
+
 function isTextInputTarget(target) {
   return Boolean(target?.closest?.("input, textarea, select, [contenteditable='true']"));
+}
+
+function isBasicSettingsEditing(event) {
+  const panel = document.getElementById("basicSettings");
+  return Boolean(panel?.contains?.(event.target));
+}
+
+function initBasicSettingsPanel(options = {}) {
+  const {
+    getTourBgm = () => null,
+    isWalkMode = () => false
+  } = options;
+
+  const root = document.getElementById("basicSettings");
+  const toggle = document.getElementById("basicSettingsToggle");
+  const body = document.getElementById("basicSettingsBody");
+  const bgmInput = document.getElementById("basicSettingsBgm");
+  const bgmValue = document.getElementById("basicSettingsBgmValue");
+  const bgmMuteInput = document.getElementById("basicSettingsBgmMute");
+  const voiceInput = document.getElementById("basicSettingsVoice");
+  const voiceValue = document.getElementById("basicSettingsVoiceValue");
+  const voiceMuteInput = document.getElementById("basicSettingsVoiceMute");
+  const tipsInput = document.getElementById("basicSettingsTips");
+  const tipsEl = document.getElementById("controlTips");
+
+  if (!root || !toggle || !body) {
+    return { syncControlTipsMode: () => {} };
+  }
+
+  function percentLabel(ratio) {
+    return `${Math.round(clamp01(ratio) * 100)}%`;
+  }
+
+  function clamp01(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return 0;
+    return Math.max(0, Math.min(1, n));
+  }
+
+  function syncControlTipsMode() {
+    if (!tipsEl) {
+      return;
+    }
+
+    const walk = Boolean(isWalkMode());
+    tipsEl.querySelectorAll("[data-tips-mode]").forEach((block) => {
+      const mode = block.getAttribute("data-tips-mode");
+      const active = walk ? mode === "tour" : mode === "orbit";
+      block.classList.toggle("is-active", active);
+      block.hidden = !active;
+    });
+  }
+
+  function applyTipsVisibility() {
+    if (!tipsEl) {
+      return;
+    }
+
+    tipsEl.hidden = !areControlTipsEnabled();
+    syncControlTipsMode();
+  }
+
+  function applyExpanded() {
+    const open = isBasicSettingsExpanded();
+    root.classList.toggle("is-open", open);
+    body.hidden = !open;
+    toggle.setAttribute("aria-expanded", open ? "true" : "false");
+  }
+
+  function syncVolumeLabels(settings) {
+    if (bgmValue) {
+      bgmValue.textContent = settings.bgmMuted ? "음소거" : percentLabel(settings.bgmVolume);
+    }
+
+    if (voiceValue) {
+      voiceValue.textContent = settings.voiceMuted ? "음소거" : percentLabel(settings.voiceVolume);
+    }
+
+    bgmMuteInput?.closest(".basic-settings__field")?.classList.toggle("is-muted", settings.bgmMuted === true);
+    voiceMuteInput?.closest(".basic-settings__field")?.classList.toggle("is-muted", settings.voiceMuted === true);
+  }
+
+  function syncFromState() {
+    const settings = getAudioSettings();
+
+    if (bgmInput) {
+      bgmInput.value = String(Math.round(settings.bgmVolume * 100));
+    }
+
+    if (bgmMuteInput) {
+      bgmMuteInput.checked = settings.bgmMuted === true;
+    }
+
+    if (voiceInput) {
+      voiceInput.value = String(Math.round(settings.voiceVolume * 100));
+    }
+
+    if (voiceMuteInput) {
+      voiceMuteInput.checked = settings.voiceMuted === true;
+    }
+
+    if (tipsInput) {
+      tipsInput.checked = settings.controlTips !== false;
+    }
+
+    syncVolumeLabels(settings);
+    applyExpanded();
+    applyTipsVisibility();
+    getTourBgm()?.applyMasterVolume?.();
+  }
+
+  toggle.addEventListener("click", () => {
+    setBasicSettingsExpanded(!isBasicSettingsExpanded());
+    applyExpanded();
+  });
+
+  bgmInput?.addEventListener("input", () => {
+    const ratio = clamp01(Number(bgmInput.value) / 100);
+    setBgmVolume(ratio);
+    syncVolumeLabels(getAudioSettings());
+    getTourBgm()?.applyMasterVolume?.();
+  });
+
+  bgmMuteInput?.addEventListener("change", () => {
+    setBgmMuted(Boolean(bgmMuteInput.checked));
+    syncVolumeLabels(getAudioSettings());
+    getTourBgm()?.applyMasterVolume?.();
+  });
+
+  voiceInput?.addEventListener("input", () => {
+    const ratio = clamp01(Number(voiceInput.value) / 100);
+    setVoiceVolume(ratio);
+    syncVolumeLabels(getAudioSettings());
+  });
+
+  voiceMuteInput?.addEventListener("change", () => {
+    setVoiceMuted(Boolean(voiceMuteInput.checked));
+    syncVolumeLabels(getAudioSettings());
+  });
+
+  tipsInput?.addEventListener("change", () => {
+    setControlTipsEnabled(Boolean(tipsInput.checked));
+    applyTipsVisibility();
+  });
+
+  syncFromState();
+
+  return {
+    syncControlTipsMode,
+    refresh: syncFromState
+  };
 }
 
 function isOverviewAdminEditing(event) {
@@ -1159,30 +1499,50 @@ overviewAdminButton.addEventListener("click", () => {
   overviewAdminPanel.hidden = !overviewAdminPanel.hidden;
 });
 
-overviewAdminCloseButton.addEventListener("click", () => {
+overviewAdminCloseButton?.addEventListener("click", (event) => {
+  event.preventDefault();
+  event.stopPropagation();
   overviewAdminPanel.hidden = true;
 });
-
-function unlockOverviewAdminIfReady() {
-  if (overviewAdminPasscode.value !== OVERVIEW_ADMIN_PASSCODE) {
-    return;
-  }
-
-  isOverviewAdminUnlocked = true;
-  overviewAdminStatus.textContent = "관리자모드가 열렸습니다.";
-  renderOverviewAdminEditor(currentOverviewConfig);
-}
 
 overviewAdminPasscode.addEventListener("input", unlockOverviewAdminIfReady);
 overviewAdminPasscode.addEventListener("keydown", (event) => {
   if (event.key === "Enter") {
     event.preventDefault();
-    unlockOverviewAdminIfReady();
+    if (!unlockOverviewAdminIfReady()) {
+      overviewAdminStatus.textContent = "비밀번호가 올바르지 않습니다.";
+    }
   }
 });
 
 overviewAdminAddRowButton.addEventListener("click", () => {
   addOverviewAdminRow();
+});
+
+overviewAdminPasswordForm?.addEventListener("submit", (event) => {
+  event.preventDefault();
+
+  if (!isOverviewAdminUnlocked) {
+    overviewAdminStatus.textContent = "관리자모드를 먼저 열어주세요.";
+    return;
+  }
+
+  const current = String(overviewAdminPasswordForm.elements.current?.value || "");
+  const next = String(overviewAdminPasswordForm.elements.next?.value || "");
+  const confirm = String(overviewAdminPasswordForm.elements.confirm?.value || "");
+  const error = validateOverviewAdminPasswordChange(current, next, confirm);
+
+  if (error) {
+    overviewAdminStatus.textContent = error;
+    return;
+  }
+
+  setOverviewAdminPasscode(next);
+  overviewAdminPasswordForm.reset();
+  if (overviewAdminPasscode) {
+    overviewAdminPasscode.value = "";
+  }
+  overviewAdminStatus.textContent = "비밀번호가 변경되었습니다. 다음 잠금 해제부터 새 비밀번호를 사용하세요.";
 });
 
 overviewAdminForm.addEventListener("submit", async (event) => {
@@ -1200,7 +1560,10 @@ overviewAdminForm.addEventListener("submit", async (event) => {
     renderProjectOverview(getProjectOverview(currentOverviewConfig));
     overviewAdminStatus.textContent = message;
   } catch (error) {
+    // Local store may already be updated — refresh the left panel anyway.
+    renderProjectOverview(getProjectOverview(currentOverviewConfig));
     overviewAdminStatus.textContent = `저장 실패: ${error.message || error}`;
+    console.error("[overview-admin] save failed", error);
   }
 });
 
@@ -2404,7 +2767,7 @@ function createTourBgmController(options = {}) {
   }
 
   function beginFadeIn() {
-    fadeVolumeTo(TOUR_BGM_VOLUME, TOUR_BGM_FADE_MS);
+    fadeVolumeTo(getTourBgmTargetVolume(), TOUR_BGM_FADE_MS);
   }
 
   function playTourBgm(config, { keepBgm = false } = {}) {
@@ -2415,12 +2778,15 @@ function createTourBgmController(options = {}) {
     }
 
     const track = getTrack(url);
+    const targetVolume = getTourBgmTargetVolume();
 
     if (keepBgm && !track.paused && loadedUrl === url) {
       cancelFade();
 
-      if (track.volume < TOUR_BGM_VOLUME - 0.01) {
+      if (track.volume < targetVolume - 0.01) {
         beginFadeIn();
+      } else {
+        track.volume = targetVolume;
       }
 
       return true;
@@ -2486,7 +2852,7 @@ function createTourBgmController(options = {}) {
     }
 
     const track = ensureCryAudio();
-    track.volume = NIGHT_CRY_VOLUME;
+    track.volume = getNightCryTargetVolume();
 
     try {
       track.currentTime = 0;
@@ -2542,12 +2908,15 @@ function createTourBgmController(options = {}) {
     }
 
     const track = getTrack(url);
+    const targetVolume = getTourBgmTargetVolume();
 
     if (keepBgm && !track.paused && loadedUrl === url) {
       cancelFade();
 
-      if (track.volume < TOUR_BGM_VOLUME - 0.01) {
+      if (track.volume < targetVolume - 0.01) {
         beginFadeIn();
+      } else {
+        track.volume = targetVolume;
       }
 
       startNightCryAmbience();
@@ -2667,6 +3036,28 @@ function createTourBgmController(options = {}) {
 
   return {
     preload,
+    applyMasterVolume() {
+      if (audio && !audio.paused) {
+        cancelFade();
+        audio.volume = getTourBgmTargetVolume();
+      }
+
+      if (cryAudio && !cryAudio.paused) {
+        cryAudio.volume = getNightCryTargetVolume();
+      }
+
+      return getTourBgmTargetVolume();
+    },
+    setMasterVolume(volume) {
+      const next = Math.max(0, Math.min(1, Number(volume)));
+
+      if (Number.isFinite(next)) {
+        setBgmVolume(next);
+      }
+
+      return this.applyMasterVolume();
+    },
+    getMasterVolume: () => getTourBgmTargetVolume(),
     onEnterWalkMode(config, walkEntryOptions = {}) {
       if (shouldUseNightTourAudio(config)) {
         playNightTourBgm(walkEntryOptions);
@@ -6559,6 +6950,9 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
   let jinjuIndoorGuestSpawnToken = 0;
   let angjiOutdoorGuestSpawnToken = 0;
   let angjiIndoorGuestSpawnToken = 0;
+  let angjiNightGuestRefreshToken = 0;
+  let angjiGuestPreloadToken = 0;
+  let angjiGuestCast = null;
   let jinjuIndoorGuestActivationStarted = false;
   let jinjuIndoorUpperGuestActivationStarted = false;
   let jinjuIndoorPreloadToken = 0;
@@ -6829,6 +7223,9 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
       }
 
       const floorMeshState = getAngjiGuestFloorMeshState();
+      const maxDelta = Number.isFinite(options.maxDelta)
+        ? options.maxDelta
+        : (options.includeUpperFloors === true ? 8 : 3);
 
       return pickAngjiGuestFloorY(
         BABYLON,
@@ -6839,7 +7236,8 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
         floorMeshState.angjiExternalFloorMeshes,
         {
           fallbackY,
-          maxDelta: options.includeUpperFloors === true ? 8 : 3,
+          preferExternal: options.preferExternal === true,
+          maxDelta,
           extraFloorMeshes: options.includeUpperFloors === true
             ? [
               ...(floorMeshState.angjiBuildingFloor2Meshes || []),
@@ -7120,7 +7518,18 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
       console.info(`[npc-interaction] loaded ${configs.length} guest configs`);
 
       try {
-        const document = await loadEffectiveNpcScene(guestCharacterSystem?.getGuests?.() || []);
+        const document = await loadEffectiveNpcScene(
+          guestCharacterSystem?.getGuests?.() || [],
+          undefined,
+          {
+            getBuiltinSpawnById: (id) => (
+              id === ANGJI_GUIDE_SPAWN.id
+                ? ANGJI_GUIDE_SPAWN
+                : (ANGJI_GUEST_MARKS.find((spawn) => spawn.id === id) || null)
+            ),
+            preferBuiltinModelPath: isAngjiNightGuestMode()
+          }
+        );
         applyNpcInteractionOverrides(document);
       } catch (error) {
         console.warn("[npc-interaction] editor distance overlay skipped", error);
@@ -7142,6 +7551,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     npcSceneEditor = createNpcSceneEditor(BABYLON, scene, {
       getGuestCharacterSystem: () => guestCharacterSystem,
       getOrbitCamera: () => orbitCamera,
+      getDialogPreviewFov: () => tpsCamera?.fov ?? BABYLON.Tools.ToRadians(72),
       enterOrbitMode: () => enterEditorOrbitMode(),
       enterWalkMode: (shouldLockPointer = false) => enterWalkMode(shouldLockPointer),
       ensureGuestsReady: () => ensureEditorGuestsReady(),
@@ -7167,6 +7577,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
           cameraLookLift: guest?.cameraLookLift,
           cameraYawOffset: guest?.cameraYawOffset,
           cameraPitchOffset: guest?.cameraPitchOffset,
+          cameraLateralOffset: guest?.cameraLateralOffset,
           cameraDistance: guest?.cameraDistance,
           dialogLines: [...(guest?.dialogLines || [])]
         };
@@ -7188,6 +7599,14 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
             enabled: true,
             dialogLines: []
           };
+        const nextLines = Array.isArray(patch.dialogLines) ? patch.dialogLines : (base.dialogLines || []);
+        const nextEvents = Array.isArray(base.conversationEvents) && base.conversationEvents.length
+          ? base.conversationEvents.map((event, eventIndex) => (
+            eventIndex === 0
+              ? { ...event, dialogLines: nextLines }
+              : event
+          ))
+          : base.conversationEvents;
         const nextGuest = {
           ...base,
           interactionEnabled: patch.interactionEnabled === true,
@@ -7197,10 +7616,12 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
           cameraLookLift: patch.cameraLookLift,
           cameraYawOffset: patch.cameraYawOffset,
           cameraPitchOffset: patch.cameraPitchOffset,
+          cameraLateralOffset: patch.cameraLateralOffset,
           cameraDistance: patch.cameraDistance == null || patch.cameraDistance === ""
             ? null
             : Number(patch.cameraDistance),
-          dialogLines: Array.isArray(patch.dialogLines) ? patch.dialogLines : (base.dialogLines || [])
+          dialogLines: nextLines,
+          conversationEvents: nextEvents
         };
 
         if (index >= 0) {
@@ -7222,9 +7643,29 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
       },
       onPlacementChanged: () => {
         void markerGameplay?.reload?.();
-        void applyNpcPlacementOverrides();
+        void applyNpcPlacementOverrides({
+          allowSpawn: Boolean(npcSceneEditor?.isActive?.()),
+          transformOnly: isAngjiNightGuestMode()
+        });
       },
       getGuideTourEvents: () => angjiGuideTourSystem?.getTourDataSnapshot?.()?.events || [],
+      getGuideTourData: () => angjiGuideTourSystem?.getTourDataSnapshot?.() || null,
+      publishGuideTourData: (data) => {
+        if (!data) {
+          return null;
+        }
+
+        const published = publishTourData(data, {
+          persist: true,
+          source: "editor-history-restore"
+        });
+
+        if (!angjiGuideTourSystem?.isActive?.()) {
+          void angjiGuideTourSystem?.reloadTourData?.(published);
+        }
+
+        return published;
+      },
       applyTourOverlay: (toursDoc) => {
         const snapshot = angjiGuideTourSystem?.getTourDataSnapshot?.();
 
@@ -7264,11 +7705,15 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
           if (document.pointerLockElement === canvas) {
             document.exitPointerLock?.();
           }
+
+        } else {
+          void angjiGuestCast?.requestCast("editor-close");
         }
       },
       onRequestClose: () => {
         editorMode?.close?.();
-      }
+      },
+      getIsNightMode: () => isAngjiNightGuestMode()
     });
 
     editorMode = createEditorMode({
@@ -7306,6 +7751,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
         if (isOpen && document.pointerLockElement === canvas) {
           document.exitPointerLock?.();
         }
+
       },
       onStatus: (message) => {
         if (typeof message === "string" && message) {
@@ -7452,28 +7898,9 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
   }
 
   function preloadAngjiOrbitGuests() {
-    if (!isAngjiProjectConfig(activeModelState.config)) {
-      return;
-    }
-
-    const run = () => {
-      const nightModeGuests = isAngjiNightGuestMode();
-      void guestCharacterSystem?.preload(
-        mapAngjiGuestSpawnsForMode(getAngjiOutdoorGuestSpawns(), nightModeGuests),
-        { parallel: true, showOnLoad: false }
-      );
-      void guestCharacterSystem?.preload(
-        mapAngjiGuestSpawnsForMode(getAngjiSimultaneousGuestSpawns(), nightModeGuests),
-        { parallel: true, showOnLoad: false }
-      );
-    };
-
-    if (typeof window.requestIdleCallback === "function") {
-      window.requestIdleCallback(run, { timeout: 4000 });
-      return;
-    }
-
-    window.setTimeout(run, 2000);
+    // The cast controller loads exactly the requested membership. A separate
+    // idle preload doubled Babylon imports and memory during day/night flips.
+    angjiGuestPreloadToken += 1;
   }
 
   function waitForIdle(timeoutMs = 3000) {
@@ -8017,6 +8444,117 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     return Boolean(options.getIsAngjiNightMode?.());
   }
 
+  /** Drop leftover day Mark meshes that survive night toggle / tour entry races. */
+  function purgeStaleDayAngjiGuests() {
+    if (!isAngjiNightGuestMode() || !guestCharacterSystem?.getGuests) {
+      return;
+    }
+
+    const staleIds = guestCharacterSystem.getGuests()
+      .filter((guest) => {
+        const id = guest?.spawn?.id;
+        const file = String(guest?.spawn?.file || "");
+
+        if (!id || id === ANGJI_GUIDE_SPAWN.id || id === ANGJI_NIGHT_MARIE_GUEST_ID) {
+          return false;
+        }
+
+        if (!isAngjiGuestId(id)) {
+          return false;
+        }
+
+        // Night cast must be Devi (or already disposed). Anything else is a day Mark leak.
+        return file !== ANGJI_NIGHT_DEVI_FILE;
+      })
+      .map((guest) => guest.spawn.id);
+
+    if (staleIds.length) {
+      guestCharacterSystem.disposeGuests?.({ onlyIds: staleIds });
+      console.info(`[angji-night] purged stale day guests: ${staleIds.join(", ")}`);
+    }
+
+    // Orphan day meshes can remain after a dispose raced an in-flight ImportMesh
+    // (same guestId as the new Devi). Disable any tourGuest mesh not owned by live guests.
+    const liveNodes = new Set();
+    guestCharacterSystem.getGuests().forEach((guest) => {
+      if (guest?.root) {
+        liveNodes.add(guest.root);
+      }
+      if (guest?.contentRoot) {
+        liveNodes.add(guest.contentRoot);
+      }
+      (guest?.meshes || []).forEach((mesh) => liveNodes.add(mesh));
+    });
+
+    const isOwnedByLiveGuest = (node) => {
+      let current = node;
+
+      while (current) {
+        if (liveNodes.has(current)) {
+          return true;
+        }
+        current = current.parent;
+      }
+
+      return false;
+    };
+
+    (scene.meshes || []).forEach((mesh) => {
+      if (!mesh || mesh.isDisposed?.() || !mesh.metadata?.tourGuest) {
+        return;
+      }
+
+      if (isOwnedByLiveGuest(mesh)) {
+        return;
+      }
+
+      try {
+        mesh.setEnabled?.(false);
+        mesh.isVisible = false;
+      } catch {
+        // ignore
+      }
+    });
+  }
+
+  /** Day mode: remove Devi / Marie / night-chase leftovers so Marks can return. */
+  function purgeStaleNightEnemyGuests() {
+    if (isAngjiNightGuestMode() || !guestCharacterSystem?.getGuests) {
+      return;
+    }
+
+    const staleIds = guestCharacterSystem.getGuests()
+      .filter((guest) => {
+        const id = guest?.spawn?.id;
+        const file = String(guest?.spawn?.file || "");
+        const behaviorType = guest?.spawn?.behavior?.type;
+
+        if (!id || id === ANGJI_GUIDE_SPAWN.id) {
+          return false;
+        }
+
+        if (id === ANGJI_NIGHT_MARIE_GUEST_ID) {
+          return true;
+        }
+
+        if (behaviorType === "nightDeviChase") {
+          return true;
+        }
+
+        if (file === ANGJI_NIGHT_DEVI_FILE || /\/Devi\.glb$/i.test(file) || file.includes("01 Devi/")) {
+          return true;
+        }
+
+        return false;
+      })
+      .map((guest) => guest.spawn.id);
+
+    if (staleIds.length) {
+      guestCharacterSystem.disposeGuests?.({ onlyIds: staleIds });
+      console.info(`[angji-day] purged stale night enemies: ${staleIds.join(", ")}`);
+    }
+  }
+
   function getAngjiOutdoorSpawnsForCurrentLighting() {
     const spawns = mapAngjiGuestSpawnsForMode(getAngjiOutdoorGuestSpawns(), isAngjiNightGuestMode());
 
@@ -8045,34 +8583,17 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
       return;
     }
 
-    await yieldFrames(1);
-    guestCharacterSystem?.disposeGuests?.({ onlyIds: getAngjiAllGuestIds() });
-    await yieldFrames(1);
+    // Cancel legacy progressive spawn tokens so orphaned schedules cannot race the cast owner.
+    angjiNightGuestRefreshToken += 1;
+    angjiOutdoorGuestSpawnToken += 1;
+    angjiIndoorGuestSpawnToken += 1;
+    angjiGuestPreloadToken += 1;
 
-    // Warm night guest assets in parallel before spawn.
-    if (isAngjiNightGuestMode()) {
-      const marieTemplate = getAngjiNightExtraGuestSpawns()[0];
-      const nightTemplate = toAngjiNightGuestSpawn({
-        id: "Mark-Night-Template",
-        position: { x: 0, y: 0, z: 0 },
-        rotationY: 0
-      });
-
-      await Promise.all([
-        marieTemplate ? guestCharacterSystem?.preloadAsset?.(marieTemplate) : Promise.resolve(),
-        guestCharacterSystem?.preloadAsset?.(nightTemplate)
-      ]);
+    if (!angjiGuestCast) {
+      return;
     }
 
-    if (walkMode) {
-      await scheduleOutdoorGuestSpawn();
-      await scheduleIndoorGuestSpawn();
-    } else {
-      await scheduleOutdoorGuestSpawn();
-    }
-
-    guestCharacterSystem?.refreshDevLabels?.();
-    await ensureAngjiGuideVisibleAfterGuestRefresh();
+    return angjiGuestCast.requestCast("night-toggle");
   }
 
   async function ensureAngjiGuideVisibleAfterGuestRefresh() {
@@ -8176,113 +8697,128 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
       return;
     }
 
-    const spawnToken = ++angjiOutdoorGuestSpawnToken;
-    guestCharacterSystem?.hide({ onlyIds: getJinjuAllGuestIds() });
-
-    const allOutdoorSpawns = getAngjiOutdoorSpawnsForCurrentLighting();
-    const outdoorBackgroundSpawns = getAngjiOutdoorBackgroundSpawnsForCurrentLighting();
-    const nightModeGuests = isAngjiNightGuestMode();
-
-    try {
-      // Night: load Devis sequentially -> parallel ImportMeshAsync of the same
-      // Devi.glb into one scene often fails and leaves enemies missing.
-      await guestCharacterSystem.ensureSpawned(allOutdoorSpawns, {
-        parallel: !nightModeGuests,
-        showOnLoad: false,
-        yieldBetweenLoads: nightModeGuests ? 1 : 0
-      });
-
-      if (spawnToken !== angjiOutdoorGuestSpawnToken) {
-        return;
-      }
-
-      guestCharacterSystem.revealGuests(
-        nightModeGuests
-          ? [...ANGJI_PRIORITY_GUEST_IDS, ANGJI_NIGHT_MARIE_GUEST_ID]
-          : ANGJI_PRIORITY_GUEST_IDS
-      );
-
-      for (const spawn of outdoorBackgroundSpawns) {
-        if (spawnToken !== angjiOutdoorGuestSpawnToken) {
-          return;
-        }
-
-        if (!nightModeGuests) {
-          await yieldFrames(getBackgroundGuestLoadYieldFrames(spawn.id));
-        }
-
-        guestCharacterSystem.revealGuest(spawn.id);
-
-        if (!nightModeGuests) {
-          const delayMs = getBackgroundGuestRevealDelayMs(spawn.id);
-
-          if (delayMs > 0) {
-            await wait(delayMs);
-          }
-        }
-      }
-      await applyNpcPlacementOverrides();
-    } catch (error) {
-      console.error("Outdoor guest spawn failed", error);
-    }
+    angjiOutdoorGuestSpawnToken += 1;
+    return angjiGuestCast?.requestCast("outdoor-schedule");
   }
 
-  async function applyNpcPlacementOverrides() {
+  async function applyNpcPlacementOverrides(options = {}) {
     if (!guestCharacterSystem || !isAngjiProjectConfig(activeModelState.config)) {
       return;
     }
 
+    const allowSpawn = options.allowSpawn === true;
+    const abortIf = typeof options.abortIf === "function" ? options.abortIf : () => false;
+    const transformOnly = options.transformOnly === true || isAngjiNightGuestMode();
+    const onlyGuestIds = Array.isArray(options.onlyGuestIds) && options.onlyGuestIds.length
+      ? new Set(options.onlyGuestIds.map(String))
+      : null;
+
     try {
-      const document = await loadEffectiveNpcScene(guestCharacterSystem.getGuests());
-      const deletedIds = (document.npcs || []).filter((npc) => npc.deleted).map((npc) => npc.id);
+      const document = await loadEffectiveNpcScene(
+        guestCharacterSystem.getGuests(),
+        undefined,
+        {
+          getBuiltinSpawnById: (id) => (
+            id === ANGJI_GUIDE_SPAWN.id
+              ? ANGJI_GUIDE_SPAWN
+              : (ANGJI_GUEST_MARKS.find((spawn) => spawn.id === id) || null)
+          ),
+          preferBuiltinModelPath: isAngjiNightGuestMode()
+        }
+      );
+
+      if (abortIf()) {
+        return;
+      }
+
+      // Local editor deletion may remove editor-created NPCs only. Shipped
+      // Mark/Guide membership remains defined by the GitHub cast configuration.
+      const deletedIds = (document.npcs || [])
+        .filter((npc) => npc.deleted && isEditorCreatedNpcId(npc.id))
+        .map((npc) => npc.id);
 
       if (deletedIds.length) {
         guestCharacterSystem.disposeGuests?.({ onlyIds: deletedIds });
       }
 
-      const templatesByFile = new Map();
-      [...ANGJI_GUEST_MARKS, ANGJI_GUIDE_SPAWN].forEach((spawn) => {
-        if (spawn?.file && !templatesByFile.has(spawn.file)) {
-          templatesByFile.set(spawn.file, spawn);
-        }
-      });
-      guestCharacterSystem.getGuests().forEach((guest) => {
-        if (guest?.spawn?.file && !templatesByFile.has(guest.spawn.file)) {
-          templatesByFile.set(guest.spawn.file, guest.spawn);
-        }
-      });
-
-      const missing = getActiveNpcRecords(document).filter((npc) => (
-        !guestCharacterSystem.isSpawned?.(npc.id)
-      ));
-
-      if (missing.length) {
-        const spawns = missing.map((npc) => {
-          const template = templatesByFile.get(npc.model?.path)
-            || ANGJI_GUEST_MARKS.find((spawn) => spawn.id === npc.id)
-            || (npc.id === ANGJI_GUIDE_SPAWN.id ? ANGJI_GUIDE_SPAWN : null);
-
-          if (!template) {
-            return null;
+      // Cast owner owns shipped Mark/Devi presence. Placement overlay may only spawn
+      // editor-created NPCs, and never while a cast abort is requested.
+      if (allowSpawn && !abortIf() && !onlyGuestIds) {
+        const templatesByFile = new Map();
+        [...ANGJI_GUEST_MARKS, ANGJI_GUIDE_SPAWN].forEach((spawn) => {
+          if (spawn?.file && !templatesByFile.has(spawn.file)) {
+            templatesByFile.set(spawn.file, spawn);
           }
+        });
+        guestCharacterSystem.getGuests().forEach((guest) => {
+          if (guest?.spawn?.file && !templatesByFile.has(guest.spawn.file)) {
+            templatesByFile.set(guest.spawn.file, guest.spawn);
+          }
+        });
 
-          return buildEditorSpawnFromTemplate(template, {
-            id: npc.id,
-            name: npc.name,
-            file: npc.model?.path || template.file,
-            position: npc.transform.position,
-            rotationY: degreesToRadians(npc.transform.rotationY)
-          });
-        }).filter(Boolean);
+        const missing = getActiveNpcRecords(document).filter((npc) => (
+          isEditorCreatedNpcId(npc.id)
+          && !guestCharacterSystem.isSpawned?.(npc.id)
+        ));
 
-        if (spawns.length) {
-          await guestCharacterSystem.ensureSpawned(spawns, { showOnLoad: true });
-          spawns.forEach((spawn) => guestCharacterSystem.revealGuest?.(spawn.id));
+        if (missing.length) {
+          const nightModeGuests = isAngjiNightGuestMode();
+          const spawns = missing.map((npc) => {
+            const template = templatesByFile.get(npc.model?.path)
+              || ANGJI_GUEST_MARKS.find((spawn) => spawn.id === npc.id)
+              || (npc.id === ANGJI_GUIDE_SPAWN.id ? ANGJI_GUIDE_SPAWN : null);
+
+            if (!template) {
+              return null;
+            }
+
+            if (nightModeGuests && npc.id === ANGJI_GUIDE_SPAWN.id) {
+              return null;
+            }
+
+            let spawn = buildEditorSpawnFromTemplate(template, {
+              id: npc.id,
+              name: npc.name,
+              file: npc.model?.path || template.file,
+              position: npc.transform.position,
+              rotationY: degreesToRadians(npc.transform.rotationY)
+            });
+
+            if (nightModeGuests && isAngjiGuestId(spawn.id)) {
+              spawn = toAngjiNightGuestSpawn(spawn);
+            }
+
+            return spawn;
+          }).filter(Boolean);
+
+          if (spawns.length) {
+            await guestCharacterSystem.ensureSpawned(spawns, {
+              showOnLoad: false,
+              parallel: !nightModeGuests,
+              yieldBetweenLoads: nightModeGuests ? 1 : 0,
+              maxConcurrency: 2,
+              abortIf
+            });
+          }
         }
       }
 
-      applyNpcSceneToGuests(guestCharacterSystem.getGuests(), document, {
+      if (abortIf()) {
+        return;
+      }
+
+      const guests = onlyGuestIds
+        ? guestCharacterSystem.getGuests().filter((guest) => onlyGuestIds.has(String(guest?.spawn?.id || "")))
+        : guestCharacterSystem.getGuests();
+
+      applyNpcSceneToGuests(guests, document, {
         skipGuestIds: [ANGJI_GUIDE_SPAWN.id],
+        // Night enemies must keep Devi Idle + chase; only inherit day spawn pose.
+        transformOnly,
+        // Do not yank Mark-9/10/11 (etc.) back to spawn mid-sequence after cast reveal.
+        preserveActiveDance: true,
+        // Same for early-revealed patrol NPCs (Ethan / newly authored patrol).
+        preserveActivePatrol: true,
         getBuiltinSpawnById: (id) => {
           if (id === ANGJI_GUIDE_SPAWN.id) {
             return ANGJI_GUIDE_SPAWN;
@@ -8291,8 +8827,23 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
           return ANGJI_GUEST_MARKS.find((spawn) => spawn.id === id) || null;
         }
       });
-      guestCharacterSystem.refreshPatrolGuests?.({ force: true });
-      applyNpcInteractionOverrides(document);
+
+      // Reveal editor-created NPCs only after authored pose is on the spawn.
+      if (allowSpawn && !abortIf() && !onlyGuestIds) {
+        getActiveNpcRecords(document)
+          .filter((npc) => isEditorCreatedNpcId(npc.id))
+          .forEach((npc) => guestCharacterSystem.revealGuest?.(npc.id));
+      }
+
+      // Only restart patrols whose movement actually changed (or never started).
+      // force:true snapped early walkers back to home after the first leg.
+      if (!transformOnly && !onlyGuestIds) {
+        guestCharacterSystem.refreshPatrolGuests?.({ force: false });
+      }
+
+      if (!onlyGuestIds) {
+        applyNpcInteractionOverrides(document);
+      }
     } catch (error) {
       console.warn("[npc-scene-editor] placement override failed", error);
     }
@@ -8345,13 +8896,47 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
   }
 
   async function ensureEditorGuestsReady() {
-    if (isAngjiProjectConfig(activeModelState.config)) {
-      await scheduleOutdoorGuestSpawn();
+    // Cancel progressive zone spawns so they cannot dispose/re-hide after editor loads.
+    angjiNightGuestRefreshToken += 1;
+    angjiOutdoorGuestSpawnToken += 1;
+    angjiIndoorGuestSpawnToken += 1;
+    jinjuOutdoorGuestSpawnToken += 1;
+    jinjuIndoorGuestSpawnToken += 1;
+    jinjuRooftopGuestSpawnToken += 1;
+
+    if (!guestCharacterSystem) {
       return;
     }
 
-    guestCharacterSystem?.show?.();
-    guestCharacterSystem?.revealGuests?.();
+    if (isAngjiProjectConfig(activeModelState.config)) {
+      await angjiGuestCast?.requestCast("editor-ready");
+      return;
+    }
+
+    if (isJinjuProjectConfig(activeModelState.config)) {
+      const spawnMap = new Map();
+
+      [
+        ...getJinjuFixedGuestSpawns(),
+        ...getJinjuOutdoorBackgroundGuestSpawns(),
+        ...getJinjuIndoorGuestSpawns(),
+        ...getJinjuRooftopGuestSpawns()
+      ].forEach((spawn) => {
+        if (spawn?.id) {
+          spawnMap.set(spawn.id, spawn);
+        }
+      });
+
+      const spawns = [...spawnMap.values()];
+      await guestCharacterSystem.ensureSpawned(spawns, {
+        parallel: false,
+        showOnLoad: false
+      });
+      guestCharacterSystem.show();
+      return;
+    }
+
+    guestCharacterSystem.show?.();
   }
 
   function enterEditorOrbitMode() {
@@ -8431,8 +9016,13 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
   }
 
   refreshAngjiOrbitGuests = () => {
+    if (npcSceneEditor?.isActive?.()) {
+      void ensureEditorGuestsReady();
+      return;
+    }
+
     if (canUseAngjiOutdoorGuests()) {
-      void scheduleOutdoorGuestSpawn();
+      void angjiGuestCast?.requestCast("orbit-refresh");
     }
 
     if (canUseJinjuOutdoorGuests()) {
@@ -8760,58 +9350,8 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
       return;
     }
 
-    const spawnToken = ++angjiIndoorGuestSpawnToken;
-    guestCharacterSystem.hide({ onlyIds: getAngjiIndoorGuestIds() });
-    guestCharacterSystem?.hide({ onlyIds: getJinjuAllGuestIds() });
-
-    const allIndoorSpawns = getAngjiIndoorSpawnsForCurrentLighting();
-    const backgroundSpawns = getAngjiIndoorBackgroundSpawnsForCurrentLighting();
-    const nightModeGuests = isAngjiNightGuestMode();
-
-    try {
-      await guestCharacterSystem.ensureSpawned(allIndoorSpawns, {
-        parallel: !nightModeGuests,
-        showOnLoad: false,
-        yieldBetweenLoads: nightModeGuests ? 1 : 0
-      });
-
-      if (spawnToken !== angjiIndoorGuestSpawnToken) {
-        return;
-      }
-
-      const simultaneousGuests = guestCharacterSystem
-        .getGuests()
-        .filter((guest) => ANGJI_SIMULTANEOUS_GUEST_IDS.includes(guest.spawn.id));
-      const loadedIds = new Set(simultaneousGuests.map((guest) => guest.spawn.id));
-
-      if (ANGJI_SIMULTANEOUS_GUEST_IDS.every((guestId) => loadedIds.has(guestId))) {
-        guestCharacterSystem.revealGuests(ANGJI_SIMULTANEOUS_GUEST_IDS, {
-          syncAnimations: !nightModeGuests
-        });
-      }
-
-      for (const spawn of backgroundSpawns) {
-        if (spawnToken !== angjiIndoorGuestSpawnToken) {
-          return;
-        }
-
-        if (!nightModeGuests) {
-          await yieldFrames(getBackgroundGuestLoadYieldFrames(spawn.id));
-        }
-
-        guestCharacterSystem.revealGuest(spawn.id);
-
-        if (!nightModeGuests) {
-          const delayMs = getBackgroundGuestRevealDelayMs(spawn.id);
-
-          if (delayMs > 0) {
-            await wait(delayMs);
-          }
-        }
-      }
-    } catch (error) {
-      console.error("Indoor guest spawn failed", error);
-    }
+    angjiIndoorGuestSpawnToken += 1;
+    return angjiGuestCast?.requestCast("indoor-schedule");
   }
 
   function getPlacementFacingYaw() {
@@ -8913,6 +9453,13 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     json: () => guestPlacementTool?.formatJson() || "[]"
   };
 
+  window.rlbNightDiag = createRlbNightDiag({
+    getGlow: () => activeModelState?.rlbProximityGlow || null,
+    getModelConfig: () => activeModelState?.config || null,
+    getIsNight: () => document.body.classList.contains("is-night-mode"),
+    getScene: () => scene
+  });
+
   window.auditAngjiTourElements = () => {
     const walkModelState = activeModelState.tourModelState || activeModelState;
     const report = auditAngjiTourElements(walkModelState);
@@ -8988,9 +9535,10 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
   }
 
   function canUseEnemyInCurrentMode() {
-    return isLocalDevEnvironment()
-      && walkMode
-      && activeModelState.config?.file === ENEMY_SETTINGS.modelFile;
+    // Fireball practice enemy used missing enemy01.glb; swapping to Devi.glb
+    // spawned a giant (raw scale:2, no height-fit). Night Devis already cover
+    // combat guests — keep this legacy spawner off until a sized asset exists.
+    return false;
   }
 
   function updateEnemyHp() {
@@ -9292,13 +9840,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     setColMeshesPickableForMode(walkMode);
 
     if (isAngjiProjectConfig(nextModelState.config)) {
-      if (walkMode) {
-        void scheduleIndoorGuestSpawn();
-        void scheduleOutdoorGuestSpawn();
-      } else {
-        void scheduleOutdoorGuestSpawn();
-      }
-
+      void angjiGuestCast?.requestCast(walkMode ? "model-walk" : "model-orbit");
       void ensureAngjiGuideVisibleAfterGuestRefresh();
     } else if (isJinjuProjectConfig(nextModelState.config)) {
       if (walkMode) {
@@ -10003,6 +10545,12 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
   }
 
   async function enterWalkMode(shouldLockPointer = false, walkEntryOptions = {}) {
+    // Leave editor session before tour — dirty beforeunload + baseline restore
+    // were racing night Devi spawns and blocking hard refresh.
+    if (editorMode?.isOpen?.() || npcSceneEditor?.isActive?.()) {
+      editorMode?.close?.();
+    }
+
     const walkModelState = activeModelState.tourModelState || activeModelState;
 
     if (!walkEntryOptions.bgmAlreadyStarted) {
@@ -10029,6 +10577,9 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     tourResetFade?.classList.remove("is-active");
     resetWalkCameraToTourStart();
     tpsSystem?.show?.();
+    if (scene.metadata) {
+      scene.metadata.historyPlayerRoot = tpsSystem?.getCharacter?.()?.getRoot?.() || null;
+    }
     scheduleEnemySpawn();
     options.onModeChange?.("walk");
     currentLabel = "third-person tour";
@@ -10038,7 +10589,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     }
 
     floorLabel.textContent = "Walk Mode (TPS)";
-    setStatus("Third-person walk mode active. WASD moves, Shift runs, Space jumps (near GUIDE or Guest: talk), J jump-over test, P dances, mouse looks, wheel zooms. Use Orbit View to return.");
+    setStatus("Third-person walk mode active. WASD moves, Shift runs, Space jumps, E talks near GUIDE/Guest, mouse looks, wheel zooms. Use Orbit View to return.");
     updateModeSwitchButtons();
     updateDebug();
 
@@ -10048,8 +10599,6 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
       });
       resetJinjuIndoorGuestLoadingState();
       ensureJinjuWalkTourOutdoorGuests("enter walk mode");
-    } else if (isAngjiProjectConfig(activeModelState.config)) {
-      void ensureAngjiGuideVisibleAfterGuestRefresh();
     }
   }
 
@@ -10060,6 +10609,9 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
 
     walkMode = false;
     document.body.classList.remove("walk-mode-active");
+    if (scene.metadata) {
+      scene.metadata.historyPlayerRoot = null;
+    }
     npcInteractionSystem?.handleEscape?.();
     markerGameplay?.handleEscape?.();
     angjiGuideTourSystem?.dispose?.();
@@ -10102,6 +10654,11 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     updateDebug();
 
     if (isAngjiProjectConfig(orbitModelState.config)) {
+      // setModelState already requested the cast when the model changed.
+      // If orbit/walk share one state, activateModelState no-ops, so request here.
+      if (willSkipModelSwitch) {
+        void angjiGuestCast?.requestCast("enter-orbit");
+      }
       void ensureAngjiGuideVisibleAfterGuestRefresh();
     }
   }
@@ -10169,7 +10726,11 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
   });
 
   window.addEventListener("keydown", (event) => {
-    if (isOverviewAdminEditing(event) || isLocalDevPanelBlockingInput()) {
+    if (
+      isOverviewAdminEditing(event)
+      || isBasicSettingsEditing(event)
+      || isLocalDevPanelBlockingInput()
+    ) {
       clearMovementKeys();
       return;
     }
@@ -10187,6 +10748,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
       && !event.repeat
       && isPlacementToolEnabled()
       && !isOverviewAdminEditing(event)
+      && !isBasicSettingsEditing(event)
       && !(event.target instanceof HTMLInputElement)
       && !(event.target instanceof HTMLTextAreaElement)
     ) {
@@ -10201,8 +10763,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     );
 
     if (
-      walkMode
-      && !event.repeat
+      !event.repeat
       && (event.code === "Escape" || event.key === "Escape")
       && angjiGuideTourSystem?.handleEscape?.()
     ) {
@@ -10236,7 +10797,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     if (
       walkMode
       && !event.repeat
-      && (event.code === "Space" || event.key === " ")
+      && (event.code === "KeyE" || event.key === "e" || event.key === "E")
       && angjiGuideTourSystem?.handleSpacePress?.()
     ) {
       event.preventDefault();
@@ -10246,7 +10807,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     if (
       walkMode
       && !event.repeat
-      && (event.code === "Space" || event.key === " ")
+      && (event.code === "KeyE" || event.key === "e" || event.key === "E")
       && npcInteractionSystem?.handleSpacePress?.()
     ) {
       event.preventDefault();
@@ -10256,7 +10817,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     if (
       walkMode
       && !event.repeat
-      && (event.code === "Space" || event.key === " ")
+      && (event.code === "KeyE" || event.key === "e" || event.key === "E")
       && markerGameplay?.handleSpacePress?.()
     ) {
       event.preventDefault();
@@ -10278,7 +10839,11 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
   });
 
   window.addEventListener("keyup", (event) => {
-    if (isOverviewAdminEditing(event) || isLocalDevPanelBlockingInput()) {
+    if (
+      isOverviewAdminEditing(event)
+      || isBasicSettingsEditing(event)
+      || isLocalDevPanelBlockingInput()
+    ) {
       clearMovementKeys();
       return;
     }
@@ -10287,7 +10852,7 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     inputDiagnostics.keyUpCount += 1;
     inputDiagnostics.lastKeyUp = `${key || "unknown"} (${event.code || event.key || "?"})`;
 
-    if (key === " " || event.code === "Space") {
+    if (event.code === "KeyE" || event.key === "e" || event.key === "E") {
       angjiGuideTourSystem?.handleSpaceRelease?.();
       npcInteractionSystem?.handleSpaceRelease?.();
     }
@@ -10316,6 +10881,9 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
 
     if (!walkMode) {
       const deltaScale = Math.min(engine.getDeltaTime() / 16.6667, 4);
+      const deltaSeconds = engine.getDeltaTime() / 1000;
+      // Orbit preview (and other editor camera scripts) must tick outside walk mode.
+      angjiGuideTourSystem?.update?.(deltaSeconds);
       guestCharacterSystem?.update(deltaScale);
       markerGameplay?.update?.();
       inputDiagnostics.lastCollision = "-";
@@ -10565,6 +11133,40 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
 
   updateDebug();
 
+  angjiGuestCast = createAngjiGuestCastController({
+    getGuestSystem: () => guestCharacterSystem,
+    isWalkMode: () => walkMode,
+    isNightMode: () => isAngjiNightGuestMode(),
+    // Guide/RLB popup tabs do not own the NPC cast. Only the 3D NPC editor
+    // expands orbit membership to include indoor NPCs.
+    isEditorActive: () => Boolean(npcSceneEditor?.isActive?.()),
+    isAngjiProject: () => isAngjiProjectConfig(activeModelState?.config),
+    yieldFrames,
+    scene,
+    applyPoseOverlay: async ({ night, abortIf }) => {
+      await applyNpcPlacementOverrides({
+        // Local npc_* records may exist while the NPC editor is active, but
+        // shipped Mark/Devi membership is still owned by the cast controller.
+        allowSpawn: Boolean(npcSceneEditor?.isActive?.()),
+        transformOnly: night === true,
+        abortIf
+      });
+    },
+    applyGuestPose: async (guestId, { abortIf } = {}) => {
+      if (!guestId) {
+        return;
+      }
+
+      await applyNpcPlacementOverrides({
+        allowSpawn: false,
+        transformOnly: isAngjiNightGuestMode(),
+        onlyGuestIds: [guestId],
+        abortIf
+      });
+    },
+    ensureGuideVisible: () => ensureAngjiGuideVisibleAfterGuestRefresh()
+  });
+
   return {
     enterWalkMode,
     enterOrbitMode,
@@ -10573,6 +11175,9 @@ function createTourControls(BABYLON, scene, engine, orbitCamera, walkCamera, ini
     isWalkMode: () => walkMode,
     getGuideTourSystem: () => angjiGuideTourSystem,
     refreshAngjiGuestsForNightMode,
+    hideGuestsForNightTransition: () => {
+      angjiGuestCast?.hideForNightTransition?.();
+    },
     preloadCharacter: () => tpsSystem?.ensureLoaded?.()
   };
 }
@@ -10661,14 +11266,10 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
   }
 
   function notifyNightModeChange(enabled) {
-    // One frame so sky paints first, then guest refresh can start.
-    window.requestAnimationFrame(() => {
-      if (nightMode !== enabled) {
-        return;
-      }
-
-      options.onNightModeChange?.(enabled);
-    });
+    // Queue the cast in the same turn as the state mutation. Delaying this with
+    // rAF allowed a second toggle/mode transition to cancel the callback, leaving
+    // the previous Devi/Mark cast alive under the new lighting state.
+    options.onNightModeChange?.(enabled);
   }
 
   function pickRandomItems(items, count) {
@@ -13178,6 +13779,16 @@ function createAngjiNightModeController(BABYLON, scene, ambient, sun, options = 
 
       if (isAngjiProjectConfig(modelState?.config)) {
         modelState.rlbProximityGlow?.logStatus?.("night-on");
+
+        if (typeof window.rlbNightDiag === "function" && shouldAutoRunRlbNightDiag()) {
+          window.setTimeout(() => {
+            try {
+              window.rlbNightDiag("night-on");
+            } catch (error) {
+              console.warn("[rlb-night-diag] auto-run failed", error);
+            }
+          }, 400);
+        }
       } else {
         console.log("[rlb-glow] skipped — RLB shader is Angji-only (current project is not Angji)");
       }
@@ -14123,8 +14734,14 @@ async function start() {
     onModeChange: () => {
       updateProjectOverviewVisibility();
       angjiNightMode?.sync();
+      basicSettingsUi?.syncControlTipsMode?.();
     },
     onActiveModelStateChange: showActiveModelState
+  });
+
+  const basicSettingsUi = initBasicSettingsPanel({
+    getTourBgm: () => tourBgm,
+    isWalkMode: () => controls?.isWalkMode?.() || false
   });
 
   angjiNightMode = createAngjiNightModeController(BABYLON, scene, ambient, sun, {
@@ -14133,6 +14750,14 @@ async function start() {
     getOrbitCamera: () => orbitCamera,
     onNightModeChange: (isNight) => {
       controls?.getGuideTourSystem?.()?.syncGuideNightVisibility?.(isNight);
+
+      // Hide the outgoing outdoor cast immediately in both directions.
+      // The serialized refresh reveals only the matching Mark/Devi replacement.
+      controls?.hideGuestsForNightTransition?.();
+
+      // Night guest swaps race with a dirty NPC editor's beforeunload + baseline
+      // restore. Drop the unload guard while Mark↔Devi refresh runs.
+      npcSceneEditor?.releaseUnloadGuard?.();
 
       void controls?.refreshAngjiGuestsForNightMode?.().catch((error) => {
         console.error("[angji-night] guest refresh failed", error);

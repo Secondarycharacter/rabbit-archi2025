@@ -1,4 +1,4 @@
-import { createTpsSystem } from "./controllers/createTpsSystem.js?v=tps-tour-test-sync-20260629";
+import { createTpsSystem } from "./controllers/createTpsSystem.js?v=seq-restart-20260905";
 import {
   ANGJI_GROUND_Y,
   ANGJI_MOVE_SPEED_MULTIPLIER,

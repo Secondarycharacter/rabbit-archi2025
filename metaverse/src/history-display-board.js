@@ -406,7 +406,10 @@ function isPlayerBlockingBoard(BABYLON, scene, boardPosition) {
   let root = scene.metadata?.historyPlayerRoot;
 
   if (!root || root.isDisposed?.()) {
-    root = scene.getTransformNodeByName?.("tps-character-root") || null;
+    // TPS CharacterController names the root "PlayerRoot" (legacy: tps-character-root).
+    root = scene.getTransformNodeByName?.("PlayerRoot")
+      || scene.getTransformNodeByName?.("tps-character-root")
+      || null;
 
     if (scene.metadata) {
       scene.metadata.historyPlayerRoot = root;

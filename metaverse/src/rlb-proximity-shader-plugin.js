@@ -3,15 +3,18 @@
  * Spill must run at CUSTOM_FRAGMENT_BEFORE_FRAGCOLOR — MAIN_END is after gl_FragColor = finalColor.
  */
 
-import { kelvinToSpillRgb, RLB_DEFAULT_COLOR_TEMP_K, RLB_DEFAULT_SPILL_ACCUM_CAP, RLB_DEFAULT_SPILL_MAX_BLEND, RLB_DEFAULT_SPILL_OPACITY } from "./rlb-shader-tuning.js?v=rlb-shader-proximity-20260818-group-v35";
+import { kelvinToSpillRgb, RLB_DEFAULT_COLOR_TEMP_K, RLB_DEFAULT_SPILL_ACCUM_CAP, RLB_DEFAULT_SPILL_MAX_BLEND, RLB_DEFAULT_SPILL_OPACITY } from "./rlb-shader-tuning.js?v=rlb-capture-opt-in-20260907";
 import { resolveRlbSpotlightAimKind } from "./rlb-fixture-types.js";
+import { selectNearestRlbOccluderAabbs } from "./rlb-spill-occlusion.js?v=rlb-wall-occ-perf-20260907";
 
 // Keep this small: std140 float arrays pad to vec4, so 248 lights blew past 16KB UBO limits.
 export const RLB_SHADER_MAX_LIGHTS = 320;
 export const RLB_SHADER_LIGHT_STRIDE = 16;
-export const RLB_SHADER_MAX_OCCLUDERS = 48;
+export const RLB_SHADER_MAX_OCCLUDERS = 32;
 export const RLB_SHADER_MAX_PORTALS = 24;
-export const RLB_SHADER_PLUGIN_BUILD = "20260819-v35";
+/** Practical per-frame pack count — packing all 320 with occlusion kills indoor FPS. */
+export const RLB_SHADER_DEFAULT_PACK_LIGHTS = 64;
+export const RLB_SHADER_PLUGIN_BUILD = "20260907-wall-occ-perf";
 export const RLB_SHADER_DEBUG_NORMAL = 0;
 export const RLB_SHADER_DEBUG_FIXED_SPILL = 1;
 export const RLB_SHADER_DEBUG_RED = 2;
@@ -78,6 +81,8 @@ const SPILL_GLSL_BODY = `
     vec4 rlbD = rlbFetchLight(i, 3);
     vec3 lightPos = rlbA.xyz;
     float weight = rlbA.w;
+    float skipOcc = step(1.5, weight);
+    weight = min(weight, 1.0);
     float innerR = max(rlbB.x, 0.001);
     float outerR = max(rlbB.y, innerR + 0.001);
     float lightMul = max(rlbB.z, 0.0);
@@ -147,7 +152,8 @@ const SPILL_GLSL_BODY = `
     float falloff = distMask * coneMask * facing * downMask * weight * lightMul;
     if (falloff > 0.002) {
       float blocked = 0.0;
-      if (rlbOccCount > 0.5 && geomDist > 0.35) {
+      // Skip only near-zero self hits; wall-wash fixtures sit close to their host face.
+      if (skipOcc < 0.5 && rlbOccCount > 0.5 && geomDist > 0.22) {
         for (int o = 0; o < RLB_MAX_OCCLUDERS; o++) {
           if (float(o) >= rlbOccCount) {
             break;
@@ -159,10 +165,10 @@ const SPILL_GLSL_BODY = `
             rlbOccMin[o].xyz,
             rlbOccMax[o].xyz
           );
-          float minOccHit = shape > 2.5 ? 0.24 : 0.04;
-          // Block only when the AABB sits fully in front of the shaded point.
-          // If the fragment is on/inside this slab (wall or floor receiving
-          // the wash), tExit >= geomDist — do not self-occlude that surface.
+          float minOccHit = shape > 2.5 ? 0.22 : 0.04;
+          // Block only when a slab sits fully between light and fragment.
+          // Do NOT treat "light starts inside host wall AABB" as a blocker —
+          // that killed same-room wall wash after wall-penetration tuning.
           if (occSpan.x > minOccHit && occSpan.y > occSpan.x && occSpan.y < geomDist - 0.12) {
             float hitT = max(occSpan.x, 0.0);
             float throughGlass = 0.0;
@@ -178,7 +184,7 @@ const SPILL_GLSL_BODY = `
                   rlbPortalMin[p].xyz,
                   rlbPortalMax[p].xyz
                 );
-                if (portalSpan.y >= 0.0 && abs(max(portalSpan.x, 0.0) - hitT) < 0.7) {
+                if (portalSpan.y >= 0.0 && abs(max(portalSpan.x, 0.0) - hitT) < 0.6) {
                   throughGlass = 1.0;
                   break;
                 }
@@ -1247,17 +1253,48 @@ export function updateRlbProximityShaderLights(BABYLON, lightEntries, options = 
     ? BABYLON.Vector3.Distance(pick, enabled[0].position)
     : null;
 
-  // Pack every shader-spill-enabled fixture. No nearest-N cull — only the GPU texture cap.
-  const selected = enabled.slice(0, RLB_SHADER_MAX_LIGHTS);
-  if (enabled.length > RLB_SHADER_MAX_LIGHTS) {
-    console.warn(
-      `[rlb-glow] shader-enabled lights=${enabled.length} exceed cap=${RLB_SHADER_MAX_LIGHTS}; extra skipped`
-    );
+  // Nearest-N pack (not all fixtures). Full 320 + per-fragment occluder loops
+  // made indoor night pan hitch even when "many lights used to be fine."
+  const packCap = Math.min(
+    RLB_SHADER_MAX_LIGHTS,
+    Math.max(8, Math.floor(Number(options.maxLights) || RLB_SHADER_DEFAULT_PACK_LIGHTS))
+  );
+
+  if (pick && enabled.length > 1) {
+    enabled.sort((left, right) => (
+      BABYLON.Vector3.DistanceSquared(pick, left.position)
+      - BABYLON.Vector3.DistanceSquared(pick, right.position)
+    ));
   }
+
+  const selected = enabled.slice(0, packCap);
   state.lightCount = selected.length;
 
-  const aabbs = Array.isArray(options.occluderAabbs) ? options.occluderAabbs : [];
-  const inflate = 0.04;
+  // Prefer the throttled nearest set from glow lifecycle. Rescoring the full
+  // AABB cache against every packed light every update is O(walls × lights).
+  let aabbs = Array.isArray(options.occluderAabbs) && options.occluderAabbs.length
+    ? options.occluderAabbs
+    : null;
+
+  if (!aabbs) {
+    const aabbsSource = Array.isArray(options.occluderAabbCache) && options.occluderAabbCache.length
+      ? options.occluderAabbCache
+      : [];
+    const focusPoint = pick
+      || options.cameraPosition
+      || options.camera?.globalPosition
+      || options.camera?.position
+      || null;
+    aabbs = selectNearestRlbOccluderAabbs(
+      aabbsSource,
+      focusPoint,
+      RLB_SHADER_MAX_OCCLUDERS,
+      // Focus-only scoring on the fallback path — light-segment scoring is too heavy.
+      []
+    );
+  }
+
+  const inflate = 0.05;
   const occCap = Math.min(aabbs.length, RLB_SHADER_MAX_OCCLUDERS);
   for (let occIndex = 0; occIndex < occCap; occIndex += 1) {
     const aabb = aabbs[occIndex];
@@ -1390,7 +1427,10 @@ export function updateRlbProximityShaderLights(BABYLON, lightEntries, options = 
     texData[base] = posX;
     texData[base + 1] = posY;
     texData[base + 2] = posZ;
-    texData[base + 3] = 1;
+    // weight>1.5 → skip wall AABB occlusion (Outdoor/Ground bollards).
+    texData[base + 3] = (entry?.rlbType === "OutdoorLight" || entry?.rlbType === "GroundLight")
+      ? 2
+      : 1;
     texData[base + 4] = innerR;
     texData[base + 5] = outerR;
     texData[base + 6] = lightMul;

@@ -1,6 +1,6 @@
 /**
  * Reusable NPC interaction + dialog state machine.
- * Data-driven guests; Space near NPC starts dialog; ESC cancels anytime.
+ * Data-driven guests; E near NPC starts dialog; ESC cancels anytime.
  */
 
 import {
@@ -9,7 +9,14 @@ import {
   projectWorldPointToScreen,
   updateGuestDevLabelHeight
 } from "./guest-dev-label.js?v=angji-guest-labels-20260823";
-import { markConversationCompleted } from "./npc-guest-data.js?v=angji-npc-korean-names-20260822";
+import {
+  loadConversationProgress,
+  markConversationEventCompleted,
+  resolveActiveConversationEvent,
+  resolveDialogLine
+} from "./npc-guest-data.js?v=npc-conversation-events-20260905";
+import { resolveNpcDialogCameraFraming } from "./npc-dialog-camera.js?v=npc-dialog-cam-lateral-20260905";
+import { getVoiceVolume } from "./metaverse-audio-settings.js?v=audio-mute-20260906";
 
 export const NPC_INTERACTION_STATE = {
   IDLE: "IDLE",
@@ -147,6 +154,7 @@ export function createNpcInteractionSystem(BABYLON, scene, options = {}) {
   let alignmentCompleted = false;
   let dialogLookTarget = new BABYLON.Vector3();
   let dialogCameraPos = new BABYLON.Vector3();
+  let playerAvatarHidden = false;
   let savedInputBlocked = false;
 
   function setConfigs(nextConfigs = []) {
@@ -323,6 +331,26 @@ export function createNpcInteractionSystem(BABYLON, scene, options = {}) {
     return target;
   }
 
+  function setPlayerAvatarVisible(visible) {
+    const character = getPlayerCharacter();
+    const tps = getTpsSystem?.();
+
+    if (visible) {
+      if (playerAvatarHidden) {
+        tps?.show?.();
+        character?.show?.();
+        playerAvatarHidden = false;
+      }
+      return;
+    }
+
+    if (!playerAvatarHidden) {
+      tps?.hide?.();
+      character?.hide?.();
+      playerAvatarHidden = true;
+    }
+  }
+
   function hideDialogUi() {
     ui.bubble.hidden = true;
     ui.subtitle.hidden = true;
@@ -361,7 +389,7 @@ export function createNpcInteractionSystem(BABYLON, scene, options = {}) {
 
     audio = new Audio(line.audioFile);
     audio.preload = "auto";
-    audio.volume = clamp(line.voiceVolume ?? 1, 0, 1);
+    audio.volume = clamp((line.voiceVolume ?? 1) * getVoiceVolume(), 0, 1);
     audio.playbackRate = clamp(line.voicePlaybackSpeed ?? 1, 0.5, 2);
     audio.addEventListener("ended", () => {
       audioEnded = true;
@@ -560,6 +588,7 @@ export function createNpcInteractionSystem(BABYLON, scene, options = {}) {
   function finishReset() {
     hideDialogUi();
     stopAudio();
+    setPlayerAvatarVisible(true);
     clearKeysAndBlockInput(false);
     spaceLatch = true;
 
@@ -585,6 +614,7 @@ export function createNpcInteractionSystem(BABYLON, scene, options = {}) {
     setState(NPC_INTERACTION_STATE.DIALOG_CANCEL);
     hideDialogUi();
     stopAudio();
+    setPlayerAvatarVisible(true);
 
     const guest = getActiveGuest();
 
@@ -715,38 +745,23 @@ export function createNpcInteractionSystem(BABYLON, scene, options = {}) {
       captureGameplayEyeFromBody();
       alignmentCompleted = true;
       cameraBlend = 0;
+      setPlayerAvatarVisible(activeConfig.hidePlayerDuringDialog === false);
       setState(NPC_INTERACTION_STATE.DIALOG_CAMERA_START);
       onStatus?.("대화 시작");
     }
   }
 
   function resolveDialogCamera(guest, playerPos) {
-    const guestPos = guest.root.getAbsolutePosition();
-    const fitScale = Math.max(guest.fitScale || 1, 0.001);
-    const lookLift = activeConfig.cameraLookLift ?? 0.35;
-    const headY = guestPos.y + getGuestHeadLocalY(guest) * fitScale;
-    const look = new BABYLON.Vector3(guestPos.x, headY - 0.15 + lookLift * 0.15, guestPos.z);
-    const fromPlayer = new BABYLON.Vector3(
-      playerPos.x - guestPos.x,
-      0,
-      playerPos.z - guestPos.z
-    );
+    const framing = resolveNpcDialogCameraFraming(BABYLON, {
+      guestPosition: guest.root.getAbsolutePosition(),
+      guestHeadLocalY: getGuestHeadLocalY(guest),
+      fitScale: guest.fitScale || 1,
+      playerEyePosition: playerPos,
+      eyeHeight,
+      settings: activeConfig || {}
+    });
 
-    if (fromPlayer.lengthSquared() < 1e-6) {
-      fromPlayer.set(0, 0, 1);
-    } else {
-      fromPlayer.normalize();
-    }
-
-    const dist = clamp(
-      activeConfig.dialogDistance + 0.55,
-      activeConfig.cameraMinDistance,
-      activeConfig.cameraMaxDistance
-    );
-    const cam = look.add(fromPlayer.scale(dist));
-    cam.y = playerPos.y - eyeHeight + activeConfig.cameraHeight;
-
-    return { look, cam };
+    return { look: framing.look, cam: framing.cam };
   }
 
   function updateDialogCamera(dt) {
@@ -848,14 +863,35 @@ export function createNpcInteractionSystem(BABYLON, scene, options = {}) {
     void dt;
     hideDialogUi();
     stopAudio();
+    setPlayerAvatarVisible(true);
 
     if (endedNormally && activeGuestId && activeConfig && !activeConfig.repeatable) {
-      markConversationCompleted(activeGuestId);
+      markConversationEventCompleted(
+        activeGuestId,
+        activeConfig.activeEventId || "event_1",
+        activeConfig
+      );
+
       const config = configByGuestId.get(activeGuestId);
 
       if (config) {
-        config.conversationCompleted = true;
-        config.canInteract = false;
+        const progress = loadConversationProgress();
+        const nextEvent = resolveActiveConversationEvent(config, progress);
+        const sourceLines = nextEvent?.dialogLines || [];
+        const lines = sourceLines
+          .filter((line) => line.enabled && String(line.koreanText || "").trim())
+          .sort((a, b) => a.order - b.order)
+          .map((line) => resolveDialogLine(config, line));
+
+        config.activeEventId = nextEvent?.id || null;
+        config.activeEventName = nextEvent?.name || null;
+        config.dialogLines = lines;
+        config.conversationCompleted = !nextEvent;
+        config.canInteract = Boolean(
+          config.interactionEnabled
+          && lines.length > 0
+          && Boolean(nextEvent)
+        );
       }
     }
 
@@ -962,6 +998,7 @@ export function createNpcInteractionSystem(BABYLON, scene, options = {}) {
   function dispose() {
     cancelDialog();
     hideDialogUi();
+    setPlayerAvatarVisible(true);
     stopAudio();
   }
 

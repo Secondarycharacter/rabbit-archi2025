@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Metaverse Editor</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="./styles/main.css?v=select-light-unify-20260906">
+</head>
+<body class="editor-popup-window">
+  <header class="editor-popup-window__header">
+    <h1 class="editor-popup-window__title">Metaverse Editor</h1>
+    <nav id="editorPopupTabs" class="editor-popup-window__tabs" aria-label="Editor tabs">
+      <button type="button" class="editor-mode-tabs__btn" data-tab="guide">가이드</button>
+      <button type="button" class="editor-mode-tabs__btn" data-tab="guest">NPC</button>
+      <button type="button" class="editor-mode-tabs__btn" data-tab="rlb">RLB 쉐이더</button>
+    </nav>
+    <p class="editor-popup-window__hint">이 창을 다른 모니터로 옮겨 편집하세요. 저장·적용은 메타버스 창에 즉시 반영됩니다.</p>
+  </header>
+
+  <aside class="rlb-tuning-panel editor-popup-rlb-panel" id="rlbTuningPanel" hidden>
+    <header class="rlb-tuning-panel__header">
+      <h2>RLB 쉐이더 튜닝</h2>
+      <div class="rlb-tuning-panel__actions">
+        <button id="rlbTuningSaveButton" type="button">저장</button>
+        <button id="rlbTuningResetButton" type="button">초기화</button>
+      </div>
+    </header>
+    <nav class="rlb-tuning-tabs" id="rlbTuningTabs" aria-label="조명 종류"></nav>
+    <div class="rlb-tuning-layout">
+      <section class="rlb-tuning-lights" id="rlbTuningLights" hidden></section>
+      <div class="rlb-tuning-body" id="rlbTuningBody"></div>
+    </div>
+    <p class="rlb-tuning-status" id="rlbTuningStatus"></p>
+  </aside>
+
+  <p id="editorPopupStatus" class="editor-popup-window__status" hidden></p>
+  <script type="module" src="./src/editor-mode/editor-popup.js?v=rlb-range-restore-20260907j"></script>
+</body>
+</html>
