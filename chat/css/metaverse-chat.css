@@ -8,8 +8,8 @@
   flex-direction: column;
   margin-top: calc(14px * 1.5);
   border-radius: 4px;
-  background: var(--shell-surface-card);
-  border: 1px solid var(--shell-border-subtle);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   overflow: hidden;
 }
 
@@ -30,7 +30,7 @@
   text-align: center;
   font-size: var(--h0-overview-body-size);
   line-height: var(--h0-overview-body-line-height);
-  color: var(--shell-text-empty);
+  color: rgba(255, 255, 255, 0.42);
 }
 
 .metaverse-chat__message {
@@ -174,18 +174,18 @@
   flex-direction: column;
   gap: 4px;
   padding: 6px;
-  border-top: 1px solid var(--shell-split-chat-border);
-  background: var(--shell-surface-composer);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.22);
 }
 
 .metaverse-chat__nickname {
   width: 100%;
   box-sizing: border-box;
   padding: 4px 6px;
-  border: 1px solid var(--shell-border-field);
+  border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 3px;
-  background: var(--shell-surface-field);
-  color: var(--shell-text-composer);
+  background: rgba(0, 0, 0, 0.35);
+  color: rgba(255, 255, 255, 0.88);
   font-family: inherit;
   font-size: 12px;
   line-height: var(--h0-overview-body-line-height);
@@ -193,7 +193,7 @@
 }
 
 .metaverse-chat__nickname::placeholder {
-  color: var(--shell-text-placeholder);
+  color: rgba(255, 255, 255, 0.38);
   font-size: 12px;
   opacity: 1;
 }
@@ -202,10 +202,10 @@
   width: 100%;
   box-sizing: border-box;
   padding: 4px 6px;
-  border: 1px solid var(--shell-border-field);
+  border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 3px;
-  background: var(--shell-surface-field);
-  color: var(--shell-text-composer);
+  background: rgba(0, 0, 0, 0.35);
+  color: rgba(255, 255, 255, 0.88);
   font-family: inherit;
   font-size: 12px;
   line-height: var(--h0-overview-body-line-height);
@@ -213,7 +213,7 @@
 }
 
 .metaverse-chat__pin::placeholder {
-  color: var(--shell-text-placeholder);
+  color: rgba(255, 255, 255, 0.38);
   font-size: 12px;
   opacity: 1;
 }
@@ -234,7 +234,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--shell-muted);
+  color: rgba(255, 255, 255, 0.72);
   font-size: var(--h0-overview-body-size);
   line-height: var(--h0-overview-body-line-height);
 }
@@ -242,10 +242,10 @@
 .metaverse-chat__logout {
   flex-shrink: 0;
   padding: 3px 6px;
-  border: 1px solid var(--shell-border-strong);
+  border: 1px solid rgba(255, 255, 255, 0.28);
   border-radius: 3px;
-  background: var(--shell-surface-logout);
-  color: var(--shell-text);
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
   font-family: inherit;
   font-size: 10px;
   letter-spacing: 0.2px;
@@ -253,7 +253,7 @@
 }
 
 .metaverse-chat__logout:hover {
-  background: var(--shell-surface-logout-hover);
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .metaverse-chat__input-row {
@@ -269,7 +269,7 @@
   height: calc(var(--h0-overview-body-line-height) * 2em + 12px);
   max-height: calc(var(--h0-overview-body-line-height) * 2em + 12px);
   padding: 6px 8px;
-  border: 1px solid var(--shell-border-field-strong);
+  border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: 3px;
   background: rgba(255, 255, 255, 0.92);
   color: rgba(0, 0, 0, 0.85);
@@ -291,10 +291,10 @@
 
 .metaverse-chat__send {
   padding: 0;
-  border: 1px solid var(--shell-border-strong);
+  border: 1px solid rgba(255, 255, 255, 0.28);
   border-radius: 3px;
-  background: var(--shell-surface-button);
-  color: var(--shell-text);
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
   font-size: 14px;
   line-height: 1;
   cursor: url('../../images/Icon/Mouse_H.png') 4 4, pointer;
@@ -302,14 +302,14 @@
 }
 
 .metaverse-chat__send:hover {
-  background: var(--shell-surface-button-hover);
+  background: rgba(255, 255, 255, 0.24);
 }
 
 .metaverse-chat__nickname:focus,
 .metaverse-chat__pin:focus,
 .metaverse-chat__input:focus,
 .metaverse-chat__edit-field:focus {
-  outline: 1px solid var(--shell-focus-outline);
+  outline: 1px solid rgba(255, 255, 255, 0.45);
   outline-offset: 0;
 }
 

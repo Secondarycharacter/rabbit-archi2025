@@ -12,18 +12,6 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 const searchParams = new URLSearchParams(window.location.search);
-
-function applyHomepageTheme() {
-  const fromQuery = searchParams.get('theme');
-  let theme = null;
-  if (fromQuery === 'light' || fromQuery === 'dark') theme = fromQuery;
-  else {
-    try { theme = localStorage.getItem('rabbitHomepageTheme'); } catch {}
-  }
-  document.body.classList.toggle('theme-light', theme === 'light');
-}
-applyHomepageTheme();
-
 const forceProductionPreview =
   searchParams.get('preview') === 'production' || searchParams.get('debug') === '0';
 
