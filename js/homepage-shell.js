@@ -98,16 +98,16 @@ const metaverseFrame = document.getElementById('metaverseFrame');
 const metaversePreviewMedia = null;
 const metaversePreviewHint = null;
 const metaverseOverview = null;
-const extraLayout = document.getElementById('extraLayout');
-const extraOverview = document.getElementById('extraOverview');
-const extraChat = document.getElementById('extraChat');
-const extraPreviewMedia = document.getElementById('extraPreviewMedia');
-const extraDownloadHint = document.getElementById('extraDownloadHint');
-const extraDownloadLink = document.getElementById('extraDownloadLink');
+const extraGalleryViewport = document.getElementById('extraGalleryViewport');
+const extraGalleryTrack = document.getElementById('extraGalleryTrack');
+const extraGalleryArrow = document.getElementById('extraGalleryArrow');
 
 const METAVERSE_GALLERY_GAP = 8;
 const METAVERSE_GALLERY_COLUMNS = 2;
 const METAVERSE_GALLERY_VISIBLE_ROWS = 2;
+const EXTRA_GALLERY_GAP = METAVERSE_GALLERY_GAP;
+const EXTRA_GALLERY_COLUMNS = METAVERSE_GALLERY_COLUMNS;
+const EXTRA_GALLERY_VISIBLE_ROWS = METAVERSE_GALLERY_VISIBLE_ROWS;
 
 const state = {
   category: 'home',
@@ -120,11 +120,17 @@ const state = {
   selectedProjectId: null,
   hoveredProjectId: null,
   selectedMetaverseProject: null,
+  selectedExtraProject: null,
   metaverseGalleryProjects: [],
   metaverseGalleryScroll: 0,
   metaverseGalleryVelocity: 0,
   metaverseGalleryRaf: null,
   metaverseGalleryRowHeight: 0,
+  extraGalleryProjects: [],
+  extraGalleryScroll: 0,
+  extraGalleryVelocity: 0,
+  extraGalleryRaf: null,
+  extraGalleryRowHeight: 0,
   descriptionCache: new Map(),
   projectOverviews: null
 };
@@ -472,9 +478,10 @@ function setCategory(category) {
     renderH1Projects();
     refreshH1ListLayout();
     setActiveView('extra');
-    const latestExtra = state.h1Projects[state.h1Projects.length - 1];
-    if (latestExtra) {
-      selectExtraProject(latestExtra);
+    renderExtraGallery({ resetScroll: true });
+    const newest = getExtraProjectsNewestFirst()[0] || null;
+    if (newest) {
+      selectExtraGalleryProject(newest, { scrollIntoView: false, openDownload: false });
     } else {
       clearExtraPreview();
     }
@@ -510,6 +517,31 @@ function syncMetaversePreviewPlayback() {
   });
 }
 
+function syncExtraPreviewPlayback() {
+  const activeId = getHighlightedProjectId();
+
+  extraGalleryTrack?.querySelectorAll('.h0-extra-card').forEach((card) => {
+    const video = card.querySelector('video');
+    if (!video) {
+      return;
+    }
+
+    if (card.dataset.projectId === activeId) {
+      if (video.paused) {
+        const playPromise = video.play();
+        if (playPromise?.catch) {
+          playPromise.catch(() => {});
+        }
+      }
+      return;
+    }
+
+    if (!video.paused) {
+      video.pause();
+    }
+  });
+}
+
 function syncProjectHighlight() {
   const highlightId = getHighlightedProjectId();
 
@@ -524,7 +556,12 @@ function syncProjectHighlight() {
     card.classList.toggle('is-active', card.dataset.projectId === highlightId);
   });
 
+  extraGalleryTrack?.querySelectorAll('.h0-extra-card').forEach((card) => {
+    card.classList.toggle('is-active', card.dataset.projectId === highlightId);
+  });
+
   syncMetaversePreviewPlayback();
+  syncExtraPreviewPlayback();
 }
 
 function setHoveredProjectId(projectId) {
@@ -594,13 +631,17 @@ function renderH1Projects() {
 
     item.addEventListener('click', () => handleH1ProjectClick(project));
 
-    if (state.category === 'metaverse') {
+    if (state.category === 'metaverse' || state.category === 'extra') {
       item.addEventListener('pointerenter', () => {
         setHoveredProjectId(project.id);
       });
       item.addEventListener('pointerleave', (event) => {
         const next = event.relatedTarget;
-        if (next?.closest?.('.h1-project-item') || next?.closest?.('.h0-metaverse-card')) {
+        if (
+          next?.closest?.('.h1-project-item')
+          || next?.closest?.('.h0-metaverse-card')
+          || next?.closest?.('.h0-extra-card')
+        ) {
           return;
         }
         clearHoveredProjectId(project.id);
@@ -618,7 +659,7 @@ function updateH1TrackPosition() {
   const translateY = centerY + state.h1ScrollOffset;
   h1ListTrack.style.transform = `translateY(${translateY}px)`;
 
-  const centeredProjectId = state.category === 'metaverse'
+  const centeredProjectId = (state.category === 'metaverse' || state.category === 'extra')
     ? null
     : getH1CenteredProjectId();
   h1ListTrack.querySelectorAll('.h1-project-item').forEach((item) => {
@@ -723,7 +764,7 @@ function handleH1ProjectClick(project) {
   if (project.category === 'extra') {
     state.selectedProjectId = project.id;
     renderH1Projects();
-    selectExtraProject(project);
+    selectExtraGalleryProject(project, { scrollIntoView: true, openDownload: false });
   }
 }
 
@@ -1942,234 +1983,482 @@ function launchMetaverse(project) {
   });
 }
 
-function applyExtraOverviewBounds(element, topOffset, bottomEdge) {
-  if (!element) {
-    return;
-  }
+function getExtraProjectsNewestFirst() {
+  return [...(state.projects.extra || [])].sort((a, b) => {
+    const dateDiff = getProjectSortKey(b) - getProjectSortKey(a);
+    if (dateDiff !== 0) {
+      return dateDiff;
+    }
 
-  if (topOffset === null || bottomEdge === null) {
-    element.style.paddingTop = '';
-    element.style.maxHeight = '';
-    return;
-  }
+    const regDiff = (b.registeredAt ?? b.orderIndex ?? 0) - (a.registeredAt ?? a.orderIndex ?? 0);
+    if (regDiff !== 0) {
+      return regDiff;
+    }
 
-  element.style.paddingTop = `${topOffset}px`;
-  element.style.maxHeight = `${bottomEdge}px`;
-  element.style.boxSizing = 'border-box';
+    return (b.orderIndex ?? 0) - (a.orderIndex ?? 0);
+  });
 }
 
-function applyExtraChatTopAlign(topOffset) {
-  if (!extraChat) {
-    return;
-  }
-
-  extraChat.style.maxHeight = '';
-  extraChat.style.paddingTop = topOffset === null ? '' : `${topOffset}px`;
+function getExtraGalleryViewportHeight() {
+  return extraGalleryViewport?.clientHeight || 0;
 }
 
-function syncExtraOverviewVideoBounds(overview, layout, media) {
-  if (!layout || !media) {
-    return;
+function getExtraGalleryRowHeight() {
+  const viewportHeight = getExtraGalleryViewportHeight();
+  if (viewportHeight <= 0) {
+    return 0;
   }
 
-  const layoutRect = layout.getBoundingClientRect();
-  const mediaRect = media.getBoundingClientRect();
-
-  if (!mediaRect.height) {
-    applyExtraOverviewBounds(overview, null, null);
-    applyExtraChatTopAlign(null);
-    return;
-  }
-
-  const topOffset = Math.max(0, Math.round(mediaRect.top - layoutRect.top));
-  const bottomEdge = Math.round(mediaRect.bottom - layoutRect.top);
-
-  applyExtraOverviewBounds(overview, topOffset, bottomEdge);
-  applyExtraChatTopAlign(topOffset);
+  return Math.max(
+    120,
+    (viewportHeight - EXTRA_GALLERY_GAP * (EXTRA_GALLERY_VISIBLE_ROWS - 1))
+      / EXTRA_GALLERY_VISIBLE_ROWS
+  );
 }
 
-function syncExtraDownloadHintPosition(media) {
-  const pane = document.querySelector('.h0-extra-preview-pane');
-  const hint = extraDownloadHint;
-
-  if (!pane || !hint || !media) {
-    return;
+function getExtraGalleryMaxScroll() {
+  const projects = state.extraGalleryProjects;
+  if (!projects.length) {
+    return 0;
   }
 
-  if (!views.extra.classList.contains('is-active') || !media.offsetHeight) {
-    hint.style.top = '';
-    return;
-  }
-
-  const paneRect = pane.getBoundingClientRect();
-  const mediaRect = media.getBoundingClientRect();
-  const hintStyle = window.getComputedStyle(hint);
-  const lineHeight = parseFloat(hintStyle.lineHeight);
-  const fontSize = parseFloat(hintStyle.fontSize) || 16;
-  const oneLine = Number.isFinite(lineHeight) ? lineHeight : fontSize * 1.45;
-
-  hint.style.top = `${Math.round(mediaRect.bottom - paneRect.top + oneLine)}px`;
+  const rowCount = Math.ceil(projects.length / EXTRA_GALLERY_COLUMNS);
+  const rowHeight = state.extraGalleryRowHeight || getExtraGalleryRowHeight();
+  const contentHeight = rowCount * rowHeight + Math.max(0, rowCount - 1) * EXTRA_GALLERY_GAP;
+  return Math.max(0, contentHeight - getExtraGalleryViewportHeight());
 }
 
-function updateExtraDownloadHint(project) {
-  if (!extraDownloadHint || !extraDownloadLink) {
-    return;
-  }
-
-  if (project?.downloadUrl) {
-    extraDownloadLink.href = project.downloadUrl;
-    extraDownloadHint.hidden = false;
-    return;
-  }
-
-  extraDownloadHint.hidden = true;
-  extraDownloadLink.removeAttribute('href');
-  extraDownloadHint.style.top = '';
+function clampExtraGalleryScroll() {
+  const maxScroll = getExtraGalleryMaxScroll();
+  state.extraGalleryScroll = Math.min(maxScroll, Math.max(0, state.extraGalleryScroll));
 }
 
-async function selectExtraProject(project) {
-  setActiveView('extra');
-  resetExtraPreviewMediaSize();
-  extraPreviewMedia.innerHTML = '';
-  updateExtraDownloadHint(project);
-  dispatchExtraChatProject(project);
+function updateExtraGalleryTrackPosition() {
+  if (!extraGalleryTrack) {
+    return;
+  }
 
-  const description = await loadDescription(project);
-  renderExtraOverview(project, description);
+  extraGalleryTrack.style.transform = `translateY(${-state.extraGalleryScroll}px)`;
+  updateExtraGalleryArrow();
+}
+
+function updateExtraGalleryArrow() {
+  if (!extraGalleryArrow) {
+    return;
+  }
+
+  const maxScroll = getExtraGalleryMaxScroll();
+  const hasMoreBelow = maxScroll > 1 && state.extraGalleryScroll < maxScroll - 2;
+  extraGalleryArrow.hidden = !hasMoreBelow;
+}
+
+function syncExtraGalleryLayout() {
+  if (!extraGalleryTrack || !extraGalleryViewport) {
+    return;
+  }
+
+  if (state.category !== 'extra' || !views.extra?.classList.contains('is-active')) {
+    return;
+  }
+
+  state.extraGalleryRowHeight = getExtraGalleryRowHeight();
+  extraGalleryTrack.style.gridAutoRows = `${state.extraGalleryRowHeight}px`;
+  clampExtraGalleryScroll();
+  updateExtraGalleryTrackPosition();
+  syncAllExtraCardPreviewVideos();
+}
+
+function buildExtraCardOverviewHtml(project, description) {
+  const title = getDisplayTitle(project);
+  let body = '';
+  if (description == null) {
+    body = '';
+  } else if (description) {
+    body = formatDescription(description);
+  } else {
+    body = '<p class="overview-empty">등록된 설명이 없습니다.</p>';
+  }
+
+  return `
+    <h3 class="h0-extra-card__overview-title">■ ${escapeOverviewValue(title)}</h3>
+    <div class="h0-extra-card__overview-body">${body}</div>
+  `;
+}
+
+function syncExtraCardPreviewVideo(video, mediaWrap, mediaClip) {
+  if (!video || !mediaWrap || !mediaClip) {
+    return;
+  }
+
+  if (!video.videoWidth || !video.videoHeight || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+    return;
+  }
+
+  const stageWidth = mediaWrap.clientWidth;
+  const stageHeight = mediaWrap.clientHeight;
+  if (!stageWidth || !stageHeight) {
+    return;
+  }
+
+  const bounds = detectVideoContentBounds(video, { force: false });
+  const useCrop = Boolean(bounds && hasVideoContentLetterbox(bounds, video));
+  const contentLeft = useCrop ? bounds.left : 0;
+  const contentTop = useCrop ? bounds.top : 0;
+  const contentWidth = useCrop ? (bounds.right - bounds.left + 1) : video.videoWidth;
+  const contentHeight = useCrop ? (bounds.bottom - bounds.top + 1) : video.videoHeight;
+
+  const renderSize = computeMetaversePreviewRenderSize(
+    contentWidth,
+    contentHeight,
+    stageWidth,
+    stageHeight
+  );
+  if (!renderSize) {
+    return;
+  }
+
+  const scale = renderSize.width / contentWidth;
+  mediaClip.style.width = `${renderSize.width}px`;
+  mediaClip.style.height = `${renderSize.height}px`;
+  mediaClip.style.left = `${Math.round((stageWidth - renderSize.width) / 2)}px`;
+  mediaClip.style.top = `${Math.round((stageHeight - renderSize.height) / 2)}px`;
+  mediaClip.classList.toggle('is-content-cropped', useCrop);
+
+  video.style.position = 'absolute';
+  video.style.left = `${-contentLeft * scale}px`;
+  video.style.top = `${-contentTop * scale}px`;
+  video.style.width = `${video.videoWidth * scale}px`;
+  video.style.height = `${video.videoHeight * scale}px`;
+  video.style.objectFit = 'fill';
+  video.style.maxWidth = 'none';
+  video.style.maxHeight = 'none';
+  video.style.margin = '0';
+}
+
+function syncAllExtraCardPreviewVideos() {
+  extraGalleryTrack?.querySelectorAll('.h0-extra-card__media').forEach((mediaWrap) => {
+    const mediaClip = mediaWrap.querySelector('.h0-extra-card__media-clip');
+    const video = mediaWrap.querySelector('video');
+    if (video && mediaClip) {
+      syncExtraCardPreviewVideo(video, mediaWrap, mediaClip);
+    }
+  });
+}
+
+function bindExtraCardPreviewVideo(video, mediaWrap, mediaClip) {
+  const sync = () => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        syncExtraCardPreviewVideo(video, mediaWrap, mediaClip);
+      });
+    });
+  };
+
+  video.addEventListener('loadedmetadata', sync);
+  video.addEventListener('loadeddata', sync);
+  video.addEventListener('seeked', sync, { once: true });
+  scheduleVideoContentBoundsDetection(video, () => {
+    invalidateVideoContentBounds(video);
+    detectVideoContentBounds(video, { force: true });
+    sync();
+  });
+  sync();
+}
+
+function openExtraDownload(project) {
+  if (!project?.downloadUrl) {
+    return;
+  }
+
+  window.open(project.downloadUrl, '_blank', 'noopener,noreferrer');
+}
+
+function createExtraGalleryCard(project) {
+  const card = document.createElement('article');
+  card.className = 'h0-extra-card';
+  card.dataset.projectId = project.id;
+  card.setAttribute('role', 'button');
+  card.tabIndex = 0;
+
+  if (getHighlightedProjectId() === project.id) {
+    card.classList.add('is-active');
+  }
+
+  const overview = document.createElement('div');
+  overview.className = 'h0-extra-card__overview';
+  overview.innerHTML = buildExtraCardOverviewHtml(project, null);
+  overview.addEventListener('wheel', (event) => {
+    event.stopPropagation();
+  }, { passive: true });
+  overview.addEventListener('click', (event) => {
+    event.stopPropagation();
+    selectExtraGalleryProject(project, { scrollIntoView: false, openDownload: false });
+  });
+
+  loadDescription(project).then((description) => {
+    if (!overview.isConnected) {
+      return;
+    }
+    overview.innerHTML = buildExtraCardOverviewHtml(project, description);
+  });
+
+  const mediaPane = document.createElement('div');
+  mediaPane.className = 'h0-extra-card__preview';
+
+  const mediaWrap = document.createElement('div');
+  mediaWrap.className = 'h0-extra-card__media';
+
+  const mediaClip = document.createElement('div');
+  mediaClip.className = 'h0-extra-card__media-clip';
+  mediaWrap.appendChild(mediaClip);
 
   if (project.previewType === 'video' && project.preview) {
     const video = document.createElement('video');
     video.src = project.preview;
     video.playsInline = true;
     video.muted = true;
-    video.autoplay = true;
+    video.autoplay = false;
     video.loop = true;
-    extraPreviewMedia.appendChild(video);
-    const syncExtra = () => requestAnimationFrame(() => {
-      requestAnimationFrame(syncExtraPreviewLayout);
-    });
-    video.addEventListener('loadeddata', syncExtra, { once: true });
-    video.addEventListener('loadedmetadata', syncExtra, { once: true });
-    video.addEventListener('seeked', syncExtra, { once: true });
-    scheduleVideoContentBoundsDetection(video, () => syncExtra());
+    video.preload = 'auto';
+    video.setAttribute('aria-hidden', 'true');
+    mediaClip.appendChild(video);
+    bindExtraCardPreviewVideo(video, mediaWrap, mediaClip);
   } else if (project.preview) {
     const img = document.createElement('img');
     img.src = project.preview;
-    img.alt = project.title;
-    extraPreviewMedia.appendChild(img);
-    img.addEventListener('load', () => requestAnimationFrame(syncExtraPreviewLayout), { once: true });
+    img.alt = '';
+    mediaClip.appendChild(img);
+    img.addEventListener('load', () => {
+      const stageWidth = mediaWrap.clientWidth;
+      const stageHeight = mediaWrap.clientHeight;
+      const renderSize = computeMetaversePreviewRenderSize(
+        img.naturalWidth,
+        img.naturalHeight,
+        stageWidth,
+        stageHeight
+      );
+      if (!renderSize) {
+        return;
+      }
+      mediaClip.style.width = `${renderSize.width}px`;
+      mediaClip.style.height = `${renderSize.height}px`;
+      mediaClip.style.left = `${Math.round((stageWidth - renderSize.width) / 2)}px`;
+      mediaClip.style.top = `${Math.round((stageHeight - renderSize.height) / 2)}px`;
+      img.style.position = 'absolute';
+      img.style.left = '0';
+      img.style.top = '0';
+      img.style.width = `${renderSize.width}px`;
+      img.style.height = `${renderSize.height}px`;
+      img.style.objectFit = 'fill';
+    }, { once: true });
   }
 
-  requestAnimationFrame(() => {
-    requestAnimationFrame(syncExtraPreviewLayout);
+  const caption = document.createElement('div');
+  caption.className = 'h0-extra-card__caption';
+  const downloadHtml = project.downloadUrl
+    ? `<a class="h0-extra-card__download" href="${escapeOverviewValue(project.downloadUrl)}" target="_blank" rel="noopener noreferrer">게임 다운로드</a>`
+    : '';
+  caption.innerHTML = `
+    <span class="h0-extra-card__date">${formatProjectDate(project.date)}</span>
+    <span class="h0-extra-card__title">${escapeOverviewValue(getDisplayTitle(project))}</span>
+    ${downloadHtml}
+  `;
+
+  const downloadLink = caption.querySelector('.h0-extra-card__download');
+  downloadLink?.addEventListener('click', (event) => {
+    event.stopPropagation();
+    selectExtraGalleryProject(project, { scrollIntoView: false, openDownload: false });
   });
+
+  mediaPane.appendChild(mediaWrap);
+  mediaPane.appendChild(caption);
+  card.appendChild(overview);
+  card.appendChild(mediaPane);
+
+  const openDownload = () => {
+    selectExtraGalleryProject(project, { scrollIntoView: false, openDownload: true });
+  };
+
+  mediaPane.addEventListener('click', (event) => {
+    if (event.target.closest('.h0-extra-card__download')) {
+      return;
+    }
+    openDownload();
+  });
+  card.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      openDownload();
+    }
+  });
+  card.addEventListener('pointerenter', () => {
+    setHoveredProjectId(project.id);
+  });
+  card.addEventListener('pointerleave', (event) => {
+    const next = event.relatedTarget;
+    if (next?.closest?.('.h0-extra-card') || next?.closest?.('.h1-project-item')) {
+      return;
+    }
+    clearHoveredProjectId(project.id);
+  });
+
+  return card;
+}
+
+function createExtraComingSoonCard() {
+  const card = document.createElement('article');
+  card.className = 'h0-extra-card is-empty';
+  card.setAttribute('aria-hidden', 'true');
+
+  const label = document.createElement('p');
+  label.className = 'h0-extra-card__coming-soon';
+  label.textContent = 'COMMING SOON';
+  card.appendChild(label);
+
+  return card;
+}
+
+function renderExtraGallery(options = {}) {
+  if (!extraGalleryTrack) {
+    return;
+  }
+
+  const { resetScroll = false } = options;
+  const projects = getExtraProjectsNewestFirst();
+  state.extraGalleryProjects = projects;
+
+  if (resetScroll) {
+    state.extraGalleryScroll = 0;
+    state.extraGalleryVelocity = 0;
+  }
+
+  extraGalleryTrack.innerHTML = '';
+
+  const visibleSlots = EXTRA_GALLERY_COLUMNS * EXTRA_GALLERY_VISIBLE_ROWS;
+
+  if (!projects.length) {
+    for (let i = 0; i < visibleSlots; i += 1) {
+      extraGalleryTrack.appendChild(createExtraComingSoonCard());
+    }
+    if (extraGalleryArrow) {
+      extraGalleryArrow.hidden = true;
+    }
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        syncExtraGalleryLayout();
+      });
+    });
+    return;
+  }
+
+  projects.forEach((project) => {
+    extraGalleryTrack.appendChild(createExtraGalleryCard(project));
+  });
+
+  const placeholderCount = Math.max(0, visibleSlots - projects.length);
+  for (let i = 0; i < placeholderCount; i += 1) {
+    extraGalleryTrack.appendChild(createExtraComingSoonCard());
+  }
+
+  syncProjectHighlight();
+
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      syncExtraGalleryLayout();
+      syncExtraPreviewPlayback();
+    });
+  });
+}
+
+function scrollExtraGalleryToProject(projectId) {
+  const index = state.extraGalleryProjects.findIndex((project) => project.id === projectId);
+  if (index < 0) {
+    return;
+  }
+
+  const row = Math.floor(index / EXTRA_GALLERY_COLUMNS);
+  const rowHeight = state.extraGalleryRowHeight || getExtraGalleryRowHeight();
+  const target = row * (rowHeight + EXTRA_GALLERY_GAP);
+  state.extraGalleryVelocity = 0;
+  state.extraGalleryScroll = target;
+  clampExtraGalleryScroll();
+  updateExtraGalleryTrackPosition();
+}
+
+function selectExtraGalleryProject(project, options = {}) {
+  if (!project) {
+    clearExtraPreview();
+    return;
+  }
+
+  const { scrollIntoView = false, openDownload = false } = options;
+  setActiveView('extra');
+  state.selectedProjectId = project.id;
+  state.selectedExtraProject = project;
+  state.hoveredProjectId = null;
+
+  if (!state.extraGalleryProjects.length) {
+    renderExtraGallery();
+  }
+
+  renderH1Projects();
+  syncProjectHighlight();
+
+  if (scrollIntoView) {
+    scrollExtraGalleryToProject(project.id);
+  }
+
+  dispatchExtraChatProject(project);
+
+  if (openDownload) {
+    openExtraDownload(project);
+  }
+}
+
+function animateExtraGalleryScroll() {
+  if (Math.abs(state.extraGalleryVelocity) < 0.05) {
+    state.extraGalleryVelocity = 0;
+    state.extraGalleryRaf = null;
+    return;
+  }
+
+  state.extraGalleryScroll += state.extraGalleryVelocity;
+  state.extraGalleryVelocity *= 0.92;
+  clampExtraGalleryScroll();
+  updateExtraGalleryTrackPosition();
+  state.extraGalleryRaf = requestAnimationFrame(animateExtraGalleryScroll);
+}
+
+function onExtraGalleryWheel(event) {
+  if (state.category !== 'extra' || !state.extraGalleryProjects.length) {
+    return;
+  }
+
+  if (getExtraGalleryMaxScroll() <= 0) {
+    return;
+  }
+
+  event.preventDefault();
+  state.extraGalleryVelocity += event.deltaY * 0.18;
+  if (!state.extraGalleryRaf) {
+    state.extraGalleryRaf = requestAnimationFrame(animateExtraGalleryScroll);
+  }
+}
+
+function pageExtraGalleryDown() {
+  const page = getExtraGalleryViewportHeight() || (state.extraGalleryRowHeight * 2);
+  state.extraGalleryVelocity = 0;
+  state.extraGalleryScroll += page * 0.92;
+  clampExtraGalleryScroll();
+  updateExtraGalleryTrackPosition();
 }
 
 function clearExtraPreview() {
-  resetExtraPreviewMediaSize();
-  extraPreviewMedia.innerHTML = '';
-  updateExtraDownloadHint(null);
-  if (extraOverview) {
-    extraOverview.innerHTML = '<p class="overview-empty">등록된 EXTRA 프로젝트가 없습니다.</p>';
-  }
+  state.selectedExtraProject = null;
+  state.hoveredProjectId = null;
+  state.extraGalleryVelocity = 0;
+  syncProjectHighlight();
   dispatchExtraChatProject(null);
-}
-
-function renderExtraOverview(project, description) {
-  if (!extraOverview) {
-    return;
-  }
-
-  extraOverview.innerHTML = `
-    <h3 class="overview-title">■ ${escapeOverviewValue(project.title)}</h3>
-    <div class="overview-body">
-      ${formatDescription(description)}
-    </div>
-  `;
-}
-
-function resetExtraPreviewMediaSize() {
-  if (!extraPreviewMedia) {
-    return;
-  }
-
-  extraPreviewMedia.style.width = '';
-  extraPreviewMedia.style.height = '';
-  extraPreviewMedia.style.position = '';
-  extraPreviewMedia.style.overflow = '';
-  extraPreviewMedia.querySelectorAll('video, img').forEach((element) => {
-    element.style.width = '';
-    element.style.height = '';
-    element.style.objectFit = '';
-    element.style.maxWidth = '';
-    element.style.maxHeight = '';
-    element.style.position = '';
-    element.style.left = '';
-    element.style.top = '';
-    element.style.margin = '';
-    element.style.pointerEvents = '';
-  });
-
-  if (extraOverview) {
-    extraOverview.style.paddingTop = '';
-    extraOverview.style.maxHeight = '';
-  }
-
-  if (extraChat) {
-    extraChat.style.paddingTop = '';
-    extraChat.style.maxHeight = '';
-  }
-
-  if (extraDownloadHint) {
-    extraDownloadHint.style.top = '';
-  }
-}
-
-function syncExtraPreviewLayout() {
-  const stage = document.querySelector('.h0-extra-preview-stage');
-  const media = extraPreviewMedia;
-  const overview = extraOverview;
-  const layout = extraLayout;
-  const mediaElement = media?.querySelector('video, img');
-
-  if (!stage || !media || !overview || !layout) {
-    return;
-  }
-
-  if (!mediaElement || !views.extra.classList.contains('is-active')) {
-    return;
-  }
-
-  const finishLayout = () => {
-    syncExtraOverviewVideoBounds(overview, layout, media);
-    syncExtraDownloadHintPosition(media);
-  };
-
-  const { width: naturalWidth, height: naturalHeight } = getPreviewMediaNaturalSize(mediaElement);
-
-  if (mediaElement.tagName === 'VIDEO') {
-    const bounds = detectVideoContentBounds(mediaElement, { force: false });
-    if (bounds && hasVideoContentLetterbox(bounds, mediaElement)) {
-      if (applyPreviewCropLayout(mediaElement, media, stage, bounds)) {
-        finishLayout();
-      }
-      return;
-    }
-  }
-
-  const renderSize = computeMetaversePreviewRenderSize(
-    naturalWidth,
-    naturalHeight,
-    stage.clientWidth,
-    stage.clientHeight
-  );
-
-  if (!renderSize) {
-    return;
-  }
-
-  applyPreviewNormalLayout(mediaElement, media, renderSize);
-  finishLayout();
 }
 
 async function loadDescription(project) {
@@ -2476,10 +2765,10 @@ function bindEvents() {
   }, { passive: false });
 
   window.addEventListener('resize', () => syncMetaverseGalleryLayout());
-  window.addEventListener('resize', syncExtraPreviewLayout);
+  window.addEventListener('resize', () => syncExtraGalleryLayout());
   document.addEventListener('pointerover', (event) => {
     const clickable = event.target.closest(
-      '.is-clickable, .h2-menu-item, .h2-admin-trigger, .h0-preview-media, .h0-metaverse-card, .h0-metaverse-gallery-arrow, .h0-extra-download-link'
+      '.is-clickable, .h2-menu-item, .h2-admin-trigger, .h0-preview-media, .h0-metaverse-card, .h0-metaverse-gallery-arrow, .h0-extra-card, .h0-extra-gallery-arrow, .h0-extra-card__download'
     );
     document.body.classList.toggle('is-pointer', Boolean(clickable));
   });
@@ -2513,6 +2802,37 @@ function bindEvents() {
 
   metaverseGalleryArrow?.addEventListener('click', () => {
     pageMetaverseGalleryDown();
+  });
+
+  if (extraGalleryViewport) {
+    extraGalleryViewport.addEventListener('wheel', onExtraGalleryWheel, { passive: false });
+
+    let extraGalleryTouchStartY = 0;
+    extraGalleryViewport.addEventListener('touchstart', (event) => {
+      extraGalleryTouchStartY = event.touches[0]?.clientY ?? 0;
+    }, { passive: true });
+    extraGalleryViewport.addEventListener('touchmove', (event) => {
+      if (state.category !== 'extra' || !state.extraGalleryProjects.length) {
+        return;
+      }
+      if (getExtraGalleryMaxScroll() <= 0) {
+        return;
+      }
+      const currentY = event.touches[0]?.clientY ?? extraGalleryTouchStartY;
+      const delta = extraGalleryTouchStartY - currentY;
+      if (Math.abs(delta) > 0) {
+        event.preventDefault();
+        state.extraGalleryVelocity += delta * 0.28;
+        extraGalleryTouchStartY = currentY;
+        if (!state.extraGalleryRaf) {
+          state.extraGalleryRaf = requestAnimationFrame(animateExtraGalleryScroll);
+        }
+      }
+    }, { passive: false });
+  }
+
+  extraGalleryArrow?.addEventListener('click', () => {
+    pageExtraGalleryDown();
   });
 }
 

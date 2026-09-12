@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>토끼 건축사사무소 워크패드 스튜디오</title>
-<link rel="stylesheet" href="css/homepage-shell.css?v=metaverse-playback-select-20260912">
+<link rel="stylesheet" href="css/homepage-shell.css?v=extra-preview-content-crop-20260912">
 <link rel="stylesheet" href="chat/css/metaverse-chat.css">
 </head>
 <body class="homepage-shell">
@@ -126,14 +126,17 @@
 
       <section class="h0-view" id="h0ViewExtra">
         <div class="h0-extra-layout" id="extraLayout">
-          <aside class="h0-extra-overview" id="extraOverview" aria-label="EXTRA 설명"></aside>
-          <div class="h0-extra-preview-pane">
-            <div class="h0-extra-preview-stage">
-              <div class="h0-extra-preview-media" id="extraPreviewMedia"></div>
+          <div class="h0-extra-gallery" id="extraGallery" aria-label="EXTRA 프로젝트">
+            <div class="h0-extra-gallery-viewport" id="extraGalleryViewport">
+              <div class="h0-extra-gallery-track" id="extraGalleryTrack"></div>
             </div>
-            <p class="h0-extra-download-hint" id="extraDownloadHint" hidden>
-              <a class="h0-extra-download-link" id="extraDownloadLink" href="#" target="_blank" rel="noopener noreferrer">게임 다운로드</a>
-            </p>
+            <button
+              type="button"
+              class="h0-extra-gallery-arrow"
+              id="extraGalleryArrow"
+              hidden
+              aria-label="아래 프로젝트 보기"
+            >↓</button>
           </div>
           <aside class="h0-split-chat h0-extra-chat" id="extraChat" aria-label="채팅">
             <h3 class="h0-split-chat__title">CHAT</h3>
@@ -192,7 +195,7 @@
   </aside>
 </div>
 
-<script type="module" src="js/homepage-shell.js?v=metaverse-hover-list-20260912"></script>
+<script type="module" src="js/homepage-shell.js?v=extra-preview-content-crop-20260912"></script>
 <script type="module" src="chat/js/metaverse-chat.js"></script>
 
 </body>
