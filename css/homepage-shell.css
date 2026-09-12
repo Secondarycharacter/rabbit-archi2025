@@ -11,6 +11,64 @@
   --shell-bg: #000;
   --shell-text: #fff;
   --shell-muted: rgba(255, 255, 255, 0.72);
+  --shell-border-subtle: rgba(255, 255, 255, 0.08);
+  --shell-border: rgba(255, 255, 255, 0.12);
+  --shell-border-strong: rgba(255, 255, 255, 0.28);
+  --shell-border-hover: rgba(255, 255, 255, 0.78);
+  --shell-border-active: rgba(255, 255, 255, 0.92);
+  --shell-border-inset-hover: rgba(255, 255, 255, 0.28);
+  --shell-border-inset-active: rgba(255, 255, 255, 0.42);
+  --shell-border-field: rgba(255, 255, 255, 0.18);
+  --shell-border-field-strong: rgba(255, 255, 255, 0.22);
+  --shell-border-download: rgba(255, 255, 255, 0.45);
+  --shell-surface-card: rgba(255, 255, 255, 0.04);
+  --shell-surface-card-empty: rgba(255, 255, 255, 0.02);
+  --shell-surface-preview: rgba(0, 0, 0, 0.35);
+  --shell-surface-composer: rgba(0, 0, 0, 0.22);
+  --shell-surface-field: rgba(0, 0, 0, 0.35);
+  --shell-surface-button: rgba(255, 255, 255, 0.14);
+  --shell-surface-button-hover: rgba(255, 255, 255, 0.24);
+  --shell-surface-logout: rgba(255, 255, 255, 0.1);
+  --shell-surface-logout-hover: rgba(255, 255, 255, 0.2);
+  --shell-surface-gallery-arrow: rgba(0, 0, 0, 0.45);
+  --shell-surface-gallery-arrow-hover: rgba(0, 0, 0, 0.62);
+  --shell-text-faint: rgba(255, 255, 255, 0.38);
+  --shell-text-secondary: rgba(255, 255, 255, 0.55);
+  --shell-text-tertiary: rgba(255, 255, 255, 0.62);
+  --shell-text-strong: rgba(255, 255, 255, 0.88);
+  --shell-text-emphasis: rgba(255, 255, 255, 0.86);
+  --shell-text-highlight: rgba(255, 255, 255, 0.92);
+  --shell-text-active: rgba(255, 255, 255, 0.94);
+  --shell-text-admin: rgba(255, 255, 255, 0.82);
+  --shell-text-placeholder: rgba(255, 255, 255, 0.38);
+  --shell-text-empty: rgba(255, 255, 255, 0.42);
+  --shell-text-composer: rgba(255, 255, 255, 0.88);
+  --shell-item-color: rgba(255, 255, 255, 0.55);
+  --shell-item-active: #fff;
+  --shell-scrollbar-track: rgba(255, 255, 255, 0.08);
+  --shell-scrollbar-thumb: rgba(255, 255, 255, 0.42);
+  --shell-scrollbar-thumb-hover: rgba(255, 255, 255, 0.62);
+  --shell-scrollbar-inline-color: rgba(255, 255, 255, 0.14) transparent;
+  --shell-scrollbar-inline-thumb: rgba(255, 255, 255, 0.12);
+  --shell-scrollbar-inline-thumb-hover: rgba(255, 255, 255, 0.22);
+  --shell-caption-gradient: linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.72) 70%);
+  --shell-caption-date: rgba(255, 255, 255, 0.62);
+  --shell-caption-title: rgba(255, 255, 255, 0.94);
+  --shell-caption-link: rgba(255, 255, 255, 0.78);
+  --shell-caption-link-hover: #fff;
+  --shell-split-chat-border: rgba(255, 255, 255, 0.1);
+  --shell-loading-bar-track: rgba(255, 255, 255, 0.15);
+  --shell-loading-bar-fill: #fff;
+  --shell-coming-soon: rgba(255, 255, 255, 0.38);
+  --shell-overview-label: rgba(255, 255, 255, 0.62);
+  --shell-overview-value: rgba(255, 255, 255, 0.86);
+  --shell-overview-empty: rgba(255, 255, 255, 0.55);
+  --shell-home-border: #fff;
+  --shell-home-text: #fff;
+  --shell-gallery-arrow-border: rgba(255, 255, 255, 0.28);
+  --shell-gallery-arrow-border-hover: rgba(255, 255, 255, 0.5);
+  --shell-gallery-arrow-color: rgba(255, 255, 255, 0.92);
+  --shell-focus-outline: rgba(255, 255, 255, 0.45);
   --h0-overview-title-size: calc(12px * 1.5);
   --h0-overview-body-size: calc(11px * 1.5);
   --h0-overview-body-line-height: calc(1.18 * 1.25);
@@ -26,6 +84,65 @@
   --debug-h1: rgba(80, 180, 255, 0.55);
   --debug-h0: rgba(120, 255, 140, 0.45);
   --debug-h2: rgba(255, 180, 80, 0.55);
+}
+
+body.homepage-shell.theme-light {
+  --shell-bg: #fff;
+  --shell-text: #000;
+  --shell-muted: rgba(0, 0, 0, 0.62);
+  --shell-border-subtle: rgba(0, 0, 0, 0.08);
+  --shell-border: rgba(0, 0, 0, 0.12);
+  --shell-border-strong: rgba(0, 0, 0, 0.22);
+  --shell-border-hover: rgba(0, 0, 0, 0.55);
+  --shell-border-active: rgba(0, 0, 0, 0.75);
+  --shell-border-inset-hover: rgba(0, 0, 0, 0.15);
+  --shell-border-inset-active: rgba(0, 0, 0, 0.25);
+  --shell-border-field: rgba(0, 0, 0, 0.18);
+  --shell-border-field-strong: rgba(0, 0, 0, 0.22);
+  --shell-border-download: rgba(0, 0, 0, 0.35);
+  --shell-surface-card: rgba(0, 0, 0, 0.03);
+  --shell-surface-card-empty: rgba(0, 0, 0, 0.015);
+  --shell-surface-preview: rgba(0, 0, 0, 0.06);
+  --shell-surface-composer: rgba(0, 0, 0, 0.04);
+  --shell-surface-field: rgba(0, 0, 0, 0.04);
+  --shell-surface-button: rgba(0, 0, 0, 0.06);
+  --shell-surface-button-hover: rgba(0, 0, 0, 0.12);
+  --shell-surface-logout: rgba(0, 0, 0, 0.06);
+  --shell-surface-logout-hover: rgba(0, 0, 0, 0.12);
+  --shell-surface-gallery-arrow: rgba(255, 255, 255, 0.85);
+  --shell-surface-gallery-arrow-hover: rgba(255, 255, 255, 0.95);
+  --shell-text-faint: rgba(0, 0, 0, 0.38);
+  --shell-text-secondary: rgba(0, 0, 0, 0.55);
+  --shell-text-tertiary: rgba(0, 0, 0, 0.62);
+  --shell-text-strong: rgba(0, 0, 0, 0.88);
+  --shell-text-emphasis: rgba(0, 0, 0, 0.86);
+  --shell-text-highlight: rgba(0, 0, 0, 0.92);
+  --shell-text-active: rgba(0, 0, 0, 0.94);
+  --shell-text-admin: rgba(0, 0, 0, 0.72);
+  --shell-text-placeholder: rgba(0, 0, 0, 0.38);
+  --shell-text-empty: rgba(0, 0, 0, 0.42);
+  --shell-text-composer: rgba(0, 0, 0, 0.88);
+  --shell-item-color: rgba(0, 0, 0, 0.45);
+  --shell-item-active: #000;
+  --shell-scrollbar-track: rgba(0, 0, 0, 0.08);
+  --shell-scrollbar-thumb: rgba(0, 0, 0, 0.28);
+  --shell-scrollbar-thumb-hover: rgba(0, 0, 0, 0.42);
+  --shell-scrollbar-inline-color: rgba(0, 0, 0, 0.14) transparent;
+  --shell-scrollbar-inline-thumb: rgba(0, 0, 0, 0.12);
+  --shell-scrollbar-inline-thumb-hover: rgba(0, 0, 0, 0.22);
+  --shell-split-chat-border: rgba(0, 0, 0, 0.1);
+  --shell-loading-bar-track: rgba(0, 0, 0, 0.12);
+  --shell-loading-bar-fill: #000;
+  --shell-coming-soon: rgba(0, 0, 0, 0.35);
+  --shell-overview-label: rgba(0, 0, 0, 0.55);
+  --shell-overview-value: rgba(0, 0, 0, 0.82);
+  --shell-overview-empty: rgba(0, 0, 0, 0.45);
+  --shell-home-border: #000;
+  --shell-home-text: #000;
+  --shell-gallery-arrow-border: rgba(0, 0, 0, 0.22);
+  --shell-gallery-arrow-border-hover: rgba(0, 0, 0, 0.35);
+  --shell-gallery-arrow-color: rgba(0, 0, 0, 0.88);
+  --shell-focus-outline: rgba(0, 0, 0, 0.35);
 }
 
 * {
@@ -127,7 +244,7 @@ body.homepage-shell.is-pointer {
 }
 
 .h1-visitor strong {
-  color: #fff;
+  color: var(--shell-item-active);
   font-size: 15px;
 }
 
@@ -160,7 +277,7 @@ body.homepage-shell.is-pointer {
   right: 0;
   width: 4px;
   height: calc(var(--h1-item-height) * 11);
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--shell-scrollbar-track);
   border-radius: 999px;
   cursor: default;
 }
@@ -171,7 +288,7 @@ body.homepage-shell.is-pointer {
   width: 100%;
   min-height: 24px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.42);
+  background: var(--shell-scrollbar-thumb);
   transition: background 0.2s ease;
   cursor: default;
   touch-action: none;
@@ -179,7 +296,7 @@ body.homepage-shell.is-pointer {
 
 .h1-scrollbar-thumb:hover,
 .h1-scrollbar.is-dragging .h1-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.62);
+  background: var(--shell-scrollbar-thumb-hover);
 }
 
 .h1-list-track {
@@ -204,13 +321,13 @@ body.homepage-shell.is-pointer {
   text-align: left;
   font-size: var(--h0-overview-body-size);
   line-height: var(--h0-overview-body-line-height);
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--shell-item-color);
   transition: color 0.2s ease;
   user-select: none;
 }
 
 .h1-project-item.is-center {
-  color: #fff;
+  color: var(--shell-item-active);
 }
 
 .h1-project-item.is-clickable {
@@ -218,7 +335,7 @@ body.homepage-shell.is-pointer {
 }
 
 .h1-project-item.is-active {
-  color: #fff;
+  color: var(--shell-item-active);
 }
 
 .h1-project-item .date {
@@ -273,14 +390,14 @@ body.homepage-shell.is-pointer {
   letter-spacing: 2px;
   background: none;
   border: none;
-  color: rgba(255, 255, 255, 0.72);
+  color: var(--shell-muted);
   cursor: url('../images/Icon/Mouse_H.png') 4 4, pointer;
   padding: 0;
   text-align: right;
 }
 
 .h2-menu-item.is-active {
-  color: #fff;
+  color: var(--shell-item-active);
 }
 
 .h2-menu-item--metaverse {
@@ -313,7 +430,7 @@ body.homepage-shell.is-pointer {
   align-self: flex-end;
   background: none;
   border: none;
-  color: rgba(255, 255, 255, 0.82);
+  color: var(--shell-text-admin);
   font-size: 22px;
   letter-spacing: 2px;
   cursor: url('../images/Icon/Mouse_H.png') 4 4, pointer;
@@ -378,7 +495,7 @@ body.homepage-shell.is-pointer {
   justify-content: center;
   width: min(260px, 42vw);
   max-width: 260px;
-  border: 4px solid #fff;
+  border: 4px solid var(--shell-home-border);
   border-radius: 50%;
   overflow: hidden;
 }
@@ -399,7 +516,7 @@ body.homepage-shell.is-pointer {
 .h0-home-welcome {
   font-size: 18px;
   line-height: 1.5;
-  color: #fff;
+  color: var(--shell-home-text);
   opacity: 0;
   transition: opacity 1s ease;
 }
@@ -435,7 +552,7 @@ body.homepage-shell.is-pointer {
 
 .h0-home-maintenance {
   font-size: 16px;
-  color: #fff;
+  color: var(--shell-home-text);
   opacity: 0;
   transition: opacity 0.5s ease;
 }
@@ -514,8 +631,8 @@ body.homepage-shell.is-pointer {
   min-height: 0;
   overflow: hidden;
   border-radius: 4px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--shell-surface-card);
+  border: 1px solid var(--shell-border);
   color: inherit;
   text-align: left;
   display: grid;
@@ -528,26 +645,26 @@ body.homepage-shell.is-pointer {
 .h0-metaverse-card:focus-visible,
 .h0-extra-card:hover,
 .h0-extra-card:focus-visible {
-  border-color: rgba(255, 255, 255, 0.78);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28);
+  border-color: var(--shell-border-hover);
+  box-shadow: inset 0 0 0 1px var(--shell-border-inset-hover);
   outline: none;
 }
 
 .h0-metaverse-card.is-active,
 .h0-extra-card.is-active {
-  border-color: rgba(255, 255, 255, 0.92);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.42);
+  border-color: var(--shell-border-active);
+  box-shadow: inset 0 0 0 1px var(--shell-border-inset-active);
 }
 
 .h0-metaverse-card.is-empty {
   pointer-events: none;
   cursor: default;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--shell-surface-card-empty);
 }
 
 .h0-extra-card.is-empty {
   cursor: default;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--shell-surface-card-empty);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -556,8 +673,8 @@ body.homepage-shell.is-pointer {
 
 .h0-extra-card.is-empty:hover,
 .h0-extra-card.is-empty:focus-visible {
-  border-color: rgba(255, 255, 255, 0.78);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28);
+  border-color: var(--shell-border-hover);
+  box-shadow: inset 0 0 0 1px var(--shell-border-inset-hover);
   outline: none;
 }
 
@@ -567,7 +684,7 @@ body.homepage-shell.is-pointer {
   font-size: 15px;
   font-weight: 700;
   letter-spacing: 0.14em;
-  color: rgba(255, 255, 255, 0.38);
+  color: var(--shell-coming-soon);
   text-align: center;
   user-select: none;
   pointer-events: none;
@@ -582,8 +699,8 @@ body.homepage-shell.is-pointer {
   flex-direction: column;
   overflow: hidden;
   padding: 8px 8px 8px 10px;
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.88);
+  border-right: 1px solid var(--shell-border-subtle);
+  color: var(--shell-text-strong);
   font-size: var(--h0-overview-body-size);
   line-height: var(--h0-overview-body-line-height);
   cursor: default;
@@ -610,7 +727,7 @@ body.homepage-shell.is-pointer {
 
 .h0-extra-card__overview-body {
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+  scrollbar-color: var(--shell-scrollbar-inline-color);
 }
 
 .h0-extra-card__overview-body::-webkit-scrollbar {
@@ -622,12 +739,12 @@ body.homepage-shell.is-pointer {
 }
 
 .h0-extra-card__overview-body::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--shell-scrollbar-inline-thumb);
   border-radius: 999px;
 }
 
 .h0-extra-card__overview-body::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.22);
+  background: var(--shell-scrollbar-inline-thumb-hover);
 }
 
 .h0-extra-card__overview-body p {
@@ -656,7 +773,7 @@ body.homepage-shell.is-pointer {
 
 .h0-metaverse-card__overview-list dt {
   width: 4em;
-  color: rgba(255, 255, 255, 0.62);
+  color: var(--shell-overview-label);
   text-align: justify;
   text-align-last: justify;
   white-space: nowrap;
@@ -665,13 +782,13 @@ body.homepage-shell.is-pointer {
 .h0-metaverse-card__overview-list dd {
   white-space: pre-line;
   word-break: keep-all;
-  color: rgba(255, 255, 255, 0.86);
+  color: var(--shell-overview-value);
 }
 
 .h0-metaverse-card__overview .overview-empty,
 .h0-extra-card__overview .overview-empty {
   margin: 0;
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--shell-overview-empty);
   font-size: calc(12px * 1.5);
   line-height: 1.6;
 }
@@ -684,7 +801,7 @@ body.homepage-shell.is-pointer {
   height: 100%;
   overflow: hidden;
   cursor: url('../images/Icon/Mouse_H.png') 4 4, pointer;
-  background: rgba(0, 0, 0, 0.35);
+  background: var(--shell-surface-preview);
 }
 
 .h0-metaverse-card__media,
@@ -738,7 +855,7 @@ body.homepage-shell.is-pointer {
   bottom: 0;
   z-index: 1;
   padding: 22px 10px 8px;
-  background: linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.72) 70%);
+  background: var(--shell-caption-gradient);
   pointer-events: none;
 }
 
@@ -747,7 +864,7 @@ body.homepage-shell.is-pointer {
   display: block;
   font-size: 11px;
   letter-spacing: 0.04em;
-  color: rgba(255, 255, 255, 0.62);
+  color: var(--shell-caption-date);
   margin-bottom: 2px;
 }
 
@@ -757,7 +874,7 @@ body.homepage-shell.is-pointer {
   font-size: 13px;
   font-weight: 700;
   line-height: 1.35;
-  color: rgba(255, 255, 255, 0.94);
+  color: var(--shell-caption-title);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -769,14 +886,14 @@ body.homepage-shell.is-pointer {
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.04em;
-  color: rgba(255, 255, 255, 0.78);
+  color: var(--shell-caption-link);
   text-decoration: none;
   pointer-events: auto;
   cursor: url('../images/Icon/Mouse_H.png') 4 4, pointer;
 }
 
 .h0-extra-card__download:hover {
-  color: #fff;
+  color: var(--shell-caption-link-hover);
   text-decoration: underline;
 }
 
@@ -789,10 +906,10 @@ body.homepage-shell.is-pointer {
   transform: translateX(-50%);
   width: 36px;
   height: 36px;
-  border: 1px solid rgba(255, 255, 255, 0.28);
+  border: 1px solid var(--shell-gallery-arrow-border);
   border-radius: 999px;
-  background: rgba(0, 0, 0, 0.45);
-  color: rgba(255, 255, 255, 0.92);
+  background: var(--shell-surface-gallery-arrow);
+  color: var(--shell-gallery-arrow-color);
   font-size: 18px;
   line-height: 1;
   cursor: url('../images/Icon/Mouse_H.png') 4 4, pointer;
@@ -801,8 +918,8 @@ body.homepage-shell.is-pointer {
 
 .h0-metaverse-gallery-arrow:hover,
 .h0-extra-gallery-arrow:hover {
-  background: rgba(0, 0, 0, 0.62);
-  border-color: rgba(255, 255, 255, 0.5);
+  background: var(--shell-surface-gallery-arrow-hover);
+  border-color: var(--shell-gallery-arrow-border-hover);
 }
 
 .h0-metaverse-gallery-empty,
@@ -812,7 +929,7 @@ body.homepage-shell.is-pointer {
   align-items: center;
   justify-content: center;
   min-height: 160px;
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--shell-text-secondary);
   font-size: 14px;
 }
 
@@ -835,7 +952,7 @@ body.homepage-shell.is-pointer {
   flex-direction: column;
   overflow: hidden;
   padding: 0 8px 10px;
-  color: rgba(255, 255, 255, 0.88);
+  color: var(--shell-text-strong);
   font-size: var(--h0-overview-body-size);
   line-height: var(--h0-overview-body-line-height);
 }
@@ -885,7 +1002,7 @@ body.homepage-shell.is-pointer {
 
 .h0-metaverse-overview .overview-list dt {
   width: 4em;
-  color: rgba(255, 255, 255, 0.62);
+  color: var(--shell-overview-label);
   text-align: justify;
   text-align-last: justify;
   white-space: nowrap;
@@ -898,7 +1015,7 @@ body.homepage-shell.is-pointer {
 
 .h0-metaverse-overview .overview-empty,
 .h0-extra-overview .overview-empty {
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--shell-overview-empty);
   font-size: calc(12px * 1.5);
   line-height: 1.6;
 }
@@ -973,7 +1090,7 @@ body.homepage-shell.is-pointer {
   font-size: var(--h0-preview-hint-size);
   line-height: 1.45;
   text-align: center;
-  color: rgba(255, 255, 255, 0.72);
+  color: var(--shell-muted);
   letter-spacing: 0.5px;
   pointer-events: none;
 }
@@ -1011,7 +1128,7 @@ body.homepage-shell.is-pointer {
 
 .h0-preview-hint {
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.72);
+  color: var(--shell-muted);
   letter-spacing: 1px;
 }
 
@@ -1032,7 +1149,7 @@ body.homepage-shell.is-pointer {
 .h0-loading-bar {
   width: min(360px, 70%);
   height: 4px;
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--shell-loading-bar-track);
   overflow: hidden;
 }
 
@@ -1040,7 +1157,7 @@ body.homepage-shell.is-pointer {
   display: block;
   width: 35%;
   height: 100%;
-  background: #fff;
+  background: var(--shell-loading-bar-fill);
   animation: loadingSlide 1.2s ease-in-out infinite;
 }
 
@@ -1057,8 +1174,8 @@ body.homepage-shell.is-pointer {
   flex-direction: column;
   overflow: hidden;
   padding: 0 6px 10px;
-  color: rgba(255, 255, 255, 0.88);
-  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--shell-text-strong);
+  border-left: 1px solid var(--shell-split-chat-border);
 }
 
 .h0-split-chat__title {
@@ -1070,23 +1187,15 @@ body.homepage-shell.is-pointer {
   letter-spacing: 0.5px;
 }
 
-.h0-split-chat__body {
-  flex: 1;
-  min-height: 0;
-  margin-top: calc(14px * 1.5);
-  overflow: auto;
-  overscroll-behavior: contain;
-  font-size: var(--h0-overview-body-size);
-  line-height: var(--h0-overview-body-line-height);
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--shell-text-secondary);
 }
 
 .h0-extra-download {
   display: inline-block;
   margin-top: 18px;
   padding: 10px 16px;
-  border: 1px solid rgba(255, 255, 255, 0.45);
-  color: #fff;
+  border: 1px solid var(--shell-border-download);
+  color: var(--shell-text);
   text-decoration: none;
   letter-spacing: 2px;
   font-size: 12px;
@@ -1105,7 +1214,7 @@ body.homepage-shell.is-pointer {
 
   .h0-split-chat {
     border-left: none;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    border-top: 1px solid var(--shell-split-chat-border);
   }
 }
 
