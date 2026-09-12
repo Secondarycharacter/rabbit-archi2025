@@ -200,7 +200,9 @@ function getInitials(name) {
  *   pinId: string,
  *   inputId: string,
  *   channel: string,
- *   projectEventName: string,
+ *   projectEventName?: string | null,
+ *   sharedRoomId?: string | null,
+ *   sharedRoomTitle?: string | null,
  *   emptyRoomText?: string
  * }} config
  */
@@ -214,6 +216,8 @@ export function createHomepageChat(config) {
   const sessionEl = root?.querySelector('.metaverse-chat__session');
   const sessionLabelEl = root?.querySelector('.metaverse-chat__session-label');
   const logoutEl = root?.querySelector('.metaverse-chat__logout');
+  const sharedRoomId = String(config.sharedRoomId || '').trim() || null;
+  const sharedRoomTitle = String(config.sharedRoomTitle || '').trim() || null;
 
   const state = {
     project: null,
@@ -663,10 +667,17 @@ export function createHomepageChat(config) {
   }
 
   async function openRoom(project) {
-    const projectId = project?.id || null;
+    const projectId = sharedRoomId || project?.id || null;
+    const roomProject = sharedRoomId
+      ? {
+          id: sharedRoomId,
+          title: sharedRoomTitle || 'METAVERSE',
+          designOverviewTitle: sharedRoomTitle || 'METAVERSE'
+        }
+      : project;
 
     detachRoomListener();
-    state.project = project;
+    state.project = roomProject;
     state.projectId = projectId;
     state.messages = [];
     state.editingId = null;
@@ -684,7 +695,7 @@ export function createHomepageChat(config) {
     renderMessages();
 
     try {
-      await ensureOpeningMessage(config.channel, project);
+      await ensureOpeningMessage(config.channel, roomProject);
     } catch (error) {
       console.warn('채팅 오프닝 메시지 생성 실패:', error);
     }
@@ -762,9 +773,11 @@ export function createHomepageChat(config) {
   }
 
   function bindEvents() {
-    document.addEventListener(config.projectEventName, (event) => {
-      openRoom(event.detail?.project || null);
-    });
+    if (!sharedRoomId && config.projectEventName) {
+      document.addEventListener(config.projectEventName, (event) => {
+        openRoom(event.detail?.project || null);
+      });
+    }
 
     nicknameEl?.addEventListener('change', () => {
       validateNicknameInput();
@@ -812,6 +825,12 @@ export function createHomepageChat(config) {
     bindEvents();
     clearComposerFields();
     applySessionToComposer();
+
+    if (sharedRoomId) {
+      await openRoom(null);
+      return;
+    }
+
     setComposerEnabled(false);
     renderMessages();
   }
