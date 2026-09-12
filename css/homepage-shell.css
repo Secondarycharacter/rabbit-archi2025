@@ -69,11 +69,16 @@
   --shell-gallery-arrow-border-hover: rgba(255, 255, 255, 0.5);
   --shell-gallery-arrow-color: rgba(255, 255, 255, 0.92);
   --shell-focus-outline: rgba(255, 255, 255, 0.45);
-  --h0-overview-title-size: calc(12px * 1.5);
-  --h0-overview-body-size: calc(11px * 1.5);
-  --h0-overview-body-line-height: calc(1.18 * 1.25);
-  --h0-overview-row-gap: calc(4px * 1.5 * 1.25);
-  --h0-preview-hint-size: calc(11px * 1.5);
+  /* Local homepage type scale (source of truth) */
+  --h0-overview-title-size: 18px;
+  --h0-overview-body-size: 16.5px;
+  --h0-overview-body-line-height: 1.475;
+  --h0-overview-row-gap: 7.5px;
+  --h0-overview-empty-size: 18px;
+  --h0-preview-hint-size: 16.5px;
+  --h0-card-caption-date-size: 11px;
+  --h0-card-caption-title-size: 13px;
+  --h0-card-download-size: 12px;
   --metaverse-switch-duration: 0.24s;
   --metaverse-switch-ease: cubic-bezier(0.4, 0, 0.2, 1);
   --h1-item-height: 52px;
@@ -730,7 +735,7 @@ body.homepage-shell.is-pointer {
 .h0-extra-card__overview .overview-empty {
   margin: 0;
   color: var(--shell-overview-empty);
-  font-size: calc(12px * 1.5);
+  font-size: var(--h0-overview-empty-size);
   line-height: 1.6;
 }
 
@@ -805,7 +810,7 @@ body.homepage-shell.is-pointer {
 .h0-metaverse-card__date,
 .h0-extra-card__date {
   display: block;
-  font-size: 11px;
+  font-size: var(--h0-card-caption-date-size);
   letter-spacing: 0.04em;
   color: var(--shell-caption-date);
   margin-bottom: 2px;
@@ -814,7 +819,7 @@ body.homepage-shell.is-pointer {
 .h0-metaverse-card__title,
 .h0-extra-card__title {
   display: block;
-  font-size: 13px;
+  font-size: var(--h0-card-caption-title-size);
   font-weight: 700;
   line-height: 1.35;
   color: var(--shell-caption-title);
@@ -826,7 +831,7 @@ body.homepage-shell.is-pointer {
 .h0-extra-card__download {
   display: inline-block;
   margin-top: 4px;
-  font-size: 12px;
+  font-size: var(--h0-card-download-size);
   font-weight: 600;
   letter-spacing: 0.04em;
   color: var(--shell-caption-link);
@@ -959,7 +964,7 @@ body.homepage-shell.is-pointer {
 .h0-metaverse-overview .overview-empty,
 .h0-extra-overview .overview-empty {
   color: var(--shell-overview-empty);
-  font-size: calc(12px * 1.5);
+  font-size: var(--h0-overview-empty-size);
   line-height: 1.6;
 }
 
