@@ -4,19 +4,19 @@
  */
 
 import { FIREBASE_CONFIG } from "../firebase-config.js?v=guide-tour-firestore-20260902";
-import { normalizeTourData } from "../angji-guide-tour-data.js?v=guide-orbit-sequences-20260905";
+import { getGuideFirestoreDocIds, getMetaverseProjectId } from "../metaverse-project-context.js?v=editor-shared-20260908";
+import { normalizeTourData } from "../angji-guide-tour-data.js?v=editor-guide-pose-20260908";
 
 export const GUIDE_TOUR_FIRESTORE_COLLECTION = "metaverseGuideTours";
 export const ANGJI_GUIDE_TOUR_DOC_ID = "angji";
 export const GUIDE_BASE_MANIFEST_DOC_ID = "angji_base_manifest";
 
 /** Current value + up to 3 rotated backups (same collection). */
-export const GUIDE_BASE_DOC_IDS = {
-  current: ANGJI_GUIDE_TOUR_DOC_ID,
-  "backup-1": "angji_base_backup_1",
-  "backup-2": "angji_base_backup_2",
-  "backup-3": "angji_base_backup_3"
-};
+export const GUIDE_BASE_DOC_IDS = getGuideFirestoreDocIds("angji");
+
+function guideDocs(projectId) {
+  return getGuideFirestoreDocIds(projectId);
+}
 
 const firestoreState = {
   enabled: false,
@@ -161,7 +161,7 @@ async function writeTourDoc(docId, tourData, extra = {}) {
 async function readBaseManifest() {
   const { db, firestore } = await ensureGuideTourFirestore();
   const snapshot = await firestore.getDoc(
-    firestore.doc(db, GUIDE_TOUR_FIRESTORE_COLLECTION, GUIDE_BASE_MANIFEST_DOC_ID)
+    firestore.doc(db, GUIDE_TOUR_FIRESTORE_COLLECTION, guideDocs().manifest)
   );
 
   if (!snapshot.exists()) {
@@ -177,7 +177,7 @@ async function readBaseManifest() {
 
 async function writeBaseManifest(manifest) {
   const { db, firestore } = await ensureGuideTourFirestore();
-  const docRef = firestore.doc(db, GUIDE_TOUR_FIRESTORE_COLLECTION, GUIDE_BASE_MANIFEST_DOC_ID);
+  const docRef = firestore.doc(db, GUIDE_TOUR_FIRESTORE_COLLECTION, guideDocs().manifest);
 
   await firestore.setDoc(docRef, {
     versions: manifest.versions || [],
@@ -185,7 +185,7 @@ async function writeBaseManifest(manifest) {
   });
 }
 
-export async function loadGuideTourFromFirestore(docId = ANGJI_GUIDE_TOUR_DOC_ID) {
+export async function loadGuideTourFromFirestore(docId = getMetaverseProjectId()) {
   if (!isGuideTourFirestoreConfigured()) {
     return null;
   }
@@ -194,10 +194,10 @@ export async function loadGuideTourFromFirestore(docId = ANGJI_GUIDE_TOUR_DOC_ID
   return loaded?.data || null;
 }
 
-export async function saveGuideTourToFirestore(data, docId = ANGJI_GUIDE_TOUR_DOC_ID) {
+export async function saveGuideTourToFirestore(data, docId = getMetaverseProjectId()) {
   const extra = {};
 
-  if (docId === ANGJI_GUIDE_TOUR_DOC_ID) {
+  if (docId === guideDocs().current) {
     extra.baseVersionId = "current";
   }
 
@@ -216,7 +216,7 @@ export async function listGuideBaseVersionsFromFirestore() {
 
   // Bootstrap labels from live docs when manifest is empty.
   if (!manifest.versions?.length) {
-    const current = await readTourDoc(GUIDE_BASE_DOC_IDS.current);
+    const current = await readTourDoc(guideDocs().current);
     manifest = {
       versions: [
         { id: "current", savedAt: current?.savedAt || null },
@@ -243,8 +243,8 @@ export async function loadGuideBaseVersionFromFirestore(versionId = "current") {
     throw new Error("Firebase 설정이 없어 Firestore를 사용할 수 없습니다.");
   }
 
-  const id = GUIDE_BASE_DOC_IDS[versionId] ? versionId : "current";
-  const docId = GUIDE_BASE_DOC_IDS[id];
+  const id = guideDocs()[versionId] ? versionId : "current";
+  const docId = guideDocs()[id];
   const loaded = await readTourDoc(docId);
 
   if (!loaded?.data) {
@@ -274,33 +274,33 @@ export async function saveGuideBaseVersionToFirestore(tourData) {
   const previousById = new Map((previousManifest.versions || []).map((item) => [item.id, item]));
   const nowIso = new Date().toISOString();
 
-  const current = await readTourDoc(GUIDE_BASE_DOC_IDS.current);
-  const backup1 = await readTourDoc(GUIDE_BASE_DOC_IDS["backup-1"]);
-  const backup2 = await readTourDoc(GUIDE_BASE_DOC_IDS["backup-2"]);
+  const current = await readTourDoc(guideDocs().current);
+  const backup1 = await readTourDoc(guideDocs()["backup-1"]);
+  const backup2 = await readTourDoc(guideDocs()["backup-2"]);
 
   // Rotate: current → backup-1 → backup-2 → backup-3
   if (backup2?.data) {
-    await writeTourDoc(GUIDE_BASE_DOC_IDS["backup-3"], backup2.data, {
+    await writeTourDoc(guideDocs()["backup-3"], backup2.data, {
       baseVersionId: "backup-3",
       baseSavedAt: previousById.get("backup-2")?.savedAt || backup2.savedAt || nowIso
     });
   }
 
   if (backup1?.data) {
-    await writeTourDoc(GUIDE_BASE_DOC_IDS["backup-2"], backup1.data, {
+    await writeTourDoc(guideDocs()["backup-2"], backup1.data, {
       baseVersionId: "backup-2",
       baseSavedAt: previousById.get("backup-1")?.savedAt || backup1.savedAt || nowIso
     });
   }
 
   if (current?.data) {
-    await writeTourDoc(GUIDE_BASE_DOC_IDS["backup-1"], current.data, {
+    await writeTourDoc(guideDocs()["backup-1"], current.data, {
       baseVersionId: "backup-1",
       baseSavedAt: previousById.get("current")?.savedAt || current.savedAt || nowIso
     });
   }
 
-  const normalized = await writeTourDoc(GUIDE_BASE_DOC_IDS.current, tourData, {
+  const normalized = await writeTourDoc(guideDocs().current, tourData, {
     baseVersionId: "current",
     baseSavedAt: nowIso
   });

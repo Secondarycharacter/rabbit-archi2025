@@ -2,9 +2,9 @@
  * Angji GUIDE scripted tour — separate from generic NPC dialog (multi-line bubbles).
  */
 
-import { ANGJI_GUIDE_SPAWN, loadAngjiGuideTourData } from "./angji-guide-tour-config.js?v=line-hold-0-20260906";
+import { ANGJI_GUIDE_SPAWN, loadAngjiGuideTourData } from "./angji-guide-tour-config.js?v=editor-guide-pose-20260908";
 import { getGuestHeadLocalY, projectWorldPointToScreen, getGuestDialogAnchorWorldPosition, setGuestDevLabelVisible } from "./guest-dev-label.js?v=guide-label-20260905";
-import { findOrbitSequence, normalizeTourData, IDLE_DANCE_RANDOM_VALUE } from "./angji-guide-tour-data.js?v=restore-common-dialogues-20260907";
+import { findOrbitSequence, normalizeTourData, IDLE_DANCE_RANDOM_VALUE, getProjectGuideSpawnTransform } from "./angji-guide-tour-data.js?v=editor-guide-pose-20260908";
 import { getVoiceVolume, subscribeAudioSettings } from "./metaverse-audio-settings.js?v=audio-mute-20260906";
 import {
   estimateSpeechRateForDuration,
@@ -104,7 +104,8 @@ export function createAngjiGuideTourSystem(BABYLON, scene, options = {}) {
     restoreTourEntryState = null,
     getIsNightMode = () => false,
     onStatus = null,
-    onTourActiveChange = null
+    onTourActiveChange = null,
+    getGuideSpawnTemplate = null
   } = options;
 
   const ui = ensureGuideDom();
@@ -1284,9 +1285,10 @@ export function createAngjiGuideTourSystem(BABYLON, scene, options = {}) {
       return candidate;
     }
 
+    const spawn = getProjectGuideSpawnTransform();
     return {
-      guidePosition: { ...ANGJI_GUIDE_SPAWN.position },
-      guideRotationY: ANGJI_GUIDE_SPAWN.rotationY
+      guidePosition: { ...spawn.position },
+      guideRotationY: spawn.rotationY
     };
   }
 
@@ -1462,12 +1464,16 @@ export function createAngjiGuideTourSystem(BABYLON, scene, options = {}) {
 
   async function ensureGuideSpawned() {
     const gcs = getGuestCharacterSystem();
+    const template = typeof getGuideSpawnTemplate === "function"
+      ? (getGuideSpawnTemplate() || ANGJI_GUIDE_SPAWN)
+      : ANGJI_GUIDE_SPAWN;
+    const spawnId = tourData?.guideSpawnId || template.id || ANGJI_GUIDE_SPAWN.id;
 
     if (!gcs) {
       return guideGuest;
     }
 
-    const liveGuest = gcs.getGuests?.()?.find((g) => g.spawn?.id === ANGJI_GUIDE_SPAWN.id) || null;
+    const liveGuest = gcs.getGuests?.()?.find((g) => g.spawn?.id === spawnId) || null;
 
     if (isGuideGuestReady(liveGuest)) {
       guideGuest = liveGuest;
@@ -1476,23 +1482,23 @@ export function createAngjiGuideTourSystem(BABYLON, scene, options = {}) {
     }
 
     if (!guideGuest) {
-      await gcs.ensureSpawned([ANGJI_GUIDE_SPAWN], { parallel: false, showOnLoad: false });
-      guideGuest = gcs.getGuests?.()?.find((g) => g.spawn?.id === ANGJI_GUIDE_SPAWN.id) || null;
+      await gcs.ensureSpawned([{ ...template, id: spawnId }], { parallel: false, showOnLoad: false });
+      guideGuest = gcs.getGuests?.()?.find((g) => g.spawn?.id === spawnId) || null;
     }
 
     if (!guideGuest?.root) {
-      console.warn("[angji-guide] spawn failed — Angji-Guide was not added to the scene");
+      console.warn("[guide] spawn failed — Guide was not added to the scene");
       return null;
     }
 
     tintGuideMeshes(BABYLON, guideGuest);
-    gcs.revealGuest?.(ANGJI_GUIDE_SPAWN.id);
+    gcs.revealGuest?.(spawnId);
     guideGuest.root.setEnabled(!getIsNightMode());
     gcs.refreshDevLabels?.();
     positionGuideNpcOnly(getGuideSpawnEvent());
     playGuideClip("Idle", true);
     syncGuideHeadLabel();
-    console.info("[angji-guide] spawned", {
+    console.info("[guide] spawned", {
       night: getIsNightMode(),
       enabled: guideGuest.root.isEnabled(),
       x: Number(guideGuest.root.position.x.toFixed?.(2) ?? guideGuest.root.position.x),
@@ -2337,6 +2343,11 @@ export function createAngjiGuideTourSystem(BABYLON, scene, options = {}) {
     }
 
     await ensureGuideSpawned();
+
+    if (!tourWasActive) {
+      positionGuideNpcOnly(getGuideSpawnEvent(), { force: true });
+    }
+
     syncGuideNightVisibility(getIsNightMode());
     return !tourWasActive;
   }
@@ -2376,24 +2387,80 @@ export function createAngjiGuideTourSystem(BABYLON, scene, options = {}) {
     scene.activeCamera = orbitCam;
   }
 
-  function captureOrbitSpinCamera() {
-    const orbitCam = getOrbitCamera();
-
-    if (!orbitCam?.position || !orbitCam?.target) {
+  function readLiveOrbitCameraPose(orbitCam) {
+    if (!orbitCam) {
       return null;
     }
 
-    const position = orbitCam.position;
-    const target = orbitCam.target;
+    // Custom orbit controls write alpha/beta/target immediately, but
+    // ArcRotateCamera.position is only rebuilt on getViewMatrix.
+    orbitCam.getViewMatrix?.(true);
+    orbitCam.computeWorldMatrix?.(true);
+
+    const targetSrc = typeof orbitCam.getTarget === "function"
+      ? orbitCam.getTarget()
+      : orbitCam.target;
+    const alpha = Number(orbitCam.alpha);
+    const beta = Number(orbitCam.beta);
+    const radius = Number(orbitCam.radius);
+    const canRebuild = [alpha, beta, radius].every(Number.isFinite)
+      && targetSrc
+      && [targetSrc.x, targetSrc.y, targetSrc.z].every(Number.isFinite);
+
+    let positionSrc = orbitCam.globalPosition || orbitCam.position;
+
+    if (canRebuild) {
+      const sinBeta = Math.sin(beta);
+      positionSrc = {
+        x: targetSrc.x + radius * Math.cos(alpha) * sinBeta,
+        y: targetSrc.y + radius * Math.cos(beta),
+        z: targetSrc.z + radius * Math.sin(alpha) * sinBeta
+      };
+    }
+
+    if (!positionSrc || !targetSrc) {
+      return null;
+    }
+
+    const position = {
+      x: Number(positionSrc.x),
+      y: Number(positionSrc.y),
+      z: Number(positionSrc.z)
+    };
+    const target = {
+      x: Number(targetSrc.x),
+      y: Number(targetSrc.y),
+      z: Number(targetSrc.z)
+    };
+
+    if (![position.x, position.y, position.z, target.x, target.y, target.z].every(Number.isFinite)) {
+      return null;
+    }
 
     return {
-      position: { x: position.x, y: position.y, z: position.z },
-      target: { x: target.x, y: target.y, z: target.z },
+      position,
+      target,
       cameraHeight: position.y,
-      rotationY: Number.isFinite(orbitCam.alpha)
-        ? orbitCam.alpha
-        : Math.atan2(position.x - target.x, position.z - target.z)
+      rotationY: Number.isFinite(alpha)
+        ? alpha
+        : Math.atan2(position.z - target.z, position.x - target.x),
+      radius: Number.isFinite(radius) ? radius : Math.hypot(
+        position.x - target.x,
+        position.y - target.y,
+        position.z - target.z
+      ),
+      beta: Number.isFinite(beta) ? beta : null
     };
+  }
+
+  function captureOrbitSpinCamera() {
+    const orbitCam = getOrbitCamera();
+    const active = scene.activeCamera;
+    const cam = active && Number.isFinite(Number(active.alpha)) && Number.isFinite(Number(active.radius))
+      ? active
+      : orbitCam;
+
+    return readLiveOrbitCameraPose(cam);
   }
 
   function captureOrbitCameraSnapshot(orbitCam) {

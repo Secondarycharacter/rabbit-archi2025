@@ -148,6 +148,49 @@ function resolveClip(animationGroups, clipName) {
   )) || null;
 }
 
+/** Prefer authored names, then Idle-like, then the first clip on this mesh. */
+function pickAvailableGuestClip(guest, preferredNames = []) {
+  const groups = guest?.animationGroups || [];
+
+  if (!groups.length) {
+    return null;
+  }
+
+  const preferred = [
+    ...(Array.isArray(preferredNames) ? preferredNames : [preferredNames]),
+    ...(guest.spawn?.animation?.clipAliases || []),
+    ...(guest.spawn?.animation?.clips || []),
+    guest.spawn?.animation?.default,
+    guest.activeAnimationGroup?.name
+  ].map((name) => String(name || "").trim()).filter(Boolean);
+
+  for (const name of preferred) {
+    const group = resolveClip(groups, name);
+
+    if (group) {
+      return group;
+    }
+  }
+
+  const idle = groups.find((group) => {
+    const name = normalizeClipName(group.name);
+    return name === "idle" || (/^idle\b/.test(name) && !/sit|seat|walk|run/.test(name));
+  });
+
+  return idle || groups[0] || null;
+}
+
+function startAvailableGuestClip(guest, preferredNames = [], { loop = true } = {}) {
+  const group = pickAvailableGuestClip(guest, preferredNames);
+
+  if (!group) {
+    return false;
+  }
+
+  startGuestClip(guest, group, loop, { clipName: group.name });
+  return true;
+}
+
 function stopAnimationGroupKeepPose(group) {
   if (!group) {
     return;
@@ -1483,6 +1526,10 @@ function playGuestClipOnce(guest, clipName, onComplete, options = {}) {
 }
 
 function playGuestAnimation(guest) {
+  if (guest?._editorPoseFrozen) {
+    return;
+  }
+
   const { animation } = guest.spawn;
   const { animationGroups } = guest;
   const softCycle = guest._softSequenceCycle === true;
@@ -1518,6 +1565,7 @@ function playGuestAnimation(guest) {
   }
 
   if (!animation?.clips?.length) {
+    startAvailableGuestClip(guest, [], { loop: true });
     return;
   }
 
@@ -1538,6 +1586,7 @@ function playGuestAnimation(guest) {
       warnMissingClip(guest, clipName);
     }
 
+    startAvailableGuestClip(guest, clipCandidates, { loop: shouldLoop });
     return;
   }
 
@@ -1554,10 +1603,17 @@ function playGuestAnimation(guest) {
 
       if (!group) {
         warnMissingClip(guest, clipName);
+        startAvailableGuestClip(guest, [clipName], { loop: true });
         return;
       }
 
       startGuestClip(guest, group, true, { clipName });
+      return;
+    }
+
+    if (!animation.clips.some((clipName) => resolveClip(animationGroups, clipName))) {
+      animation.clips.forEach((clipName) => warnMissingClip(guest, clipName));
+      startAvailableGuestClip(guest, animation.clips, { loop: true });
       return;
     }
 
@@ -1955,9 +2011,24 @@ function blendPatrolHeight(position, targetY, deltaScale) {
   position.y += (targetY - position.y) * blend;
 }
 
+const PATROL_RAMP_Y_DELTA = 0.12;
+
 export function shouldSnapPatrolFloorAtTarget(movement, patrolTargetIndex) {
   if (!movement?.snapToFloor) {
     return false;
+  }
+
+  const targets = movement.patrolTargets || [];
+  const target = targets[patrolTargetIndex];
+  const previous = targets[(patrolTargetIndex - 1 + targets.length) % targets.length];
+  const yDelta = Number.isFinite(target?.y) && Number.isFinite(previous?.y)
+    ? Math.abs(target.y - previous.y)
+    : 0;
+
+  // Authored snap segments often lag behind a longer editor path (Rio descent).
+  // Any real height change is a ramp/stair — always follow the floor there.
+  if (yDelta >= PATROL_RAMP_Y_DELTA) {
+    return true;
   }
 
   const segments = movement.snapToFloorSegments;
@@ -1980,7 +2051,13 @@ function resolvePatrolHeight(x, z, fallbackY, movement, resolveFloorY, patrolTar
     return fallbackY;
   }
 
-  return resolveFloorY?.(x, z, fallbackY) ?? fallbackY;
+  if (typeof resolveFloorY !== "function") {
+    return fallbackY;
+  }
+
+  return resolveFloorY.length >= 4
+    ? resolveFloorY(x, z, fallbackY, { maxDelta: 4, preferHighest: true })
+    : resolveFloorY(x, z, fallbackY);
 }
 
 function updateGuestPatrol(guest, deltaScale, resolveFloorY) {
@@ -3363,13 +3440,20 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
       resolvedSpawn.position.z
     );
     guest.root.rotation.set(0, resolvedSpawn.rotationY, 0);
-    // First visible placement is the canonical sequence return target.
-    lockGuestInitialSpawnPose(guest, {
+    // Hidden/first placement is the canonical sequence return target.
+    // Force-lock so a later editor pose is not ignored after a config-position preload.
+    const origin = lockGuestInitialSpawnPose(guest, {
       x: resolvedSpawn.position.x,
       y: resolvedSpawn.position.y,
       z: resolvedSpawn.position.z,
       rotationY: resolvedSpawn.rotationY
-    });
+    }, { force: true });
+    guest.danceSequenceHome = {
+      x: origin.x,
+      y: origin.y,
+      z: origin.z,
+      rotationY: origin.rotationY
+    };
   }
 
   function startGuestPatrolIfNeeded(guest, wasVisible) {
@@ -3501,11 +3585,16 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
 
   function hide(options = {}) {
     const onlyIds = options.onlyIds?.length ? new Set(options.onlyIds) : null;
+    const excludeIds = new Set(options.excludeIds || []);
 
     getGuests().forEach((guest) => {
       const guestId = guest.spawn.id;
 
       if (onlyIds && !onlyIds.has(guestId)) {
+        return;
+      }
+
+      if (excludeIds.has(guestId)) {
         return;
       }
 
@@ -3521,7 +3610,7 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
     });
 
     if (!onlyIds) {
-      visible = false;
+      visible = getGuests().some((guest) => guest.root?.isEnabled());
       return;
     }
     // A targeted hide must not change the global runtime intent. The cast owner
@@ -3645,6 +3734,22 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
           resolvedSpawn.position.y,
           resolvedSpawn.position.z
         );
+        existing.root.rotation.set(0, resolvedSpawn.rotationY, 0);
+
+        if (!(existing.isVisibleShown && existing.root.isEnabled())) {
+          const origin = lockGuestInitialSpawnPose(existing, {
+            x: resolvedSpawn.position.x,
+            y: resolvedSpawn.position.y,
+            z: resolvedSpawn.position.z,
+            rotationY: resolvedSpawn.rotationY
+          }, { force: true });
+          existing.danceSequenceHome = {
+            x: origin.x,
+            y: origin.y,
+            z: origin.z,
+            rotationY: origin.rotationY
+          };
+        }
       }
 
       if (isNightDeviChaseGuest(existing) && !existing.nightChase?.engaged) {
@@ -3920,10 +4025,10 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
     return /walk|run|jump|attack/.test(name);
   }
 
-  function shouldPlantGuestIdle(guest) {
-    if (!guest?.root?.isEnabled() || isNightDeviChaseGuest(guest)) {
-      return false;
-    }
+function shouldPlantGuestIdle(guest) {
+  if (!guest?.root?.isEnabled() || isNightDeviChaseGuest(guest) || guest._editorPoseFrozen) {
+    return false;
+  }
 
     if (guest.spawn.movement?.type === "rootMotion") {
       return false;
@@ -4080,7 +4185,8 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
       // Watchdog: after walk-home some guests could sit idle with no clip if a
       // synced peer wait or restart queue got stuck. Force another loop.
       if (
-        guest.spawn.animation?.type === "sequence"
+        !guest._editorPoseFrozen
+        && guest.spawn.animation?.type === "sequence"
         && guest.danceSequenceHome
         && guest.danceSequencePhase == null
         && !guest.syncSequenceRestartQueued
@@ -4146,7 +4252,7 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
         return;
       }
 
-      if (guest.spawn?.movement?.type !== "patrol") {
+      if (guest.spawn?.movement?.type !== "patrol" || guest._editorPoseFrozen) {
         return;
       }
 
@@ -4169,7 +4275,7 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
         return;
       }
 
-      if (guest.spawn?.movement?.type === "patrol") {
+      if (guest.spawn?.movement?.type === "patrol" || guest._editorPoseFrozen) {
         return;
       }
 
@@ -4181,6 +4287,244 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
     });
 
     return restarted;
+  }
+
+  function freezeAtClipStart(guestId, clipName) {
+    const guest = guestsById.get(guestId);
+
+    if (!guest?.root) {
+      return false;
+    }
+
+    const requested = String(clipName || guest.spawn?.animation?.default || guest.spawn?.animation?.clips?.[0] || "Idle");
+    const group = resolveClip(guest.animationGroups, requested)
+      || pickAvailableGuestClip(guest, [requested]);
+    const clip = group?.name || requested;
+
+    guest.sequenceEndObserver?.remove?.();
+    guest.sequenceEndObserver = null;
+
+    if (guest.sequenceClipTimeoutId) {
+      window.clearTimeout(guest.sequenceClipTimeoutId);
+      guest.sequenceClipTimeoutId = null;
+    }
+
+    if (guest.syncSequenceTimeoutId) {
+      window.clearTimeout(guest.syncSequenceTimeoutId);
+      guest.syncSequenceTimeoutId = null;
+    }
+
+    guest.syncSequenceRunId = null;
+    guest.danceSequencePhase = null;
+    guest.patrolPhase = null;
+    guest.patrolArrivalPending = false;
+    guest.clipCrossfade = null;
+    guest._editorNeedsAnimRestart = false;
+    guest._editorNeedsPatrolRestart = false;
+    guest._editorPoseFrozen = true;
+    guest._editorFrozenClip = clip;
+    guest._editorBindPose = false;
+
+    (guest.animationGroups || []).forEach((item) => {
+      if (item && item !== group) {
+        stopAnimationGroupKeepPose(item);
+      }
+    });
+
+    if (!group) {
+      return false;
+    }
+
+    try {
+      group.stop();
+    } catch {
+      // ignore
+    }
+
+    try {
+      group.reset();
+      group.start(false);
+    } catch {
+      try {
+        group.start(false);
+      } catch {
+        // ignore
+      }
+    }
+
+    applyAnimationGroupStartPose(group);
+
+    try {
+      group.pause();
+    } catch {
+      // ignore
+    }
+
+    group.speedRatio = 0;
+    guest.activeAnimationGroup = group;
+    applyGuestClipWorldOffset(guest, clip);
+    guest.rootMotionNeutralizer?.endFootPlantSession?.();
+    guest.solePlantActive = false;
+    guest.rootMotionNeutralizer?.neutralize?.({ pinNodes: true, syncSample: true });
+    guest.rootMotionNeutralizer?.resetRootMotionSample?.();
+    return true;
+  }
+
+  function collectGuestSkeletons(guest) {
+    const skeletons = new Set();
+    const meshes = Array.isArray(guest?.meshes) && guest.meshes.length
+      ? guest.meshes
+      : (typeof guest?.root?.getChildMeshes === "function"
+        ? guest.root.getChildMeshes(false)
+        : []);
+
+    meshes.forEach((mesh) => {
+      if (mesh?.skeleton) {
+        skeletons.add(mesh.skeleton);
+      }
+    });
+
+    return [...skeletons];
+  }
+
+  function markEditorPoseFrozen(guest, clipName = null, bindPose = false) {
+    guest.sequenceEndObserver?.remove?.();
+    guest.sequenceEndObserver = null;
+
+    if (guest.sequenceClipTimeoutId) {
+      window.clearTimeout(guest.sequenceClipTimeoutId);
+      guest.sequenceClipTimeoutId = null;
+    }
+
+    if (guest.syncSequenceTimeoutId) {
+      window.clearTimeout(guest.syncSequenceTimeoutId);
+      guest.syncSequenceTimeoutId = null;
+    }
+
+    guest.syncSequenceRunId = null;
+    guest.danceSequencePhase = null;
+    guest.patrolPhase = null;
+    guest.patrolArrivalPending = false;
+    guest.clipCrossfade = null;
+    guest._editorNeedsAnimRestart = false;
+    guest._editorNeedsPatrolRestart = false;
+    guest._editorPoseFrozen = true;
+    guest._editorFrozenClip = clipName;
+    guest._editorBindPose = bindPose === true;
+  }
+
+  function pauseCurrentAnimation(guestId) {
+    const guest = guestsById.get(guestId);
+
+    if (!guest?.root) {
+      return false;
+    }
+
+    const currentClip = guest.activeAnimationGroup?.name
+      || guest._editorFrozenClip
+      || guest.spawn?.animation?.default
+      || guest.spawn?.animation?.clips?.[0]
+      || "Idle";
+    markEditorPoseFrozen(guest, currentClip, false);
+
+    const group = guest.activeAnimationGroup
+      || resolveClip(guest.animationGroups, currentClip)
+      || pickAvailableGuestClip(guest, [currentClip]);
+
+    if (!group) {
+      return false;
+    }
+
+    guest._editorFrozenClip = group.name || currentClip;
+
+    const wasPlaying = group === guest.activeAnimationGroup
+      && Array.isArray(group.animatables)
+      && group.animatables.length > 0;
+
+    if (!wasPlaying) {
+      try {
+        group.start(false);
+      } catch {
+        // ignore
+      }
+    }
+
+    try {
+      group.pause();
+    } catch {
+      try {
+        group.start(false);
+        group.pause();
+      } catch {
+        // ignore
+      }
+    }
+
+    group.speedRatio = 0;
+    guest.activeAnimationGroup = group;
+    guest.rootMotionNeutralizer?.endFootPlantSession?.();
+    guest.solePlantActive = false;
+    guest.rootMotionNeutralizer?.neutralize?.({ pinNodes: true, syncSample: true });
+    guest.rootMotionNeutralizer?.resetRootMotionSample?.();
+    return true;
+  }
+
+  function freezeAtBindPose(guestId) {
+    const guest = guestsById.get(guestId);
+
+    if (!guest?.root) {
+      return false;
+    }
+
+    markEditorPoseFrozen(guest, null, true);
+
+    (guest.animationGroups || []).forEach((group) => {
+      try {
+        group.stop();
+      } catch {
+        // ignore
+      }
+
+      try {
+        group.reset();
+      } catch {
+        // ignore
+      }
+    });
+
+    guest.activeAnimationGroup = null;
+    collectGuestSkeletons(guest).forEach((skeleton) => {
+      try {
+        skeleton.returnToRest?.();
+      } catch {
+        // ignore
+      }
+    });
+
+    guest.rootMotionNeutralizer?.endFootPlantSession?.();
+    guest.solePlantActive = false;
+    guest.rootMotionNeutralizer?.neutralize?.({ pinNodes: true, syncSample: true });
+    guest.rootMotionNeutralizer?.resetRootMotionSample?.();
+    return true;
+  }
+
+  function thawPose(guestId) {
+    const guest = guestsById.get(guestId);
+
+    if (!guest) {
+      return false;
+    }
+
+    guest._editorPoseFrozen = false;
+    guest._editorFrozenClip = null;
+    guest._editorBindPose = false;
+
+    if (guest.activeAnimationGroup) {
+      guest.activeAnimationGroup.speedRatio = 1;
+    }
+
+    playGuestAnimation(guest);
+    return true;
   }
 
   function setEditorMeshPickable(enabled) {
@@ -4220,6 +4564,10 @@ export function createGuestCharacterSystem(BABYLON, scene, helpers = {}) {
     applyGuestLabelTexts,
     refreshPatrolGuests,
     refreshGuestAnimations,
+    freezeAtClipStart,
+    pauseCurrentAnimation,
+    freezeAtBindPose,
+    thawPose,
     setEditorMeshPickable,
     getGuests,
     getGuestSceneAudit,

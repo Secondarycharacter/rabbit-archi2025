@@ -89,17 +89,25 @@ const views = {
 
 const historyFrame = document.getElementById('historyFrame');
 const historyLinkFrame = document.getElementById('historyLinkFrame');
-const metaversePreviewMedia = document.getElementById('metaversePreviewMedia');
-const metaversePreviewHint = document.getElementById('metaversePreviewHint');
-const metaverseOverview = document.getElementById('metaverseOverview');
+const metaverseGallery = document.getElementById('metaverseGallery');
+const metaverseGalleryViewport = document.getElementById('metaverseGalleryViewport');
+const metaverseGalleryTrack = document.getElementById('metaverseGalleryTrack');
+const metaverseGalleryArrow = document.getElementById('metaverseGalleryArrow');
 const metaverseChat = document.getElementById('metaverseChat');
 const metaverseFrame = document.getElementById('metaverseFrame');
+const metaversePreviewMedia = null;
+const metaversePreviewHint = null;
+const metaverseOverview = null;
 const extraLayout = document.getElementById('extraLayout');
 const extraOverview = document.getElementById('extraOverview');
 const extraChat = document.getElementById('extraChat');
 const extraPreviewMedia = document.getElementById('extraPreviewMedia');
 const extraDownloadHint = document.getElementById('extraDownloadHint');
 const extraDownloadLink = document.getElementById('extraDownloadLink');
+
+const METAVERSE_GALLERY_GAP = 8;
+const METAVERSE_GALLERY_COLUMNS = 2;
+const METAVERSE_GALLERY_VISIBLE_ROWS = 2;
 
 const state = {
   category: 'home',
@@ -110,7 +118,13 @@ const state = {
   h1Velocity: 0,
   h1Raf: null,
   selectedProjectId: null,
+  hoveredProjectId: null,
   selectedMetaverseProject: null,
+  metaverseGalleryProjects: [],
+  metaverseGalleryScroll: 0,
+  metaverseGalleryVelocity: 0,
+  metaverseGalleryRaf: null,
+  metaverseGalleryRowHeight: 0,
   descriptionCache: new Map(),
   projectOverviews: null
 };
@@ -410,6 +424,7 @@ function setActiveView(name) {
 function setCategory(category) {
   state.category = category;
   state.selectedProjectId = null;
+  state.hoveredProjectId = null;
   state.selectedMetaverseProject = null;
   state.h1Velocity = 0;
 
@@ -440,12 +455,13 @@ function setCategory(category) {
     state.h1Projects = [...state.projects.metaverse];
     renderH1Projects();
     refreshH1ListLayout();
-    const latest = state.h1Projects[state.h1Projects.length - 1];
-    if (latest) {
-      showMetaversePreview(latest);
+    setActiveView('metaversePreview');
+    renderMetaverseGallery({ resetScroll: true });
+    const newest = getMetaverseProjectsNewestFirst()[0] || null;
+    if (newest) {
+      selectMetaverseGalleryProject(newest, { scrollIntoView: false, launch: false });
     } else {
       clearMetaversePreview();
-      setActiveView('metaversePreview');
     }
     return;
   }
@@ -465,6 +481,75 @@ function setCategory(category) {
   }
 }
 
+function getHighlightedProjectId() {
+  return state.hoveredProjectId || state.selectedProjectId;
+}
+
+function syncMetaversePreviewPlayback() {
+  const activeId = getHighlightedProjectId();
+
+  metaverseGalleryTrack?.querySelectorAll('.h0-metaverse-card').forEach((card) => {
+    const video = card.querySelector('video');
+    if (!video) {
+      return;
+    }
+
+    if (card.dataset.projectId === activeId) {
+      if (video.paused) {
+        const playPromise = video.play();
+        if (playPromise?.catch) {
+          playPromise.catch(() => {});
+        }
+      }
+      return;
+    }
+
+    if (!video.paused) {
+      video.pause();
+    }
+  });
+}
+
+function syncProjectHighlight() {
+  const highlightId = getHighlightedProjectId();
+
+  h1ListTrack?.querySelectorAll('.h1-project-item').forEach((item) => {
+    if (!item.dataset.projectId) {
+      return;
+    }
+    item.classList.toggle('is-active', item.dataset.projectId === highlightId);
+  });
+
+  metaverseGalleryTrack?.querySelectorAll('.h0-metaverse-card').forEach((card) => {
+    card.classList.toggle('is-active', card.dataset.projectId === highlightId);
+  });
+
+  syncMetaversePreviewPlayback();
+}
+
+function setHoveredProjectId(projectId) {
+  const nextId = projectId || null;
+  if (state.hoveredProjectId === nextId) {
+    return;
+  }
+
+  state.hoveredProjectId = nextId;
+  syncProjectHighlight();
+}
+
+function clearHoveredProjectId(projectId = null) {
+  if (projectId && state.hoveredProjectId !== projectId) {
+    return;
+  }
+
+  if (state.hoveredProjectId == null) {
+    return;
+  }
+
+  state.hoveredProjectId = null;
+  syncProjectHighlight();
+}
+
 function renderH1Projects() {
   h1ListTrack.innerHTML = '';
   state.h1ListEntries = buildH1ListEntries(state.h1Projects);
@@ -477,6 +562,8 @@ function renderH1Projects() {
     updateH1TrackPosition();
     return;
   }
+
+  const listHighlightId = getHighlightedProjectId();
 
   state.h1ListEntries.forEach((entry) => {
     if (entry.type === 'period') {
@@ -493,7 +580,7 @@ function renderH1Projects() {
     item.className = 'h1-project-item';
     item.dataset.projectId = project.id;
 
-    if (state.selectedProjectId === project.id) {
+    if (listHighlightId === project.id) {
       item.classList.add('is-active');
     }
     if (isClickableInH1(project)) {
@@ -507,6 +594,19 @@ function renderH1Projects() {
 
     item.addEventListener('click', () => handleH1ProjectClick(project));
 
+    if (state.category === 'metaverse') {
+      item.addEventListener('pointerenter', () => {
+        setHoveredProjectId(project.id);
+      });
+      item.addEventListener('pointerleave', (event) => {
+        const next = event.relatedTarget;
+        if (next?.closest?.('.h1-project-item') || next?.closest?.('.h0-metaverse-card')) {
+          return;
+        }
+        clearHoveredProjectId(project.id);
+      });
+    }
+
     h1ListTrack.appendChild(item);
   });
 
@@ -518,9 +618,11 @@ function updateH1TrackPosition() {
   const translateY = centerY + state.h1ScrollOffset;
   h1ListTrack.style.transform = `translateY(${translateY}px)`;
 
-  const centeredProjectId = getH1CenteredProjectId();
+  const centeredProjectId = state.category === 'metaverse'
+    ? null
+    : getH1CenteredProjectId();
   h1ListTrack.querySelectorAll('.h1-project-item').forEach((item) => {
-    item.classList.toggle('is-center', item.dataset.projectId === centeredProjectId);
+    item.classList.toggle('is-center', Boolean(centeredProjectId) && item.dataset.projectId === centeredProjectId);
   });
 
   updateH1Scrollbar();
@@ -614,7 +716,7 @@ function handleH1ProjectClick(project) {
     state.selectedProjectId = project.id;
     state.selectedMetaverseProject = project;
     renderH1Projects();
-    showMetaversePreview(project);
+    selectMetaverseGalleryProject(project, { scrollIntoView: true, launch: false });
     return;
   }
 
@@ -790,17 +892,335 @@ function dispatchExtraChatProject(project) {
   );
 }
 
-function clearMetaversePreview() {
-  metaversePreviewSwitchToken += 1;
-  abortMetaversePreviewCrossfade();
-  setMetaversePreviewLayoutPending(false);
-  resetMetaversePreviewMediaSize();
-  metaversePreviewMedia.innerHTML = '';
-  if (metaverseOverview) {
-    metaverseOverview.innerHTML = '<p class="overview-empty">프로젝트를 선택하면 설계개요가 표시됩니다.</p>';
+function getMetaverseProjectsNewestFirst() {
+  return [...(state.projects.metaverse || [])].sort((a, b) => {
+    const dateDiff = getProjectSortKey(b) - getProjectSortKey(a);
+    if (dateDiff !== 0) {
+      return dateDiff;
+    }
+
+    const regDiff = (b.registeredAt ?? b.orderIndex ?? 0) - (a.registeredAt ?? a.orderIndex ?? 0);
+    if (regDiff !== 0) {
+      return regDiff;
+    }
+
+    return (b.orderIndex ?? 0) - (a.orderIndex ?? 0);
+  });
+}
+
+function getMetaverseGalleryViewportHeight() {
+  return metaverseGalleryViewport?.clientHeight || 0;
+}
+
+function getMetaverseGalleryRowHeight() {
+  const viewportHeight = getMetaverseGalleryViewportHeight();
+  if (viewportHeight <= 0) {
+    return 0;
   }
-  metaversePreviewHint.textContent = '프로젝트를 선택하면 Preview가 표시됩니다.';
+
+  return Math.max(
+    120,
+    (viewportHeight - METAVERSE_GALLERY_GAP * (METAVERSE_GALLERY_VISIBLE_ROWS - 1))
+      / METAVERSE_GALLERY_VISIBLE_ROWS
+  );
+}
+
+function getMetaverseGalleryMaxScroll() {
+  const projects = state.metaverseGalleryProjects;
+  if (!projects.length) {
+    return 0;
+  }
+
+  const rowCount = Math.ceil(projects.length / METAVERSE_GALLERY_COLUMNS);
+  const rowHeight = state.metaverseGalleryRowHeight || getMetaverseGalleryRowHeight();
+  const contentHeight = rowCount * rowHeight + Math.max(0, rowCount - 1) * METAVERSE_GALLERY_GAP;
+  return Math.max(0, contentHeight - getMetaverseGalleryViewportHeight());
+}
+
+function clampMetaverseGalleryScroll() {
+  const maxScroll = getMetaverseGalleryMaxScroll();
+  state.metaverseGalleryScroll = Math.min(maxScroll, Math.max(0, state.metaverseGalleryScroll));
+}
+
+function updateMetaverseGalleryTrackPosition() {
+  if (!metaverseGalleryTrack) {
+    return;
+  }
+
+  metaverseGalleryTrack.style.transform = `translateY(${-state.metaverseGalleryScroll}px)`;
+  updateMetaverseGalleryArrow();
+}
+
+function updateMetaverseGalleryArrow() {
+  if (!metaverseGalleryArrow) {
+    return;
+  }
+
+  const maxScroll = getMetaverseGalleryMaxScroll();
+  const hasMoreBelow = maxScroll > 1 && state.metaverseGalleryScroll < maxScroll - 2;
+  metaverseGalleryArrow.hidden = !hasMoreBelow;
+}
+
+function syncMetaverseGalleryLayout() {
+  if (!metaverseGalleryTrack || !metaverseGalleryViewport) {
+    return;
+  }
+
+  if (state.category !== 'metaverse' || !views.metaversePreview?.classList.contains('is-active')) {
+    return;
+  }
+
+  state.metaverseGalleryRowHeight = getMetaverseGalleryRowHeight();
+  metaverseGalleryTrack.style.gridAutoRows = `${state.metaverseGalleryRowHeight}px`;
+  clampMetaverseGalleryScroll();
+  updateMetaverseGalleryTrackPosition();
+}
+
+function buildMetaverseCardOverviewHtml(project) {
+  const overviewId = project.overviewId || project.id;
+  const overview = state.projectOverviews?.[overviewId];
+  const title = overview?.title || getDisplayTitle(project);
+
+  if (!overview) {
+    return `
+      <h3 class="h0-metaverse-card__overview-title">${escapeOverviewValue(title)}</h3>
+      <div class="h0-metaverse-card__overview-body">
+        <p class="overview-empty">등록된 설계개요가 없습니다.</p>
+      </div>
+    `;
+  }
+
+  const rowsHtml = (overview.rows || [])
+    .map(([label, value]) => `
+      <dt>${formatOverviewLabel(label)}</dt>
+      <dd>${escapeOverviewValue(value)}</dd>
+    `)
+    .join('');
+
+  return `
+    <h3 class="h0-metaverse-card__overview-title">${escapeOverviewValue(title)}</h3>
+    <div class="h0-metaverse-card__overview-body">
+      <dl class="h0-metaverse-card__overview-list">${rowsHtml}</dl>
+    </div>
+  `;
+}
+
+function createMetaverseGalleryCard(project) {
+  const card = document.createElement('article');
+  card.className = 'h0-metaverse-card';
+  card.dataset.projectId = project.id;
+  card.setAttribute('role', 'button');
+  card.tabIndex = 0;
+
+  if (getHighlightedProjectId() === project.id) {
+    card.classList.add('is-active');
+  }
+
+  const overview = document.createElement('div');
+  overview.className = 'h0-metaverse-card__overview';
+  overview.innerHTML = buildMetaverseCardOverviewHtml(project);
+  overview.addEventListener('wheel', (event) => {
+    event.stopPropagation();
+  }, { passive: true });
+  overview.addEventListener('click', (event) => {
+    event.stopPropagation();
+    selectMetaverseGalleryProject(project, { scrollIntoView: false, launch: false });
+  });
+
+  const mediaPane = document.createElement('div');
+  mediaPane.className = 'h0-metaverse-card__preview';
+
+  const mediaWrap = document.createElement('div');
+  mediaWrap.className = 'h0-metaverse-card__media';
+
+  if (project.previewType === 'video' && project.preview) {
+    const video = document.createElement('video');
+    video.src = project.preview;
+    video.playsInline = true;
+    video.muted = true;
+    video.autoplay = false;
+    video.loop = true;
+    video.preload = 'metadata';
+    video.setAttribute('aria-hidden', 'true');
+    mediaWrap.appendChild(video);
+  } else if (project.preview) {
+    const img = document.createElement('img');
+    img.src = project.preview;
+    img.alt = '';
+    mediaWrap.appendChild(img);
+  }
+
+  const caption = document.createElement('div');
+  caption.className = 'h0-metaverse-card__caption';
+  caption.innerHTML = `
+    <span class="h0-metaverse-card__date">${formatProjectDate(project.date)}</span>
+    <span class="h0-metaverse-card__title">${getDisplayTitle(project)}</span>
+  `;
+
+  mediaPane.appendChild(mediaWrap);
+  mediaPane.appendChild(caption);
+  card.appendChild(overview);
+  card.appendChild(mediaPane);
+
+  const launch = () => {
+    selectMetaverseGalleryProject(project, { scrollIntoView: false, launch: true });
+  };
+
+  mediaPane.addEventListener('click', launch);
+  card.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      launch();
+    }
+  });
+  card.addEventListener('pointerenter', () => {
+    setHoveredProjectId(project.id);
+  });
+  card.addEventListener('pointerleave', (event) => {
+    const next = event.relatedTarget;
+    if (next?.closest?.('.h0-metaverse-card') || next?.closest?.('.h1-project-item')) {
+      return;
+    }
+    clearHoveredProjectId(project.id);
+  });
+
+  return card;
+}
+
+function renderMetaverseGallery(options = {}) {
+  if (!metaverseGalleryTrack) {
+    return;
+  }
+
+  const { resetScroll = false } = options;
+  const projects = getMetaverseProjectsNewestFirst();
+  state.metaverseGalleryProjects = projects;
+
+  if (resetScroll) {
+    state.metaverseGalleryScroll = 0;
+    state.metaverseGalleryVelocity = 0;
+  }
+
+  metaverseGalleryTrack.innerHTML = '';
+
+  if (!projects.length) {
+    const empty = document.createElement('div');
+    empty.className = 'h0-metaverse-gallery-empty';
+    empty.textContent = '등록된 메타버스 프로젝트가 없습니다.';
+    metaverseGalleryTrack.appendChild(empty);
+    if (metaverseGalleryArrow) {
+      metaverseGalleryArrow.hidden = true;
+    }
+    return;
+  }
+
+  projects.forEach((project) => {
+    metaverseGalleryTrack.appendChild(createMetaverseGalleryCard(project));
+  });
+
+  syncProjectHighlight();
+
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      syncMetaverseGalleryLayout();
+      syncMetaversePreviewPlayback();
+    });
+  });
+}
+
+function scrollMetaverseGalleryToProject(projectId) {
+  const index = state.metaverseGalleryProjects.findIndex((project) => project.id === projectId);
+  if (index < 0) {
+    return;
+  }
+
+  const row = Math.floor(index / METAVERSE_GALLERY_COLUMNS);
+  const rowHeight = state.metaverseGalleryRowHeight || getMetaverseGalleryRowHeight();
+  const target = row * (rowHeight + METAVERSE_GALLERY_GAP);
+  state.metaverseGalleryVelocity = 0;
+  state.metaverseGalleryScroll = target;
+  clampMetaverseGalleryScroll();
+  updateMetaverseGalleryTrackPosition();
+}
+
+function selectMetaverseGalleryProject(project, options = {}) {
+  if (!project) {
+    clearMetaversePreview();
+    return;
+  }
+
+  const { scrollIntoView = false, launch = false } = options;
+  setActiveView('metaversePreview');
+  state.selectedProjectId = project.id;
+  state.selectedMetaverseProject = project;
+  state.hoveredProjectId = null;
+
+  if (!state.metaverseGalleryProjects.length) {
+    renderMetaverseGallery();
+  }
+
+  renderH1Projects();
+  syncProjectHighlight();
+
+  if (scrollIntoView) {
+    scrollMetaverseGalleryToProject(project.id);
+  }
+
+  dispatchMetaverseChatProject(project);
+
+  if (launch && project.metaverseUrl) {
+    launchMetaverse(project);
+  }
+}
+
+function animateMetaverseGalleryScroll() {
+  if (Math.abs(state.metaverseGalleryVelocity) < 0.05) {
+    state.metaverseGalleryVelocity = 0;
+    state.metaverseGalleryRaf = null;
+    return;
+  }
+
+  state.metaverseGalleryScroll += state.metaverseGalleryVelocity;
+  state.metaverseGalleryVelocity *= 0.92;
+  clampMetaverseGalleryScroll();
+  updateMetaverseGalleryTrackPosition();
+  state.metaverseGalleryRaf = requestAnimationFrame(animateMetaverseGalleryScroll);
+}
+
+function onMetaverseGalleryWheel(event) {
+  if (state.category !== 'metaverse' || !state.metaverseGalleryProjects.length) {
+    return;
+  }
+
+  if (getMetaverseGalleryMaxScroll() <= 0) {
+    return;
+  }
+
+  event.preventDefault();
+  state.metaverseGalleryVelocity += event.deltaY * 0.18;
+  if (!state.metaverseGalleryRaf) {
+    state.metaverseGalleryRaf = requestAnimationFrame(animateMetaverseGalleryScroll);
+  }
+}
+
+function pageMetaverseGalleryDown() {
+  const page = getMetaverseGalleryViewportHeight() || (state.metaverseGalleryRowHeight * 2);
+  state.metaverseGalleryVelocity = 0;
+  state.metaverseGalleryScroll += page * 0.92;
+  clampMetaverseGalleryScroll();
+  updateMetaverseGalleryTrackPosition();
+}
+
+function clearMetaversePreview() {
+  state.selectedMetaverseProject = null;
+  state.hoveredProjectId = null;
+  state.metaverseGalleryVelocity = 0;
+  syncProjectHighlight();
   dispatchMetaverseChatProject(null);
+}
+
+function showMetaversePreview(project) {
+  selectMetaverseGalleryProject(project, { scrollIntoView: true, launch: false });
 }
 
 function formatOverviewLabel(label) {
@@ -1446,49 +1866,8 @@ function computeMetaversePreviewRenderSize(naturalWidth, naturalHeight, stageWid
   return { width, height };
 }
 
-function syncMetaversePreviewLayout(options = {}) {
-  const stage = document.querySelector('.h0-metaverse-preview-stage');
-  const layout = stage?.closest('.h0-metaverse-layout');
-  const media = metaversePreviewMedia;
-  const overview = metaverseOverview;
-  const mediaElement = getActiveMetaversePreviewMediaElement();
-
-  if (!stage || !media || !overview || !layout) {
-    return;
-  }
-
-  if (!mediaElement || !views.metaversePreview.classList.contains('is-active')) {
-    return;
-  }
-
-  const { width: naturalWidth, height: naturalHeight } = getPreviewMediaNaturalSize(mediaElement);
-
-  if (mediaElement.tagName === 'VIDEO') {
-    const bounds = detectVideoContentBounds(mediaElement, { force: false });
-    if (bounds && hasVideoContentLetterbox(bounds, mediaElement)) {
-      applyVideoPreviewCropLayout(mediaElement, media, stage, overview, bounds, options);
-      if (media.offsetHeight) {
-        finishMetaversePreviewLayoutSync();
-      }
-      return;
-    }
-  }
-
-  const renderSize = computeMetaversePreviewRenderSize(
-    naturalWidth,
-    naturalHeight,
-    stage.clientWidth,
-    stage.clientHeight
-  );
-
-  if (!renderSize) {
-    return;
-  }
-
-  applyVideoPreviewNormalLayout(mediaElement, media, stage, overview, renderSize, options);
-  if (media.offsetHeight) {
-    finishMetaversePreviewLayoutSync();
-  }
+function syncMetaversePreviewLayout() {
+  syncMetaverseGalleryLayout();
 }
 
 function bindMetaversePreviewMediaEvents(mediaElement, project) {
@@ -1549,47 +1928,6 @@ function bindMetaversePreviewMediaEvents(mediaElement, project) {
       mediaElement.addEventListener('load', sync, { once: true });
     }
   }
-}
-
-function showMetaversePreview(project) {
-  if (!project) {
-    clearMetaversePreview();
-    setActiveView('metaversePreview');
-    return;
-  }
-
-  setActiveView('metaversePreview');
-  metaversePreviewSwitchToken += 1;
-
-  const hasExistingPreview = Boolean(metaversePreviewMedia?.querySelector('video, img'));
-
-  setMetaversePreviewLayoutPending(true);
-
-  if (hasExistingPreview) {
-    abortMetaversePreviewCrossfade();
-    resetMetaversePreviewMediaSize({ preserveLayout: true });
-    markOutgoingMetaversePreviewMedia();
-  } else {
-    resetMetaversePreviewMediaSize();
-    metaversePreviewMedia.innerHTML = '';
-  }
-
-  renderMetaverseOverview(project);
-
-  const mediaElement = createMetaversePreviewMediaElement(project);
-  if (hasExistingPreview) {
-    mediaElement.classList.add('preview-media-incoming');
-    metaversePreviewMedia.classList.add('has-layer-stack');
-  }
-
-  metaversePreviewMedia.appendChild(mediaElement);
-  bindMetaversePreviewMediaEvents(mediaElement, project);
-
-  metaversePreviewHint.textContent = `${getDisplayTitle(project)} — Preview를 클릭하면 메타버스로 이동합니다.`;
-  dispatchMetaverseChatProject(project);
-  requestAnimationFrame(() => {
-    requestAnimationFrame(syncMetaversePreviewLayout);
-  });
 }
 
 function launchMetaverse(project) {
@@ -2137,11 +2475,44 @@ function bindEvents() {
     }
   }, { passive: false });
 
-  window.addEventListener('resize', () => syncMetaversePreviewLayout({ force: true }));
+  window.addEventListener('resize', () => syncMetaverseGalleryLayout());
   window.addEventListener('resize', syncExtraPreviewLayout);
   document.addEventListener('pointerover', (event) => {
-    const clickable = event.target.closest('.is-clickable, .h2-menu-item, .h2-admin-trigger, .h0-preview-media, .h0-extra-download-link');
+    const clickable = event.target.closest(
+      '.is-clickable, .h2-menu-item, .h2-admin-trigger, .h0-preview-media, .h0-metaverse-card, .h0-metaverse-gallery-arrow, .h0-extra-download-link'
+    );
     document.body.classList.toggle('is-pointer', Boolean(clickable));
+  });
+
+  if (metaverseGalleryViewport) {
+    metaverseGalleryViewport.addEventListener('wheel', onMetaverseGalleryWheel, { passive: false });
+
+    let galleryTouchStartY = 0;
+    metaverseGalleryViewport.addEventListener('touchstart', (event) => {
+      galleryTouchStartY = event.touches[0]?.clientY ?? 0;
+    }, { passive: true });
+    metaverseGalleryViewport.addEventListener('touchmove', (event) => {
+      if (state.category !== 'metaverse' || !state.metaverseGalleryProjects.length) {
+        return;
+      }
+      if (getMetaverseGalleryMaxScroll() <= 0) {
+        return;
+      }
+      const currentY = event.touches[0]?.clientY ?? galleryTouchStartY;
+      const delta = galleryTouchStartY - currentY;
+      if (Math.abs(delta) > 0) {
+        event.preventDefault();
+        state.metaverseGalleryVelocity += delta * 0.28;
+        galleryTouchStartY = currentY;
+        if (!state.metaverseGalleryRaf) {
+          state.metaverseGalleryRaf = requestAnimationFrame(animateMetaverseGalleryScroll);
+        }
+      }
+    }, { passive: false });
+  }
+
+  metaverseGalleryArrow?.addEventListener('click', () => {
+    pageMetaverseGalleryDown();
   });
 }
 

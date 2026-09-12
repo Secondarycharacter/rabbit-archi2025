@@ -3,6 +3,7 @@
  * PHASE 5: save pipeline polish + Play Test.
  */
 
+import { getMetaverseProjectContext, getMetaverseProjectId } from "../metaverse-project-context.js?v=editor-shared-20260908";
 import {
   applyNpcRecordToGuest,
   applyNpcSceneToGuests,
@@ -15,6 +16,8 @@ import {
   getActiveNpcRecords,
   guestToNpcRecord,
   isEditorCreatedNpcId,
+  isNpcRandomModel,
+  canToggleNpcRandomModel,
   loadEffectiveNpcScene,
   nextEditorNpcId,
   normalizeOffset3,
@@ -28,13 +31,13 @@ import {
   spawnAnimationToEditor,
   writeNpcSceneStorage,
   clearNpcSceneStorage
-} from "./npc-scene-editor-data.js?v=preserve-active-patrol-20260907";
-import { createEditorHistory } from "./npc-scene-editor-history.js?v=tour-undo-focus-20260905";
+} from "./npc-scene-editor-data.js?v=rooftop-editor-pose-20260908";
+import { createEditorHistory } from "./npc-scene-editor-history.js?v=project-scope-20260908";
 import { createNpcDialogCameraPreview } from "./npc-dialog-camera-preview.js?v=select-dropdown-fix-20260906";
 import {
   createNpcSceneEditorUi,
   isNpcEditorScenePointerBlocked
-} from "./npc-scene-editor-ui.js?v=patrol-random-clip-fix-20260907";
+} from "./npc-scene-editor-ui.js?v=pose-clip-fallback-20260908";
 import {
   EDITOR_LAYERS,
   EVENT_TYPES,
@@ -49,12 +52,13 @@ import {
   normalizeTourDocument,
   normalizeTourRecord,
   offsetTransform,
+  applyEditorToursToGuideData,
   applyGuideDataToEditorTours,
   tourPointsFromGuideEvents,
   writeEventStorage,
   writeTeleportStorage,
   writeTourStorage
-} from "./scene-marker-data.js?v=tour-undo-focus-20260905";
+} from "./scene-marker-data.js?v=editor-guide-pose-20260908";
 import { createSceneMarkerRuntime } from "./scene-marker-runtime.js?v=tour-facing-arrow-20260903";
 import {
   buildEditorProjectBundle,
@@ -64,7 +68,7 @@ import {
   summarizeProjectBundle,
   validateEditorProjectBundle,
   writeProjectImportBackup
-} from "./editor-project-bundle.js?v=editor-phase5-20260903";
+} from "./editor-project-bundle.js?v=editor-guide-pose-20260908";
 import {
   applyEditorBundleToProject,
   isEditorWriteServerAvailable
@@ -207,6 +211,7 @@ export function createNpcSceneEditor(BABYLON, scene, options = {}) {
     onMarkerFieldsChange: (id, patch) => updateMarkerFields(id, patch),
     onNpcFieldsChange: (id, patch) => updateNpcFields(id, patch),
     onNpcModelChange: (id, file) => void changeNpcModel(id, file),
+    onNpcRandomModelChange: (id, random) => setNpcRandomModel(id, random),
     onNpcDialogueChange: (id, patch, meta = {}) => {
       onNpcDialogueChange?.(id, patch);
 
@@ -229,6 +234,7 @@ export function createNpcSceneEditor(BABYLON, scene, options = {}) {
     onResetOffsetEdits: (scope) => resetOffsetEdits(scope),
     onClipFineTuneChange: (active) => setClipFineTuneActive(active),
     onClipFineTuneClipChange: (clip) => previewClipFineTuneAnimation(clip),
+    onPoseFreezeChange: (active) => setPoseFreezeActive(active),
     onSelectPatrolWaypoint: (index) => selectPatrolWaypoint(index),
     onAddPatrolWaypoint: (id) => addPatrolWaypoint(id),
     onRemovePatrolWaypoint: (id, index) => removePatrolWaypoint(id, index),
@@ -242,6 +248,7 @@ export function createNpcSceneEditor(BABYLON, scene, options = {}) {
   let clipFineTuneClip = null;
   let clipFineTuneBase = null;
   let clipFineTuneSnapshot = null;
+  let poseFreezeActive = false;
   let selectedWaypointIndex = null;
   let refreshUiDeferred = false;
   let patrolWaypointRoots = [];
@@ -403,6 +410,90 @@ export function createNpcSceneEditor(BABYLON, scene, options = {}) {
 
     writeTourStorage(tourDocument);
     markNeedsJsonExport();
+  }
+
+  function isGuideNpcId(id) {
+    const value = String(id || "");
+    return value === "Angji-Guide" || value === "Guide";
+  }
+
+  function syncGuideNpcPoseToTour(guest) {
+    if (!guest?.root || !isGuideNpcId(guest.spawn?.id)) {
+      return false;
+    }
+
+    const position = {
+      x: Number(guest.root.position.x),
+      y: Number(guest.root.position.y),
+      z: Number(guest.root.position.z)
+    };
+    const rotationY = Number(guest.root.rotation?.y);
+
+    if (![position.x, position.y, position.z].every(Number.isFinite)) {
+      return false;
+    }
+
+    const heading = Number.isFinite(rotationY) ? rotationY : 0;
+    const guide = cloneJson(getGuideTourData?.() || { events: [] });
+    const events = Array.isArray(guide.events)
+      ? guide.events.map((event) => ({ ...event }))
+      : [];
+    let spawnIndex = events.findIndex((event) => String(event.id) === "00");
+
+    if (spawnIndex < 0) {
+      events.unshift({
+        id: "00",
+        title: "가이드 등장",
+        dialogues: []
+      });
+      spawnIndex = 0;
+    }
+
+    const spawn = {
+      ...events[spawnIndex],
+      id: "00",
+      guidePosition: position,
+      guideRotationY: heading
+    };
+    events[spawnIndex] = spawn;
+
+    const tours = [...(tourDocument.tours || [])];
+    const tourIndex = tours.findIndex((tour) => String(tour.sourceEventId || "") === "00");
+    const nextTour = normalizeTourRecord({
+      ...(tourIndex >= 0 ? tours[tourIndex] : {}),
+      id: tourIndex >= 0 ? tours[tourIndex].id : "tour_000",
+      name: spawn.title || tours[tourIndex]?.name || "가이드 등장",
+      sourceEventId: "00",
+      duration: tourIndex >= 0 ? tours[tourIndex].duration : 10,
+      transform: {
+        position: { ...position },
+        rotationY: radiansToDegrees(heading)
+      }
+    });
+
+    if (tourIndex >= 0) {
+      tours[tourIndex] = nextTour;
+    } else {
+      tours.unshift(nextTour);
+    }
+
+    tourDocument = normalizeTourDocument({
+      ...tourDocument,
+      tours
+    });
+    tourDirty = true;
+
+    if (typeof applyTourOverlay === "function") {
+      persistToursToRuntime();
+    } else if (typeof publishGuideTourData === "function") {
+      publishGuideTourData({ ...guide, events });
+      writeTourStorage(tourDocument);
+    } else {
+      writeTourStorage(tourDocument);
+    }
+
+    syncMarkers();
+    return true;
   }
 
   function syncToursFromGuideData(guideTourData) {
@@ -702,12 +793,22 @@ export function createNpcSceneEditor(BABYLON, scene, options = {}) {
       models: getModelCatalog(),
       animationClips: selectedRecord?.id ? getAnimationClipsForNpc(selectedRecord.id) : [],
       displayName: selectedRecord?.id ? resolveNpcListName(selectedRecord) : "",
+      currentModelFile: selectedRecord?.id
+        ? (getGuestById(selectedRecord.id)?.spawn?.file || selectedRecord.model?.path || "")
+        : "",
+      randomModel: selectedRecord
+        ? isNpcRandomModel(selectedRecord, getBuiltinSpawn(selectedRecord.id))
+        : false,
+      canToggleRandom: selectedRecord
+        ? canToggleNpcRandomModel(selectedRecord, getBuiltinSpawn(selectedRecord.id))
+        : false,
       offsetEditMode,
       offsetDirty,
       offsetDefaultDirty: selectedRecord ? isOffsetScopeDirty(selectedRecord, "default") : false,
       offsetClipDirty: selectedRecord ? isOffsetScopeDirty(selectedRecord, "clip") : false,
       clipFineTuneActive,
       clipFineTuneClip,
+      poseFreezeActive,
       selectedWaypointIndex,
       connectionTargets: selectedRecord?.type === "event"
         ? getConnectionTargets(selectedRecord.connection?.type || "none")
@@ -876,8 +977,8 @@ export function createNpcSceneEditor(BABYLON, scene, options = {}) {
     const utilLayer = gizmoManager?.utilityLayer
       || new BABYLON.UtilityLayerRenderer(scene);
     const utilScene = utilLayer.utilityLayerScene;
-    const discRadius = offsetEditMode ? 1.05 : 0.9;
-    const ringRadius = discRadius + 0.18;
+    const discRadius = offsetEditMode ? 0.525 : 0.45;
+    const ringRadius = discRadius + 0.09;
 
     xzDragProxy = BABYLON.MeshBuilder.CreateDisc(
       "npc-editor-xz-drag-proxy",
@@ -900,7 +1001,7 @@ export function createNpcSceneEditor(BABYLON, scene, options = {}) {
       "npc-editor-xz-drag-ring",
       {
         diameter: ringRadius * 2,
-        thickness: 0.045,
+        thickness: 0.0225,
         tessellation: 64
       },
       utilScene
@@ -1174,6 +1275,7 @@ export function createNpcSceneEditor(BABYLON, scene, options = {}) {
     }
 
     updateRecordFromGuest(guest);
+    syncGuideNpcPoseToTour(guest);
     refreshUi();
     scheduleAutoSave();
 
@@ -1234,11 +1336,15 @@ export function createNpcSceneEditor(BABYLON, scene, options = {}) {
       z: guest.root.position.z
     };
     applyNpcRecordToGuest(guest, record, {
-      clipName: offsetEditMode === "clip" ? getActiveOffsetClip(record) : null
+      clipName: offsetEditMode === "clip"
+        ? getActiveOffsetClip(record)
+        : "__bindPose__"
     });
     offsetDragBase = null;
-    if (clipFineTuneActive && clipFineTuneClip) {
-      // Keep fine-tune preview clip looping after gizmo commits.
+    if (offsetEditMode === "default") {
+      getGuestCharacterSystem()?.freezeAtBindPose?.(guest.spawn.id);
+      relockGuestHomeFromRoot(guest);
+    } else if (clipFineTuneActive && clipFineTuneClip) {
       playEditorPreviewClip(guest, clipFineTuneClip);
       relockGuestHomeFromRoot(guest);
     }
@@ -1253,6 +1359,10 @@ export function createNpcSceneEditor(BABYLON, scene, options = {}) {
   }
 
   function getActiveOffsetClip(record) {
+    if (offsetEditMode === "default") {
+      return "__bindPose__";
+    }
+
     if (clipFineTuneActive && clipFineTuneClip) {
       return String(clipFineTuneClip);
     }
@@ -1276,16 +1386,186 @@ export function createNpcSceneEditor(BABYLON, scene, options = {}) {
     guest.syncSequencePeers = null;
   }
 
+  function resolveIdleClipName(guest, record) {
+    const names = (guest?.animationGroups || [])
+      .map((group) => String(group.name || "").trim())
+      .filter(Boolean);
+    const exact = names.find((name) => name.toLowerCase() === "idle");
+
+    if (exact) {
+      return exact;
+    }
+
+    const loose = names.find((name) => /^idle\b/i.test(name) && !/sit|seat|walk|run/i.test(name));
+
+    if (loose) {
+      return loose;
+    }
+
+    return names[0] || String(record?.animation?.default || "Idle");
+  }
+
+  function pickPlayableEditorClip(guest, record, preferredNames = []) {
+    const names = (guest?.animationGroups || [])
+      .map((group) => String(group.name || "").trim())
+      .filter(Boolean);
+
+    const resolveName = (wanted) => {
+      const target = String(wanted || "").trim().toLowerCase();
+
+      if (!target) {
+        return null;
+      }
+
+      const compact = target.replace(/[_\s-]/g, "");
+      return names.find((name) => name.toLowerCase() === target)
+        || names.find((name) => name.toLowerCase().replace(/[_\s-]/g, "") === compact)
+        || null;
+    };
+
+    const preferred = [
+      ...(Array.isArray(preferredNames) ? preferredNames : [preferredNames]),
+      guest?.activeAnimationGroup?.name,
+      ...(guest?.spawn?.animation?.clips || []),
+      record?.animation?.default,
+      ...(record?.animation?.clips || [])
+    ];
+
+    for (const name of preferred) {
+      const hit = resolveName(name);
+
+      if (hit) {
+        return hit;
+      }
+    }
+
+    return resolveIdleClipName(guest, record);
+  }
+
+  function getPoseFreezeClip(record) {
+    const guest = getGuestById(record?.id);
+
+    if (clipFineTuneActive && clipFineTuneClip) {
+      return pickPlayableEditorClip(guest, record, [clipFineTuneClip]);
+    }
+
+    return pickPlayableEditorClip(guest, record, [
+      record?.animation?.default,
+      record?.animation?.clips?.[0]
+    ]);
+  }
+
+  function thawAllPoseFreeze() {
+    const gcs = getGuestCharacterSystem();
+    getGuests().forEach((guest) => {
+      if (guest?._editorPoseFrozen && guest.spawn?.id) {
+        gcs?.thawPose?.(guest.spawn.id);
+      }
+    });
+  }
+
+  function syncSelectedPoseFreeze(clipName = null) {
+    const guest = getGuestById(selectedGuestId);
+    const record = getRecordById(selectedGuestId);
+
+    if (!poseFreezeActive || !guest?.spawn?.id || !record) {
+      return false;
+    }
+
+    pauseGuestLocomotionForFineTune(guest);
+    const clip = pickPlayableEditorClip(guest, record, [
+      clipName,
+      getPoseFreezeClip(record)
+    ]);
+    guest.spawn.animation = {
+      type: "loop",
+      clips: [clip]
+    };
+    return getGuestCharacterSystem()?.freezeAtClipStart?.(guest.spawn.id, clip) === true;
+  }
+
+  function setPoseFreezeActive(active) {
+    const record = getRecordById(selectedGuestId);
+    const guest = getGuestById(selectedGuestId);
+    const next = active === true;
+
+    if (!guest?.spawn?.id) {
+      poseFreezeActive = next;
+      refreshUi();
+      return;
+    }
+
+    if (next === poseFreezeActive) {
+      refreshUi();
+      return;
+    }
+
+    if (next) {
+      poseFreezeActive = true;
+      pauseGuestLocomotionForFineTune(guest);
+      getGuestCharacterSystem()?.pauseCurrentAnimation?.(guest.spawn.id);
+      setStatus(`${record?.id || guest.spawn.id} 포즈 고정 · 루프 정지`);
+      refreshUi();
+      return;
+    }
+
+    applyFrozenPoseEditsToPlayback(guest, record);
+  }
+
+  function applyFrozenPoseEditsToPlayback(guest, record) {
+    if (offsetDirty || !offsetsMatchSnapshot(record)) {
+      persistAll();
+      syncOffsetCommitSnapshot(record, { force: true });
+    }
+
+    if (clipFineTuneActive) {
+      commitClipFineTuneEdits(guest, record);
+    }
+
+    offsetEditMode = null;
+    poseFreezeActive = false;
+    applyNpcRecordToGuest(guest, record, {
+      builtinSpawn: getBuiltinSpawn(record.id),
+      allowClearMovement: true
+    });
+    relockGuestHomeFromRoot(guest);
+    getGuestCharacterSystem()?.thawPose?.(guest.spawn.id);
+
+    if (record.movement?.type === "patrol") {
+      getGuestCharacterSystem()?.refreshPatrolGuests?.({
+        onlyIds: [record.id],
+        force: true
+      });
+    } else {
+      getGuestCharacterSystem()?.refreshGuestAnimations?.({
+        onlyIds: [record.id],
+        force: true
+      });
+    }
+
+    attachEditorTransformTarget(guest.root);
+    refreshUi();
+    setStatus(`${record.id} 포즈 고정 해제 · 수정 내용 반영`);
+  }
+
   function playEditorPreviewClip(guest, clipName) {
     if (!guest?.spawn) {
       return;
     }
 
+    const record = getRecordById(guest.spawn.id);
+    const clip = pickPlayableEditorClip(guest, record, [clipName]);
     pauseGuestLocomotionForFineTune(guest);
     guest.spawn.animation = {
       type: "loop",
-      clips: [String(clipName || "Idle")]
+      clips: [clip]
     };
+
+    if (poseFreezeActive) {
+      getGuestCharacterSystem()?.freezeAtClipStart?.(guest.spawn.id, clip);
+      return;
+    }
+
     guest._editorNeedsAnimRestart = true;
     getGuestCharacterSystem()?.refreshGuestAnimations?.({
       onlyIds: [guest.spawn.id],
@@ -1346,6 +1626,61 @@ export function createNpcSceneEditor(BABYLON, scene, options = {}) {
     guest._appliedClipOffset = null;
   }
 
+  function commitClipFineTuneEdits(guest, record) {
+    if (!clipFineTuneActive || !guest || !record) {
+      clearClipFineTuneState();
+      return null;
+    }
+
+    const editClip = clipFineTuneClip || "Idle";
+    const editedOffset = resolveNpcOffset(record, editClip);
+    const hadOffsetEdits = offsetDirty || !offsetsMatchSnapshot(record);
+
+    if (hadOffsetEdits) {
+      persistAll();
+      syncOffsetCommitSnapshot(record, { force: true });
+    }
+
+    const keptPivots = {
+      ...(cloneJson(record.animation?.pivots || {})),
+      [editClip]: { useCustom: true, ...editedOffset }
+    };
+
+    if (hadOffsetEdits) {
+      record.footOffset = cloneJson(editedOffset);
+    }
+
+    if (clipFineTuneSnapshot?.animation) {
+      record.animation = {
+        ...cloneJson(clipFineTuneSnapshot.animation),
+        pivots: keptPivots
+      };
+    } else {
+      record.animation = {
+        ...(record.animation || {}),
+        pivots: keptPivots
+      };
+    }
+
+    const restoreClip = record.animation?.default
+      || record.animation?.clips?.[0]
+      || editClip
+      || "Idle";
+
+    if (hadOffsetEdits && !keptPivots[restoreClip]?.useCustom) {
+      keptPivots[restoreClip] = { useCustom: true, ...editedOffset };
+      record.animation.pivots = keptPivots;
+    }
+
+    clearClipFineTuneState();
+    if (offsetEditMode === "clip") {
+      offsetEditMode = null;
+    }
+
+    persistAll();
+    return restoreClip;
+  }
+
   function setClipFineTuneActive(active) {
     const record = getRecordById(selectedGuestId);
     const guest = getGuestById(selectedGuestId);
@@ -1356,8 +1691,11 @@ export function createNpcSceneEditor(BABYLON, scene, options = {}) {
     }
 
     if (active) {
+      if (!poseFreezeActive || offsetEditMode === "default") {
+        return;
+      }
+
       if (!clipFineTuneActive) {
-        // Use live spawn footing (includes sitYOffsetOverride), not only record.footOffset.
         const currentOffset = normalizeOffset3(
           guest.spawn?.positionOffset
           ?? guest.spawn?.footOffset
@@ -1383,12 +1721,13 @@ export function createNpcSceneEditor(BABYLON, scene, options = {}) {
       }
 
       clipFineTuneActive = true;
-      // Start on the NPC's real playback clip (Mark-7 → Sit_Clap), not Idle,
-      // so toggling the checkbox alone does not drop sit height.
-      const startClip = record.animation?.mode === "sequence" || record.animation?.type === "sequence"
-        || (Array.isArray(record.animation?.clips) && record.animation.clips.length > 1)
-        ? (record.animation.clips?.[0] || record.animation?.default || "Idle")
-        : (record.animation?.default || record.animation?.clips?.[0] || "Idle");
+      const startClip = pickPlayableEditorClip(guest, record, [
+        record.animation?.mode === "sequence" || record.animation?.type === "sequence"
+          || (Array.isArray(record.animation?.clips) && record.animation.clips.length > 1)
+          ? (record.animation.clips?.[0] || record.animation?.default)
+          : (record.animation?.default || record.animation?.clips?.[0]),
+        guest.activeAnimationGroup?.name
+      ]);
       clipFineTuneClip = startClip;
       syncOffsetCommitSnapshot(record);
       applyFineTuneWorldPose(guest, record, startClip);
@@ -1402,54 +1741,11 @@ export function createNpcSceneEditor(BABYLON, scene, options = {}) {
       }
       attachEditorTransformTarget(guest.root);
       refreshUi();
-      setStatus(`${record.id} 위치 미세조정 · ${startClip} 기준 위치에서 시작`);
+      setStatus(`${record.id} 위치 미세조정 · ${startClip} 시작 포즈`);
       return;
     }
 
-    // Exit: keep current pivots (auto-persist if dirty), restore playback animation.
-    const editClip = clipFineTuneClip || "Idle";
-    const editedOffset = resolveNpcOffset(record, editClip);
-    const hadOffsetEdits = offsetDirty || !offsetsMatchSnapshot(record);
-
-    if (hadOffsetEdits) {
-      persistAll();
-      syncOffsetCommitSnapshot(record, { force: true });
-    }
-
-    const keptPivots = {
-      ...(cloneJson(record.animation?.pivots || {})),
-      [editClip]: { useCustom: true, ...editedOffset }
-    };
-
-    // Only rewrite baseline footing when the user actually changed an offset.
-    if (hadOffsetEdits) {
-      record.footOffset = cloneJson(editedOffset);
-    }
-
-    if (clipFineTuneSnapshot?.animation) {
-      record.animation = {
-        ...cloneJson(clipFineTuneSnapshot.animation),
-        pivots: keptPivots
-      };
-    } else {
-      record.animation = {
-        ...(record.animation || {}),
-        pivots: keptPivots
-      };
-    }
-
-    const restoreClip = record.animation?.default
-      || record.animation?.clips?.[0]
-      || editClip
-      || "Idle";
-
-    // Stamp the playback start clip so the first frame matches the edited height.
-    if (hadOffsetEdits && !keptPivots[restoreClip]?.useCustom) {
-      keptPivots[restoreClip] = { useCustom: true, ...editedOffset };
-      record.animation.pivots = keptPivots;
-    }
-
-    applyFineTuneWorldPose(guest, record, restoreClip);
+    const restoreClip = commitClipFineTuneEdits(guest, record);
     applyNpcRecordToGuest(guest, record, {
       builtinSpawn: getBuiltinSpawn(record.id),
       allowClearMovement: true,
@@ -1457,7 +1753,9 @@ export function createNpcSceneEditor(BABYLON, scene, options = {}) {
     });
     relockGuestHomeFromRoot(guest);
 
-    if (record.movement?.type === "patrol") {
+    if (poseFreezeActive) {
+      syncSelectedPoseFreeze(restoreClip);
+    } else if (record.movement?.type === "patrol") {
       getGuestCharacterSystem()?.refreshPatrolGuests?.({
         onlyIds: [record.id],
         force: true
@@ -1470,22 +1768,19 @@ export function createNpcSceneEditor(BABYLON, scene, options = {}) {
       });
     }
 
-    clearClipFineTuneState();
-    offsetEditMode = null;
     if (gizmoManager) {
       gizmoManager.rotationGizmoEnabled = true;
       gizmoManager.positionGizmoEnabled = true;
     }
     attachEditorTransformTarget(guest.root);
-    persistAll();
     refreshUi();
-    setStatus(`${record.id} 위치 미세조정 종료 · 보정 높이 유지, 초기 애니 재시작`);
+    setStatus(`${record.id} 위치 미세조정 종료`);
   }
 
   function previewClipFineTuneAnimation(clipName) {
     const record = getRecordById(selectedGuestId);
     const guest = getGuestById(selectedGuestId);
-    const clip = String(clipName || "Idle").trim() || "Idle";
+    const clip = pickPlayableEditorClip(guest, record, [clipName]);
 
     if (!clipFineTuneActive || !record || !guest?.root) {
       return;
@@ -1496,7 +1791,7 @@ export function createNpcSceneEditor(BABYLON, scene, options = {}) {
     playEditorPreviewClip(guest, clip);
     offsetEditMode = "clip";
     refreshUi();
-    setStatus(`${record.id} 클립 미리보기: ${clip}`);
+    setStatus(`${record.id} ${clip} 시작 포즈에서 보정`);
   }
 
   function captureOffsetSnapshot(record) {
@@ -1955,6 +2250,7 @@ export function createNpcSceneEditor(BABYLON, scene, options = {}) {
 
     highlightGuest(guest);
     attachEditorTransformTarget(guest.root);
+    syncGuideNpcPoseToTour(guest);
     refreshUi();
     scheduleAutoSave();
   }
@@ -2007,6 +2303,7 @@ export function createNpcSceneEditor(BABYLON, scene, options = {}) {
     applyNpcRecordToGuest(guest, record);
     attachEditorTransformTarget(guest.root);
     highlightGuest(guest);
+    syncGuideNpcPoseToTour(guest);
     refreshUi();
     scheduleAutoSave();
     setStatus(`${guestId} rotationY ${next.toFixed(1)}°`);
@@ -2032,6 +2329,7 @@ export function createNpcSceneEditor(BABYLON, scene, options = {}) {
     offsetCommitSnapshot = null;
     offsetDirty = false;
     clearClipFineTuneState();
+    thawAllPoseFreeze();
     ensureEditorRuntime();
     if (gizmoManager) {
       gizmoManager.rotationGizmoEnabled = true;
@@ -2042,6 +2340,10 @@ export function createNpcSceneEditor(BABYLON, scene, options = {}) {
     syncOffsetCommitSnapshot(record, { force: true });
     refreshUi();
     attachEditorTransformTarget(guest.root);
+    if (poseFreezeActive) {
+      pauseGuestLocomotionForFineTune(guest);
+      getGuestCharacterSystem()?.pauseCurrentAnimation?.(guest.spawn.id);
+    }
     return true;
   }
 
@@ -2419,10 +2721,14 @@ export function createNpcSceneEditor(BABYLON, scene, options = {}) {
           force: true
         });
       } else if (patch.animation) {
-        getGuestCharacterSystem()?.refreshGuestAnimations?.({
-          onlyIds: [id],
-          force: false
-        });
+        if (poseFreezeActive && id === selectedGuestId) {
+          syncSelectedPoseFreeze();
+        } else {
+          getGuestCharacterSystem()?.refreshGuestAnimations?.({
+            onlyIds: [id],
+            force: false
+          });
+        }
       }
     }
 
@@ -2434,14 +2740,41 @@ export function createNpcSceneEditor(BABYLON, scene, options = {}) {
   }
 
   function setOffsetEditMode(mode) {
-    offsetEditMode = mode === "default" || mode === "clip" ? mode : null;
+    if (mode === "default" && (!poseFreezeActive || clipFineTuneActive)) {
+      return;
+    }
+
+    if (mode === "clip" && !poseFreezeActive) {
+      return;
+    }
+
+    const nextMode = mode === "default" || mode === "clip" ? mode : null;
+    const leavingDefault = offsetEditMode === "default" && nextMode !== "default";
+    offsetEditMode = nextMode;
     selectedWaypointIndex = null;
 
     const record = getRecordById(selectedGuestId);
+    const guest = getGuestById(selectedGuestId);
     syncOffsetCommitSnapshot(record);
 
-    if (offsetEditMode && selectedGuestId) {
-      const guest = getGuestById(selectedGuestId);
+    if (offsetEditMode === "default" && guest) {
+      pauseGuestLocomotionForFineTune(guest);
+      applyNpcRecordToGuest(guest, record, {
+        builtinSpawn: getBuiltinSpawn(record?.id),
+        allowClearMovement: true,
+        clipName: "__bindPose__"
+      });
+      getGuestCharacterSystem()?.freezeAtBindPose?.(guest.spawn.id);
+      if (guest.root) {
+        if (gizmoManager) {
+          gizmoManager.rotationGizmoEnabled = true;
+          gizmoManager.positionGizmoEnabled = true;
+        }
+        attachEditorTransformTarget(guest.root);
+      }
+      setStatus(`${record?.id || guest.spawn?.id} 기본 보정 · T포즈에서 위치·높이 편집`);
+    } else if (offsetEditMode === "clip" && selectedGuestId) {
+      syncSelectedPoseFreeze();
       if (guest?.root) {
         if (gizmoManager) {
           gizmoManager.rotationGizmoEnabled = true;
@@ -2449,20 +2782,74 @@ export function createNpcSceneEditor(BABYLON, scene, options = {}) {
         }
         attachEditorTransformTarget(guest.root);
       }
-      setStatus(
-        offsetEditMode === "clip"
-          ? "애니 보정: 원 안쪽 드래그=XZ, 원형 링=회전, Y축=높이"
-          : "기본 보정: 원 안쪽 드래그=XZ, 원형 링=회전, Y축=높이"
-      );
+      setStatus("클립 보정: 원 안쪽 드래그=XZ, 원형 링=회전, Y축=높이");
     } else if (gizmoManager) {
       gizmoManager.rotationGizmoEnabled = true;
       gizmoManager.positionGizmoEnabled = true;
-      const guest = getGuestById(selectedGuestId);
+      if (leavingDefault && guest && record && poseFreezeActive) {
+        pauseGuestLocomotionForFineTune(guest);
+        getGuestCharacterSystem()?.pauseCurrentAnimation?.(guest.spawn.id);
+      }
       attachEditorTransformTarget(guest?.root || null);
       setStatus("위치 이동: 원 안쪽 드래그=XZ, 원형 링=회전, Y축=높이");
     }
 
     refreshUi();
+  }
+
+  function attachPatrolWaypointIndexLabel(root, index) {
+    const labelText = `#${index + 1}`;
+    const existing = root.getChildren?.()?.find((child) => child.metadata?.patrolWaypointLabel === true);
+
+    if (existing) {
+      if (existing.metadata.labelText !== labelText) {
+        existing.material?.diffuseTexture?.drawText?.(
+          labelText,
+          null,
+          52,
+          "bold 42px sans-serif",
+          "#ffffff",
+          "transparent",
+          true
+        );
+        existing.metadata.labelText = labelText;
+      }
+
+      return existing;
+    }
+
+    const texture = new BABYLON.DynamicTexture(
+      `${root.name}-label-tex`,
+      { width: 128, height: 80 },
+      scene,
+      false
+    );
+    texture.hasAlpha = true;
+    texture.drawText(labelText, null, 52, "bold 42px sans-serif", "#ffffff", "transparent", true);
+
+    const material = new BABYLON.StandardMaterial(`${root.name}-label-mat`, scene);
+    material.diffuseTexture = texture;
+    material.emissiveTexture = texture;
+    material.emissiveColor = new BABYLON.Color3(1, 1, 1);
+    material.specularColor = new BABYLON.Color3(0, 0, 0);
+    material.disableLighting = true;
+    material.backFaceCulling = false;
+    material.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+    material.useAlphaFromDiffuseTexture = true;
+    material.disableDepthWrite = true;
+
+    const plane = BABYLON.MeshBuilder.CreatePlane(`${root.name}-label`, { width: 0.7, height: 0.44 }, scene);
+    plane.parent = root;
+    plane.position.set(0, 0.55, 0);
+    plane.material = material;
+    plane.isPickable = false;
+    plane.checkCollisions = false;
+    plane.applyFog = false;
+    plane.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
+    plane.renderingGroupId = 1;
+    plane.metadata = { patrolWaypointLabel: true, labelText };
+
+    return plane;
   }
 
   function clearPatrolWaypointVisuals() {
@@ -2518,6 +2905,7 @@ export function createNpcSceneEditor(BABYLON, scene, options = {}) {
 
       root.metadata = { patrolWaypointIndex: index, npcId: selectedGuestId };
       root.position.set(target.x, target.y + 0.15, target.z);
+      attachPatrolWaypointIndexLabel(root, index);
 
       if (root.material) {
         root.material.emissiveColor = index === selectedWaypointIndex
@@ -2579,7 +2967,7 @@ export function createNpcSceneEditor(BABYLON, scene, options = {}) {
     const pos = xzDragTarget.getAbsolutePosition?.() || xzDragTarget.position;
     const dx = pick.pickedPoint.x - pos.x;
     const dz = pick.pickedPoint.z - pos.z;
-    const radius = offsetEditMode ? 1.2 : 1.05;
+    const radius = offsetEditMode ? 0.6 : 0.525;
     return (dx * dx) + (dz * dz) <= radius * radius;
   }
 
@@ -2653,7 +3041,9 @@ export function createNpcSceneEditor(BABYLON, scene, options = {}) {
       ...record.movement,
       patrolTargets: targets
     });
-    selectedWaypointIndex = null;
+    selectedWaypointIndex = targets.length
+      ? Math.min(index, targets.length - 1)
+      : null;
     const guest = getGuestById(id);
     if (guest) {
       applyNpcRecordToGuest(guest, record);
@@ -2663,6 +3053,46 @@ export function createNpcSceneEditor(BABYLON, scene, options = {}) {
     refreshUi();
     scheduleAutoSave();
     setStatus(`${id} 웨이포인트 삭제`);
+  }
+
+  function setNpcRandomModel(id, random) {
+    const record = getRecordById(id);
+    const guest = getGuestById(id);
+    const builtin = getBuiltinSpawn(id);
+
+    if (!record || !canToggleNpcRandomModel(record, builtin)) {
+      return false;
+    }
+
+    const nextRandom = random === true;
+    const currentRandom = isNpcRandomModel(record, builtin);
+
+    if (nextRandom === currentRandom && record.randomModel === nextRandom) {
+      return false;
+    }
+
+    pushHistory();
+    record.randomModel = nextRandom;
+
+    if (!nextRandom) {
+      const file = String(guest?.spawn?.file || record.model?.path || builtin?.file || "").trim();
+      if (file) {
+        record.model = { path: file };
+      }
+    }
+
+    if (guest?.spawn) {
+      guest.spawn.randomModel = nextRandom;
+      if (!nextRandom && record.model?.path) {
+        guest.spawn.file = record.model.path;
+      }
+    }
+
+    persistAll();
+    refreshUi();
+    scheduleAutoSave();
+    setStatus(nextRandom ? `${id} 모델 랜덤` : `${id} 모델 고정`);
+    return true;
   }
 
   async function changeNpcModel(id, file) {
@@ -2690,13 +3120,16 @@ export function createNpcSceneEditor(BABYLON, scene, options = {}) {
 
     try {
       disposeNpcs([id]);
-      const spawn = buildEditorSpawnFromTemplate(template, {
-        id,
-        name: record.name || id,
-        file,
-        position,
-        rotationY
-      });
+      const spawn = {
+        ...buildEditorSpawnFromTemplate(template, {
+          id,
+          name: record.name || id,
+          file,
+          position,
+          rotationY
+        }),
+        randomModel: false
+      };
 
       if (record.animation) {
         spawn.animation = editorAnimationToSpawn(record.animation);
@@ -2710,6 +3143,10 @@ export function createNpcSceneEditor(BABYLON, scene, options = {}) {
 
       snapGuestRoot(nextGuest);
       record.model = { path: file };
+      record.randomModel = false;
+      if (nextGuest.spawn) {
+        nextGuest.spawn.randomModel = false;
+      }
       record.name = record.name || id;
       applyNpcRecordToGuest(nextGuest, record);
       persistAll();
@@ -3248,6 +3685,7 @@ export function createNpcSceneEditor(BABYLON, scene, options = {}) {
           || /01 Devi\//i.test(storedPath)
           || npc.id === "Mark-Night-Marie"
         );
+        const randomModel = isNpcRandomModel(npc, builtin);
         const movement = hasPoisonedNightModel
           ? normalizeNpcMovement(builtin.movement)
           : resolveRecordMovement(npc, builtin);
@@ -3256,9 +3694,13 @@ export function createNpcSceneEditor(BABYLON, scene, options = {}) {
           : resolveRecordAnimation(npc, builtin);
         return {
           ...npc,
+          randomModel,
           // Repair old night sessions that persisted Devi/Marie paths over a
           // shipped Mark. Types always follow the GitHub/builtin config.
-          ...(builtin?.file ? { model: { path: builtin.file } } : {}),
+          // Random slots keep the session pool file; fixed slots keep the saved mesh.
+          ...((builtin?.file && (randomModel || hasPoisonedNightModel))
+            ? { model: { path: builtin.file } }
+            : {}),
           ...(movement ? { movement } : {}),
           animation: {
             ...animation,
@@ -3292,7 +3734,7 @@ export function createNpcSceneEditor(BABYLON, scene, options = {}) {
 
     let base = null;
     try {
-      const res = await fetch("./data/guide/angji-guide-tour.json", { cache: "no-store" });
+      const res = await fetch(getMetaverseProjectContext().guide.dataUrl, { cache: "no-store" });
       if (res.ok) base = await res.json();
     } catch {
       base = null;
@@ -3384,21 +3826,31 @@ export function createNpcSceneEditor(BABYLON, scene, options = {}) {
 
   function buildCurrentProjectBundle() {
     getGuests().forEach(updateRecordFromGuest);
-    return buildEditorProjectBundle({
-      projectId: sceneDocument.projectId || "angji",
+    const bundle = buildEditorProjectBundle({
+      projectId: sceneDocument.projectId || getMetaverseProjectId(),
       npcs: sceneDocument,
       events: eventDocument,
       teleports: teleportDocument,
       tours: tourDocument
     });
+    const guideSnapshot = getGuideTourData?.();
+    const guide = guideSnapshot
+      ? applyEditorToursToGuideData(guideSnapshot, tourDocument, {
+        pruneUnlinkedEvents: Boolean(tourDocument?.tours?.length)
+      }).tourData
+      : null;
+
+    if (guide) {
+      bundle.guide = cloneJson(guide);
+    }
+
+    return bundle;
   }
 
   async function applyToProject() {
-    const bundle = buildCurrentProjectBundle();
     persistAll();
-    if (tourDirty) {
-      persistToursToRuntime();
-    }
+    persistToursToRuntime();
+    const bundle = buildCurrentProjectBundle();
 
     setStatus("프로젝트 파일에 쓰는 중…");
 
@@ -3702,6 +4154,8 @@ export function createNpcSceneEditor(BABYLON, scene, options = {}) {
     selectedGuestId = null;
     offsetEditMode = null;
     selectedWaypointIndex = null;
+    poseFreezeActive = false;
+    thawAllPoseFreeze();
     clearClipFineTuneState();
     skipWaypointVisualRebuild = false;
     skipMarkerPositionSync = false;

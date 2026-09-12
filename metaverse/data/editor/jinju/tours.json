@@ -1,0 +1,26 @@
+{
+  "version": "1.0",
+  "projectId": "jinju",
+  "tours": [
+    {
+      "id": "tour_000",
+      "name": "가이드 등장",
+      "type": "tour",
+      "sourceEventId": "00",
+      "duration": 10,
+      "script": {
+        "ko": "진주 글로컬",
+        "en": "",
+        "voice": ""
+      },
+      "transform": {
+        "position": {
+          "x": 26.824003219604492,
+          "y": 1.99999947822527,
+          "z": 5.988270282745361
+        },
+        "rotationY": 89.46449402849683
+      }
+    }
+  ]
+}

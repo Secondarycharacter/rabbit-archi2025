@@ -1,0 +1,44 @@
+{
+  "version": "1.0",
+  "projectId": "geochang",
+  "npcs": [
+    {
+      "id": "Angji-Guide",
+      "name": "GUIDE",
+      "type": "guide",
+      "deleted": false,
+      "model": {
+        "path": "00 Guide/Guide.glb"
+      },
+      "transform": {
+        "position": {
+          "x": -31.1300048828125,
+          "y": 19.873126411775047,
+          "z": -19.171123504638672
+        },
+        "rotationY": 0.440047590158902,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Idle",
+        "loop": true,
+        "clips": [
+          "Idle"
+        ],
+        "pivots": {}
+      },
+      "movement": null
+    }
+  ]
+}

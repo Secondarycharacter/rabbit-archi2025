@@ -2,6 +2,8 @@
  * Open editor UI in a separate browser window (can move to another monitor).
  */
 
+import { getMetaverseProjectId } from "../metaverse-project-context.js?v=editor-shared-20260908";
+
 export function computeEditorPopupFeatures(width = 1040, height = 880) {
   const gap = 16;
   let left = window.screenX + window.outerWidth + gap;
@@ -39,20 +41,20 @@ export function computeEditorPopupFeatures(width = 1040, height = 880) {
 
 export function buildEditorPopupUrl(tab = "guide") {
   const params = new URLSearchParams(window.location.search);
-  const project = params.get("project") || "angji";
+  const project = getMetaverseProjectId(params.get("project"));
   const editor = params.get("editor") || "1";
   const next = new URLSearchParams();
 
   next.set("project", project);
   next.set("editor", editor);
   next.set("tab", tab === "guest" ? "guest" : (tab === "rlb" ? "rlb" : "guide"));
-  next.set("v", "guide-orbit-github-20260903");
+  next.set("v", "npc-list-sync-20260908");
 
   return `./editor-popup.html?${next.toString()}`;
 }
 
 export function openEditorPopupWindow(tab = "guide") {
-  const project = new URLSearchParams(window.location.search).get("project") || "angji";
+  const project = getMetaverseProjectId();
   const popupName = `metaverse-editor-${project}`;
   const popup = window.open(
     buildEditorPopupUrl(tab),

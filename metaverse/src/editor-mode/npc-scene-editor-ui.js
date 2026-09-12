@@ -33,6 +33,30 @@ function restoreInspectorScrollport(scrollHost) {
   scrollHost.style.overflowY = "auto";
 }
 
+function captureInspectorScroll(inspectorEl) {
+  const waypointList = inspectorEl?.querySelector?.(".npc-scene-editor-waypoint-list");
+  return {
+    inspector: Number(inspectorEl?.scrollTop) || 0,
+    waypoint: waypointList ? Number(waypointList.scrollTop) || 0 : null
+  };
+}
+
+function applyInspectorScroll(inspectorEl, saved) {
+  if (!inspectorEl || !saved) {
+    return;
+  }
+
+  inspectorEl.scrollTop = saved.inspector;
+  const waypointList = inspectorEl.querySelector(".npc-scene-editor-waypoint-list");
+
+  if (waypointList && Number.isFinite(saved.waypoint)) {
+    waypointList.scrollTop = saved.waypoint;
+  }
+
+  const selected = waypointList?.querySelector("li.is-selected");
+  selected?.scrollIntoView({ block: "nearest", inline: "nearest" });
+}
+
 function bindInspectorSelectGuards(root, { onIdle = null } = {}) {
   if (!root) {
     return;
@@ -393,6 +417,7 @@ export function createNpcSceneEditorUi(options = {}) {
     onMarkerFieldsChange = null,
     onNpcFieldsChange = null,
     onNpcModelChange = null,
+    onNpcRandomModelChange = null,
     onNpcDialogueChange = null,
     onDialogCameraPreview = null,
     onOffsetEditModeChange = null,
@@ -400,6 +425,7 @@ export function createNpcSceneEditorUi(options = {}) {
     onResetOffsetEdits = null,
     onClipFineTuneChange = null,
     onClipFineTuneClipChange = null,
+    onPoseFreezeChange = null,
     onSelectPatrolWaypoint = null,
     onAddPatrolWaypoint = null,
     onRemovePatrolWaypoint = null,
@@ -718,6 +744,8 @@ export function createNpcSceneEditorUi(options = {}) {
       return;
     }
 
+    const savedScroll = captureInspectorScroll(inspectorEl);
+
     // Select-open unlock must not survive a re-render (that stuck overflow:visible).
     restoreInspectorScrollport(inspectorEl);
 
@@ -917,11 +945,12 @@ export function createNpcSceneEditorUi(options = {}) {
       });
       bindInspectorSelectGuards(inspectorEl, { onIdle: onInspectorInteractionIdle });
       bindFormIdleFlush(inspectorEl);
+      applyInspectorScroll(inspectorEl, savedScroll);
       return;
     }
 
     const level = collision?.level || "ok";
-    const currentModel = record.model?.path || "";
+    const currentModel = options.currentModelFile || record.model?.path || "";
     const animMode = String(record.animation?.mode || record.animation?.type || "loop").toLowerCase();
     const sequenceClips = Array.isArray(record.animation?.clips)
       ? record.animation.clips.map((clip) => String(clip || "").trim()).filter(Boolean)
@@ -929,7 +958,8 @@ export function createNpcSceneEditorUi(options = {}) {
     const currentAnim = record.animation?.default
       || sequenceClips[0]
       || "Idle";
-    const clipOptions = [...animationClips];
+    const meshClips = [...animationClips];
+    const clipOptions = [...meshClips];
     const footOffset = record.footOffset && typeof record.footOffset === "object"
       ? record.footOffset
       : { x: 0, y: Number(record.footOffset || 0), z: 0 };
@@ -958,10 +988,6 @@ export function createNpcSceneEditorUi(options = {}) {
       }
     });
 
-    if (!clipOptions.includes("Idle")) {
-      clipOptions.unshift("Idle");
-    }
-
     const patrolClipOptions = [...new Set([
       ...clipOptions,
       movement?.clip,
@@ -970,8 +996,12 @@ export function createNpcSceneEditorUi(options = {}) {
       "Idle"
     ].filter(Boolean))];
     const addClipDefault = clipOptions.find((clip) => !sequenceClips.includes(clip)) || clipOptions[0] || "Idle";
-    const fineTuneClipOptionsHtml = clipOptions.map((clip) => `
-      <option value="${clip}"${clip === clipFineTuneClip ? " selected" : ""}>${clip}</option>
+    const fineTuneClips = meshClips.length ? meshClips : clipOptions;
+    const fineTuneSelected = fineTuneClips.includes(clipFineTuneClip)
+      ? clipFineTuneClip
+      : (fineTuneClips[0] || clipFineTuneClip);
+    const fineTuneClipOptionsHtml = fineTuneClips.map((clip) => `
+      <option value="${clip}"${clip === fineTuneSelected ? " selected" : ""}>${clip}</option>
     `).join("");
     const clipOptionsHtml = clipOptions.map((clip) => `
       <option value="${clip}"${clip === currentAnim ? " selected" : ""}>${clip}</option>
@@ -990,13 +1020,21 @@ export function createNpcSceneEditorUi(options = {}) {
       </dl>
       <section class="npc-scene-editor-section npc-scene-editor-section--compact npc-scene-editor-section--tone-model">
         <h3>Model</h3>
-        <label>NPC 종류
-          <select name="npcModel">
-            ${models.map((model) => `
-              <option value="${model.file}"${model.file === currentModel ? " selected" : ""}>${model.name || model.file}</option>
-            `).join("")}
-          </select>
-        </label>
+        <div class="npc-scene-editor-model-row">
+          <label class="npc-scene-editor-model-row__select">NPC 종류
+            <select name="npcModel"${options.randomModel === true ? " disabled" : ""}>
+              ${models.map((model) => `
+                <option value="${model.file}"${model.file === currentModel ? " selected" : ""}>${model.name || model.file}</option>
+              `).join("")}
+            </select>
+          </label>
+          ${options.canToggleRandom === false ? "" : `
+            <label class="npc-scene-editor-model-row__random">
+              <input type="checkbox" name="npcRandomModel"${options.randomModel === true ? " checked" : ""}>
+              <span>랜덤</span>
+            </label>
+          `}
+        </div>
       </section>
       ${transformSectionHtml(pos, rotY)}
 
@@ -1052,15 +1090,17 @@ export function createNpcSceneEditorUi(options = {}) {
       </section>
 
       <section class="npc-scene-editor-section npc-scene-editor-section--focus npc-scene-editor-section--tone-anim">
-        <h3>애니메이션 · 위치 미세조정</h3>
-        <div class="npc-scene-editor-subsection">
-          <h4>기본 보정 편집</h4>
-          <p class="guide-manager-hint">저장 값이 클립 초기화·기본 위치 기준이 됩니다</p>
-          <label>애니메이션
-            <select name="offsetDefaultClip">
-              ${clipOptionsHtml}
-            </select>
+        <div class="npc-scene-editor-section-title">
+          <h3>애니메이션 · 위치 미세조정</h3>
+          <label class="npc-scene-editor-section-title__check">
+            <input type="checkbox" name="poseFreeze"${options.poseFreezeActive === true ? " checked" : ""}>
+            <span>포즈 고정</span>
           </label>
+        </div>
+        <fieldset class="npc-scene-editor-subsection" ${options.poseFreezeActive === true && !clipFineTuneActive ? "" : "disabled"}>
+          <h4>기본 보정 편집</h4>
+          <p class="guide-manager-hint">포즈 고정 후 기즈모로 편집하면 T포즈에서 위치와 높이를 맞춥니다. 저장해야 유지됩니다.</p>
+          ${offsetEditMode === "default" ? '<p class="guide-manager-hint">T포즈로 위치·높이 편집 중 · 위치 미세조정은 종료 후 사용</p>' : ""}
           <dl class="npc-scene-editor-fields">
             <dt>기본 보정</dt>
             <dd>X ${Number(footOffset.x || 0).toFixed(2)} / Y ${Number(footOffset.y || 0).toFixed(2)} / Z ${Number(footOffset.z || 0).toFixed(2)}</dd>
@@ -1072,8 +1112,8 @@ export function createNpcSceneEditorUi(options = {}) {
             <button type="button" data-action="offset-save-default"${offsetDefaultDirty ? "" : " disabled"}>저장</button>
             <button type="button" data-action="offset-reset-default">초기화</button>
           </div>
-        </div>
-        <div class="npc-scene-editor-subsection">
+        </fieldset>
+        <fieldset class="npc-scene-editor-subsection" ${options.poseFreezeActive === true ? "disabled" : ""}>
           <h4>재생</h4>
           <label>모드
             <select name="animMode">
@@ -1122,10 +1162,10 @@ export function createNpcSceneEditorUi(options = {}) {
               </select>
             </label>
           `}
-        </div>
-        <div class="npc-scene-editor-subsection">
+        </fieldset>
+        <fieldset class="npc-scene-editor-subsection" ${options.poseFreezeActive === true && offsetEditMode !== "default" ? "" : "disabled"}>
           <h4>위치 미세조정</h4>
-          <p class="guide-manager-hint">체크 시 Idle·등장 위치로 리셋 후 클립별 보정</p>
+          <p class="guide-manager-hint">클립별 보정입니다. Sit 높이처럼 클립마다 다를 때 씁니다. 클립을 고르면 그 클립의 첫 포즈에서 멈춥니다.</p>
           <label class="npc-manager-field--check">
             <span>클립별 보정</span>
             <input type="checkbox" name="clipFineTune"${clipFineTuneActive ? " checked" : ""}>
@@ -1142,7 +1182,7 @@ export function createNpcSceneEditorUi(options = {}) {
               <dt>현재 적용</dt>
               <dd>X ${Number(activeOffset.x).toFixed(2)} / Y ${Number(activeOffset.y).toFixed(2)} / Z ${Number(activeOffset.z).toFixed(2)}</dd>
             </dl>
-            <p class="guide-manager-hint">${offsetEditMode === "clip" ? "클립 보정 기즈모 활성 · 체크 해제 시 보정 유지 후 초기 애니 재시작" : "선택 클립을 기즈모로 편집합니다"}</p>
+            <p class="guide-manager-hint">선택한 클립의 시작 포즈에서 높이·위치를 맞춥니다.</p>
             <div class="npc-scene-editor-offset-actions">
               <button type="button" data-action="offset-edit-clip"${offsetEditMode === "clip" ? " class=\"is-active\"" : ""}>
                 ${offsetEditMode === "clip" ? "클립 보정 중 · 종료" : "기즈모로 편집"}
@@ -1151,7 +1191,7 @@ export function createNpcSceneEditorUi(options = {}) {
               <button type="button" data-action="offset-reset-clip">초기화</button>
             </div>
           ` : ""}
-        </div>
+        </fieldset>
       </section>
 
       <section class="npc-scene-editor-section npc-scene-editor-section--focus npc-scene-editor-section--tone-patrol">
@@ -1227,24 +1267,26 @@ export function createNpcSceneEditorUi(options = {}) {
             <ul class="npc-scene-editor-waypoint-list">
               ${patrolTargets.map((target, index) => `
                 <li class="${selectedWaypointIndex === index ? "is-selected" : ""}">
-                  <button type="button" data-action="patrol-select-wp" data-index="${index}">#${index + 1}</button>
-                  <label>이동
-                    <select data-role="wp-move-clip" data-index="${index}">
-                      <option value="">(기본)</option>
-                      ${patrolClipOptions.map((clip) => `
-                        <option value="${clip}"${clip === (target.moveClip || "") ? " selected" : ""}>${clip}</option>
-                      `).join("")}
-                    </select>
-                  </label>
-                  <label>도착
-                    <select data-role="wp-arrival-clip" data-index="${index}">
-                      <option value="">(없음)</option>
-                      ${patrolClipOptions.map((clip) => `
-                        <option value="${clip}"${clip === (target.arrivalClip || "") ? " selected" : ""}>${clip}</option>
-                      `).join("")}
-                    </select>
-                  </label>
-                  <button type="button" data-action="patrol-remove-wp" data-index="${index}">삭제</button>
+                  <div class="npc-scene-editor-waypoint-list__row">
+                    <button type="button" data-action="patrol-select-wp" data-index="${index}">#${index + 1}</button>
+                    <label>이동
+                      <select data-role="wp-move-clip" data-index="${index}">
+                        <option value="">(기본)</option>
+                        ${patrolClipOptions.map((clip) => `
+                          <option value="${clip}"${clip === (target.moveClip || "") ? " selected" : ""}>${clip}</option>
+                        `).join("")}
+                      </select>
+                    </label>
+                    <label>도착
+                      <select data-role="wp-arrival-clip" data-index="${index}">
+                        <option value="">(없음)</option>
+                        ${patrolClipOptions.map((clip) => `
+                          <option value="${clip}"${clip === (target.arrivalClip || "") ? " selected" : ""}>${clip}</option>
+                        `).join("")}
+                      </select>
+                    </label>
+                    <button type="button" data-action="patrol-remove-wp" data-index="${index}">삭제</button>
+                  </div>
                 </li>
               `).join("") || "<li class=\"guide-manager-hint\">포인트 추가 후 기즈모로 배치</li>"}
             </ul>
@@ -1257,6 +1299,12 @@ export function createNpcSceneEditorUi(options = {}) {
     bindActionButtons(record);
     inspectorEl.querySelector('[name="npcModel"]')?.addEventListener("change", (event) => {
       onNpcModelChange?.(record.id, event.target.value);
+    });
+    inspectorEl.querySelector('[name="npcRandomModel"]')?.addEventListener("change", (event) => {
+      onNpcRandomModelChange?.(record.id, event.target.checked);
+    });
+    inspectorEl.querySelector('[name="poseFreeze"]')?.addEventListener("change", (event) => {
+      onPoseFreezeChange?.(event.target.checked);
     });
     inspectorEl.querySelector('[data-action="offset-edit-default"]')?.addEventListener("click", () => {
       onOffsetEditModeChange?.(offsetEditMode === "default" ? null : "default");
@@ -1275,12 +1323,6 @@ export function createNpcSceneEditorUi(options = {}) {
     });
     inspectorEl.querySelector('[data-action="offset-reset-clip"]')?.addEventListener("click", () => {
       onResetOffsetEdits?.("clip");
-    });
-    inspectorEl.querySelector('[name="offsetDefaultClip"]')?.addEventListener("change", (event) => {
-      onNpcFieldsChange?.(record.id, { animation: { default: event.target.value } });
-      if (offsetEditMode !== "default") {
-        onOffsetEditModeChange?.("default");
-      }
     });
     inspectorEl.querySelector('[name="clipFineTune"]')?.addEventListener("change", (event) => {
       onClipFineTuneChange?.(Boolean(event.target.checked));
@@ -1556,6 +1598,7 @@ export function createNpcSceneEditorUi(options = {}) {
     });
     bindInspectorSelectGuards(inspectorEl, { onIdle: onInspectorInteractionIdle });
     bindFormIdleFlush(inspectorEl);
+    applyInspectorScroll(inspectorEl, savedScroll);
   }
 
   function isEditingForm() {

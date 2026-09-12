@@ -1,0 +1,26 @@
+{
+  "version": "1.0",
+  "projectId": "geochang",
+  "tours": [
+    {
+      "id": "tour_000",
+      "name": "가이드 등장",
+      "type": "tour",
+      "sourceEventId": "00",
+      "duration": 10,
+      "script": {
+        "ko": "",
+        "en": "",
+        "voice": ""
+      },
+      "transform": {
+        "position": {
+          "x": -31.1300048828125,
+          "y": 19.873126983642578,
+          "z": -19.171123504638672
+        },
+        "rotationY": 0.440047590158902
+      }
+    }
+  ]
+}

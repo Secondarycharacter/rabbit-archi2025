@@ -3,7 +3,7 @@
  * Stores document snapshots; gizmo drag is one command (push before drag).
  */
 
-import { cloneJson } from "./npc-scene-editor-data.js?v=npc-editor-phase4-20260903";
+import { cloneJson } from "./npc-scene-editor-data.js?v=project-scope-20260908";
 
 export function createEditorHistory({ max = 50 } = {}) {
   let undoStack = [];

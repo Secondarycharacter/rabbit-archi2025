@@ -6,7 +6,7 @@ import {
   ensureRlbGroupState,
   createDefaultRlbTuningState,
   rebuildRlbLightGroups
-} from "../rlb-shader-tuning.js?v=rlb-range-restore-20260907j";
+} from "../rlb-shader-tuning.js?v=editor-shared-20260908";
 
 function mergeProfile(baseProfile, incomingProfile) {
   return {

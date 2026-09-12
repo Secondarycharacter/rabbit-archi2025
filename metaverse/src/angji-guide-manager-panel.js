@@ -23,19 +23,19 @@ import {
   syncDialogueLinePostEvent,
   GUIDE_TOUR_GLOBAL_DEFAULTS,
   IDLE_DANCE_RANDOM_VALUE
-} from "./angji-guide-tour-data.js?v=restore-common-dialogues-20260907";
+} from "./angji-guide-tour-data.js?v=editor-guide-pose-20260908";
 import {
   isGuideTourFirestoreConfigured,
   loadGuideTourFromFirestore,
   saveGuideTourToFirestore
-} from "./editor-mode/guide-tour-firestore.js?v=guide-base-firestore-20260905";
-import { subscribeTourDataRemote } from "./editor-mode/editor-broadcast-sync.js?v=editor-broadcast-sync-20260902";
+} from "./editor-mode/guide-tour-firestore.js?v=editor-guide-pose-20260908";
+import { subscribeTourDataRemote } from "./editor-mode/editor-broadcast-sync.js?v=project-scope-20260908";
 import {
   isGuideBaseStoreAvailable,
   listGuideBaseVersions,
   loadGuideBaseVersion,
   saveGuideBaseVersion
-} from "./editor-mode/guide-base-file.js?v=guide-base-firestore-20260905";
+} from "./editor-mode/guide-base-file.js?v=project-scope-20260908";
 import {
   isSpeechTtsAvailable,
   loadTtsPrefs,
@@ -519,6 +519,37 @@ export function createAngjiGuideManagerPanel(options = {}) {
 
   function getSelectedEvent() {
     return tourData.events.find((event) => event.id === selectedEventId) || null;
+  }
+
+  function nextDialogueLineIndex(event) {
+    const used = new Set((event?.dialogues || []).map((line) => String(line.id || "")));
+    let index = event?.dialogues?.length || 0;
+
+    while (used.has(`${event.id}_${String(index + 1).padStart(2, "0")}`)) {
+      index += 1;
+    }
+
+    return index;
+  }
+
+  function addDialogueSetToSelectedEvent() {
+    readEditorForms();
+    const selected = getSelectedEvent();
+
+    if (!selected) {
+      setStatus("왼쪽에서 이벤트를 선택하세요.");
+      return false;
+    }
+
+    if (!Array.isArray(selected.dialogues)) {
+      selected.dialogues = [];
+    }
+
+    selected.dialogues.push(createEmptyDialogueLine(selected.id, nextDialogueLineIndex(selected)));
+    markDirty();
+    renderEventEditor();
+    setStatus(`대사 세트를 추가했습니다. (총 ${selected.dialogues.length}개)`);
+    return true;
   }
 
   function readOptionalNumber(raw, fallback) {
@@ -1056,7 +1087,7 @@ export function createAngjiGuideManagerPanel(options = {}) {
             ${field("회전 수 (1=360°)", numInput(orbit.rotationTurns, "0.1", "orbitRotationTurns")).outerHTML}
             ${field("피치 보정 (°)", numInput(orbit.pitchOffsetDegrees, "0.1", "orbitPitchOffsetDegrees")).outerHTML}
           </div>
-          <p class="guide-manager-hint">회전 속도 ≈ ${((Number(orbit.rotationTurns) * 360) / Math.max(Number(orbit.durationSeconds) || 1, 0.1)).toFixed(1)}°/s</p>
+          <p class="guide-manager-hint">「오르빗뷰 가져오기」는 지금 메타버스 창 Orbit View 카메라/중심점을 그대로 넣습니다. 회전 속도 ≈ ${((Number(orbit.rotationTurns) * 360) / Math.max(Number(orbit.durationSeconds) || 1, 0.1)).toFixed(1)}°/s</p>
           <div class="guide-manager-orbit-action-grid">
             <button type="button" data-action="show-orbit-center-gizmo">중심점 기즈모 표시</button>
             <button type="button" data-action="capture-orbit-center">기즈모 → 중심점</button>
@@ -1246,15 +1277,25 @@ export function createAngjiGuideManagerPanel(options = {}) {
     }
 
     const orbit = getSelectedOrbitSequence();
-    orbit.position = { ...captured.position };
-    orbit.target = { ...captured.target };
-    orbit.position.y = captured.cameraHeight ?? captured.position.y;
-    orbit.cameraHeight = orbit.position.y;
+    orbit.position = {
+      x: captured.position.x,
+      y: captured.position.y,
+      z: captured.position.z
+    };
+    orbit.target = {
+      x: captured.target.x,
+      y: captured.target.y,
+      z: captured.target.z
+    };
+    orbit.cameraHeight = captured.position.y;
     orbit.rotationY = captured.rotationY;
+    // Captured world pose already includes the current tilt. Extra pitch
+    // offset would replay the view at a different beta.
+    orbit.pitchOffsetDegrees = 0;
     tourData.orbitSpin = tourData.orbitSequences[0];
     markDirty();
     renderGlobalForm();
-    setStatus(`현재 Orbit View 카메라를「${orbit.name}」에 넣었습니다.`);
+    setStatus(`현재 Orbit View 카메라(실시간)를「${orbit.name}」에 넣었습니다.`);
   }
 
   async function previewOrbitCameraFromForm() {
@@ -1616,11 +1657,9 @@ export function createAngjiGuideManagerPanel(options = {}) {
       syncLineTextSpeedControls(card);
     });
 
-    editorEl.querySelector('[data-action="add-line"]')?.addEventListener("click", () => {
-      readEditorForms();
-      event.dialogues.push(createEmptyDialogueLine(event.id, event.dialogues.length));
-      markDirty();
-      renderEventEditor();
+    editorEl.querySelector('[data-action="add-line"]')?.addEventListener("click", (clickEvent) => {
+      clickEvent.stopPropagation();
+      addDialogueSetToSelectedEvent();
     });
 
     dialogueRoot?.querySelectorAll('[data-action="move-line-up"]').forEach((btn) => {
@@ -1637,14 +1676,20 @@ export function createAngjiGuideManagerPanel(options = {}) {
 
     dialogueRoot?.querySelectorAll('[data-action="delete-line"]').forEach((btn) => {
       btn.addEventListener("click", () => {
-        if (event.dialogues.length <= 1) {
+        readEditorForms();
+        const selected = getSelectedEvent();
+
+        if (!selected) {
+          return;
+        }
+
+        if (selected.dialogues.length <= 1) {
           setStatus("이벤트에는 최소 1개의 대사가 필요합니다.");
           return;
         }
 
-        readEditorForms();
         const lineId = btn.getAttribute("data-line-id");
-        event.dialogues = event.dialogues.filter((item) => item.id !== lineId);
+        selected.dialogues = selected.dialogues.filter((item) => item.id !== lineId);
         markDirty();
         renderEventEditor();
       });
@@ -1664,8 +1709,8 @@ export function createAngjiGuideManagerPanel(options = {}) {
           return;
         }
 
-        const lines = event.dialogues
-          .map((line) => String(line.ko || line.en || "").trim())
+        const lines = getSelectedEvent()?.dialogues
+          ?.map((line) => String(line.ko || line.en || "").trim())
           .filter(Boolean);
 
         if (!lines.length) {
@@ -1684,7 +1729,7 @@ export function createAngjiGuideManagerPanel(options = {}) {
         void (async () => {
           readEditorForms();
           const lineId = btn.getAttribute("data-line-id");
-          const line = event.dialogues.find((item) => item.id === lineId);
+          const line = getSelectedEvent()?.dialogues.find((item) => item.id === lineId);
           const text = String(line?.ko || line?.en || "").trim();
 
           if (!text) {
@@ -1827,6 +1872,11 @@ export function createAngjiGuideManagerPanel(options = {}) {
       markDirty();
       render();
       setStatus(`이벤트 ${newEvent.id}를 추가했습니다.`);
+      return;
+    }
+
+    if (action === "add-line") {
+      addDialogueSetToSelectedEvent();
       return;
     }
 

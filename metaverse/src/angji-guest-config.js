@@ -4,7 +4,7 @@ export const ANGJI_NIGHT_DEVI_ASSET_ROOT = "./assets/Enemy/";
 export const ANGJI_NIGHT_DEVI_FILE = "01 Devi/Devi.glb";
 export const ANGJI_NIGHT_MARIE_FILE = "05 Edition/01 Marie Antoinette Fox/Edition_Marie.glb";
 export const ANGJI_NIGHT_MARIE_GUEST_ID = "Mark-Night-Marie";
-export const ANGJI_GUEST_CONFIG_VERSION = "angji-mark19-waypoint-anim-20260903";
+export const ANGJI_GUEST_CONFIG_VERSION = "angji-sit-offset-editor-20260908";
 
 export const ANGJI_PRIORITY_GUEST_IDS = ["Mark-1", "Mark-2"];
 export const ANGJI_SIMULTANEOUS_GUEST_IDS = ["Mark-4", "Mark-5", "Mark-6"];
@@ -53,9 +53,8 @@ export const ANGJI_NIGHT_DEVI_BEHAVIOR = {
 };
 
 export function toAngjiNightGuestSpawn(spawn) {
-  // Keep day initial placement height/floor policy. Night swaps Idle + Devi mesh,
-  // so sit-clip-based Y lift would otherwise drop to 0 and enemies float/sink.
-  const daySitLift = getAngjiGuestPositionYOffset(spawn);
+  // Night swaps Idle + Devi mesh. Height comes from editor overlay / authored
+  // footOffset — do not re-inject a sit-clip Y lift here.
   const nightSpawn = {
     id: spawn.id,
     position: { ...spawn.position },
@@ -75,10 +74,10 @@ export function toAngjiNightGuestSpawn(spawn) {
     }
   };
 
-  if (typeof spawn.sitYOffsetOverride === "number") {
-    nightSpawn.sitYOffsetOverride = spawn.sitYOffsetOverride;
-  } else if (daySitLift) {
-    nightSpawn.sitYOffsetOverride = daySitLift;
+  if (spawn.footOffset != null) {
+    nightSpawn.footOffset = typeof spawn.footOffset === "object"
+      ? { ...spawn.footOffset }
+      : spawn.footOffset;
   }
 
   return nightSpawn;
@@ -265,11 +264,6 @@ export { getBackgroundGuestRevealDelayMs, getBackgroundGuestLoadYieldFrames };
 /** Applied from Mark-1 placement anchor (-12.68, 22.11, 6.9). */
 export const ANGJI_GUEST_WORLD_OFFSET = { x: 0.29, y: 5.03, z: -1.63 };
 
-/** Extra root Y for seated guests (Sit / Sitting / Seat clips). Tune here. */
-export const ANGJI_SIT_GUEST_Y_OFFSET = 0.12;
-
-const SIT_CLIP_PATTERN = /sit|seat/i;
-
 /** Patrol loop for Mark-19 (new area Mark-1~12 coordinates). */
 const ANGJI_MARK19_PATROL_WAYPOINTS = [
   { x: 18.37, y: 22.17, z: 2.18, moveClip: "Walking" },
@@ -293,19 +287,6 @@ const ANGJI_MARK19_PATROL_WAYPOINTS = [
   }
 ];
 
-export function getAngjiGuestPositionYOffset(spawn) {
-  if (typeof spawn.sitYOffsetOverride === "number") {
-    return spawn.sitYOffsetOverride;
-  }
-
-  const clips = [
-    ...(spawn.animation?.clips || []),
-    spawn.movement?.clip
-  ].filter(Boolean);
-
-  return clips.some((clip) => SIT_CLIP_PATTERN.test(clip)) ? ANGJI_SIT_GUEST_Y_OFFSET : 0;
-}
-
 export const ANGJI_GUEST_MARKS = [
   {
     id: "Mark-1",
@@ -325,7 +306,6 @@ export const ANGJI_GUEST_MARKS = [
     id: "Mark-3",
     file: "02 Shrooms/01 Shroom_Hip Hop Dancer/Shroom_Hip Hop Dancer.glb",
     position: { x: 5.3, y: 22.47, z: -0.42 },
-    sitYOffsetOverride: 0.17,
     rotationY: 16.0116,
     animation: { type: "loop", clips: ["Seat_Clapping"] }
   },
@@ -503,7 +483,6 @@ export const ANGJI_GUEST_MARKS = [
     file: "01 Happycats/02_Happycat_Ultra_General/Happycats_Ultra_gen.glb",
     position: { x: 47.62, y: 23.94, z: -38.39 },
     rotationY: 4.627,
-    sitYOffsetOverride: 0.4,
     animation: { type: "loop", clips: ["Sit_Footswing"] }
   },
   {

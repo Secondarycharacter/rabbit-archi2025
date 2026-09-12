@@ -14,7 +14,7 @@ import {
   markConversationEventCompleted,
   resolveActiveConversationEvent,
   resolveDialogLine
-} from "./npc-guest-data.js?v=npc-conversation-events-20260905";
+} from "./npc-guest-data.js?v=project-scope-20260908";
 import { resolveNpcDialogCameraFraming } from "./npc-dialog-camera.js?v=npc-dialog-cam-lateral-20260905";
 import { getVoiceVolume } from "./metaverse-audio-settings.js?v=audio-mute-20260906";
 

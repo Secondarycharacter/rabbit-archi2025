@@ -8,7 +8,7 @@ import {
   listGuideBaseVersionsFromFirestore,
   loadGuideBaseVersionFromFirestore,
   saveGuideBaseVersionToFirestore
-} from "./guide-tour-firestore.js?v=guide-base-firestore-20260905";
+} from "./guide-tour-firestore.js?v=project-scope-20260908";
 
 export function isGuideBaseStoreAvailable() {
   return isGuideTourFirestoreConfigured();

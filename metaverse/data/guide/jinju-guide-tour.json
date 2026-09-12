@@ -1,0 +1,145 @@
+{
+  "version": 2,
+  "guideSpawnId": "Angji-Guide",
+  "dialogDistance": 1.2,
+  "interactionDistance": 2,
+  "textSpeed": 0.1,
+  "lineHoldSeconds": 0,
+  "lineHoldPerChar": 0.01,
+  "lineHoldMaxExtra": 3.33,
+  "cameraBlendSeconds": 0.85,
+  "idleDanceDelaySeconds": 60,
+  "idleDanceClips": [
+    "Dance_Samba01",
+    "Dance_Samba02",
+    "Dance_Samba03",
+    "Dance_Samba04",
+    "Dance_Samba05",
+    "Dance_Samba06",
+    "Dance_Samba07"
+  ],
+  "idleDanceClip": "__random_dance__",
+  "orbitSequences": [
+    {
+      "id": "orbit_spin",
+      "name": "사이트 전경",
+      "position": {
+        "x": 112.8797919134043,
+        "y": 69.3690356379467,
+        "z": -2.6035365468778817
+      },
+      "target": {
+        "x": -17.596641540527344,
+        "y": 8.30112361907959,
+        "z": -2.087026596069336
+      },
+      "cameraHeight": 69.3690356379467,
+      "rotationY": -0.010040966443875404,
+      "durationSeconds": 20,
+      "rotationTurns": 1,
+      "pitchOffsetDegrees": 0
+    }
+  ],
+  "orbitSpin": {
+    "id": "orbit_spin",
+    "name": "사이트 전경",
+    "position": {
+      "x": 112.8797919134043,
+      "y": 69.3690356379467,
+      "z": -2.6035365468778817
+    },
+    "target": {
+      "x": -17.596641540527344,
+      "y": 8.30112361907959,
+      "z": -2.087026596069336
+    },
+    "cameraHeight": 69.3690356379467,
+    "rotationY": -0.010040966443875404,
+    "durationSeconds": 20,
+    "rotationTurns": 1,
+    "pitchOffsetDegrees": 0
+  },
+  "closingAnimations": [
+    "Greeting_Hand"
+  ],
+  "transitionPrompt": {
+    "ko": "다음 설명으로 넘어갈까요?",
+    "en": "Shall we move on to the next explanation?"
+  },
+  "declineMessage": {
+    "ko": "설명이 필요하시면 저를 다시 찾아주세요.",
+    "en": "Please find me again if you would like a guided explanation."
+  },
+  "escPrompt": {
+    "ko": "투어에서 빠져나가시겠습니까?",
+    "en": "Would you like to leave the tour?"
+  },
+  "restartTourPrompt": {
+    "ko": "GUIDE 투어를 다시 시작하시겠습니까?",
+    "en": "Would you like to start the GUIDE tour again?"
+  },
+  "talkingClips": [
+    "Talking01",
+    "Talking02"
+  ],
+  "talkingSwitchSeconds": {
+    "min": 3,
+    "max": 6
+  },
+  "talkingBlendSpeed": 0.045,
+  "talkingCrossfadeSeconds": 0.45,
+  "events": [
+    {
+      "id": "00",
+      "title": "가이드 등장",
+      "guidePosition": {
+        "x": 26.824003219604492,
+        "y": 1.99999947822527,
+        "z": 5.988270282745361
+      },
+      "guideRotationY": 1.5614499844280754,
+      "keepConfiguredY": false,
+      "dialogues": [
+        {
+          "id": "00_01",
+          "ko": "진주 글로컬",
+          "en": "",
+          "textSpeed": null,
+          "startTourChoice": false,
+          "orbitAfter": false,
+          "postEvent": {
+            "type": "none",
+            "comment": "",
+            "checkpointId": ""
+          }
+        },
+        {
+          "id": "00_03",
+          "ko": "저와 함께 투어를 진행하시겠습니까?",
+          "en": "",
+          "textSpeed": null,
+          "startTourChoice": true,
+          "orbitAfter": false,
+          "postEvent": {
+            "type": "yes_no",
+            "comment": "",
+            "checkpointId": ""
+          }
+        },
+        {
+          "id": "00_02",
+          "ko": "아직 투어프로그램이 준비되지 않았습니다. 다음에 다시 찾아주세요.",
+          "en": "",
+          "textSpeed": null,
+          "startTourChoice": false,
+          "orbitAfter": true,
+          "postEvent": {
+            "type": "other",
+            "comment": "",
+            "checkpointId": "orbit_spin"
+          }
+        }
+      ]
+    }
+  ]
+}

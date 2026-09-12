@@ -6,7 +6,7 @@ import {
   RLB_SHAPE,
   formatRlbTuningTabLabel,
   listPresentRlbTuningTypes
-} from "./rlb-fixture-types.js";
+} from "./rlb-fixture-types.js?v=editor-shared-20260908";
 import {
   createDefaultRlbTuningState,
   createRlbLightGroup,
@@ -25,7 +25,7 @@ import {
   setAllRlbShaderEnabled,
   setRlbTypeShaderEnabled,
   syncSpillColorFromTemperature
-} from "./rlb-shader-tuning.js?v=rlb-range-restore-20260907j";
+} from "./rlb-shader-tuning.js?v=editor-shared-20260908";
 
 const COLOR_TEMP_FIELD = {
   key: "colorTemperatureK",

@@ -14,7 +14,6 @@ const {
   buildJinjuIndoorGuestSpawns,
   getJinjuIndoorGuestLoadYieldFrames,
   getJinjuIndoorGuestRevealDelayMs,
-  getJinjuIndoorGuestPositionYOffset,
   JINJU_INDOOR_GUEST_CONFIG_VERSION
 } = await import(configUrl);
 
@@ -97,7 +96,7 @@ const rows = spawns.map((spawn) => {
     animationType: spawn.animation?.type,
     clips,
     sitClipCount: sitClips.length,
-    yOffset: getJinjuIndoorGuestPositionYOffset(spawn),
+    yOffset: Number(spawn.footOffset?.y ?? spawn.sitYOffsetOverride ?? 0) || 0,
     loadYieldFrames: getJinjuIndoorGuestLoadYieldFrames(spawn.id),
     revealDelayMs: getJinjuIndoorGuestRevealDelayMs(spawn.id),
     glb

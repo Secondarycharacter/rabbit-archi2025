@@ -17,20 +17,22 @@ import {
   normalizeGuestBundle,
   publishGuestBundle,
   resolveInteractionConfigs,
+  subscribeGuestBundleUpdates,
   loadConversationProgress,
   clearConversationCompleted
-} from "./npc-guest-data.js?v=npc-conversation-events-20260905";
+} from "./npc-guest-data.js?v=npc-list-sync-20260908";
 import {
   isGuestBundleFirestoreConfigured,
   loadGuestBundleFromFirestore,
   saveGuestBundleToFirestore
-} from "./editor-mode/guest-bundle-firestore.js?v=guest-base-firestore-20260905";
+} from "./editor-mode/guest-bundle-firestore.js?v=project-scope-20260908";
 import {
   isGuestBaseStoreAvailable,
   listGuestBaseVersions,
   loadGuestBaseVersion,
   saveGuestBaseVersion
-} from "./editor-mode/guest-base-file.js?v=guest-base-firestore-20260905";
+} from "./editor-mode/guest-base-file.js?v=project-scope-20260908";
+import { subscribeGuestBundleRemote } from "./editor-mode/editor-broadcast-sync.js?v=npc-list-sync-20260908";
 import {
   isSpeechTtsAvailable,
   loadTtsPrefs,
@@ -141,6 +143,40 @@ export function createNpcGuestManagerPanel(options = {}) {
   let liveApplyTimer = null;
   let baseVersions = [{ id: "current", label: "현재값 (Firestore)" }];
   let selectedBaseVersionId = "current";
+  let lastModelEntries = [];
+
+  async function resolveModelGuestEntries() {
+    const raw = getModelGuestEntries();
+    const entries = typeof raw?.then === "function" ? await raw : raw;
+    lastModelEntries = Array.isArray(entries) ? entries : [];
+    return lastModelEntries;
+  }
+
+  function pickDefaultGuestId(guests = bundle.guests) {
+    return guests.find((guest) => guest.guestId === "Mark-2")?.guestId
+      || guests[0]?.guestId
+      || null;
+  }
+
+  function applyCatalogToBundle(source = bundle, modelEntries = lastModelEntries) {
+    bundle = mergeModelGuestsIntoBundle(source, modelEntries);
+
+    if (!bundle.guests.some((guest) => guest.guestId === selectedGuestId)) {
+      selectedGuestId = pickDefaultGuestId();
+      selectedEventId = null;
+      selectedDialogId = null;
+    }
+
+    ensureSelectedEvent(getSelectedGuest());
+    return bundle;
+  }
+
+  async function syncCatalog(incomingBundle = null) {
+    const modelEntries = await resolveModelGuestEntries();
+    applyCatalogToBundle(incomingBundle || bundle, modelEntries);
+    render();
+    return bundle;
+  }
 
   const root = el("aside", "npc-manager-panel");
   root.id = "npcGuestManagerPanel";
@@ -753,7 +789,7 @@ export function createNpcGuestManagerPanel(options = {}) {
         name: "기본 대화",
         unlockedByDefault: true
       })];
-      guest.displayName = getModelGuestEntries()
+      guest.displayName = lastModelEntries
         .find((entry) => entry.guestId === guest.guestId)?.displayName || guest.displayName;
       selectedEventId = guest.conversationEvents[0].id;
       selectedDialogId = null;
@@ -786,11 +822,9 @@ export function createNpcGuestManagerPanel(options = {}) {
   }
 
   async function load() {
-    const modelEntries = getModelGuestEntries() || [];
+    const modelEntries = await resolveModelGuestEntries();
     bundle = await loadEffectiveGuestBundle(undefined, modelEntries);
-    selectedGuestId = bundle.guests.find((guest) => guest.guestId === "Mark-2")?.guestId
-      || bundle.guests[0]?.guestId
-      || null;
+    selectedGuestId = pickDefaultGuestId();
     selectedEventId = null;
     selectedDialogId = null;
     ensureSelectedEvent(getSelectedGuest());
@@ -843,12 +877,10 @@ export function createNpcGuestManagerPanel(options = {}) {
       return;
     }
 
-    void importGuestBundleFromFile(file).then((imported) => {
-      const modelEntries = getModelGuestEntries() || [];
+    void importGuestBundleFromFile(file).then(async (imported) => {
+      const modelEntries = await resolveModelGuestEntries();
       bundle = mergeModelGuestsIntoBundle(imported, modelEntries);
-      selectedGuestId = bundle.guests.find((guest) => guest.guestId === "Mark-2")?.guestId
-        || bundle.guests[0]?.guestId
-        || null;
+      selectedGuestId = pickDefaultGuestId();
       selectedEventId = null;
       selectedDialogId = null;
       ensureSelectedEvent(getSelectedGuest());
@@ -886,11 +918,9 @@ export function createNpcGuestManagerPanel(options = {}) {
 
       try {
         const result = await loadGuestBaseVersion(versionId);
-        const modelEntries = getModelGuestEntries() || [];
+        const modelEntries = await resolveModelGuestEntries();
         bundle = mergeModelGuestsIntoBundle(result.data, modelEntries);
-        selectedGuestId = bundle.guests.find((guest) => guest.guestId === "Mark-2")?.guestId
-          || bundle.guests[0]?.guestId
-          || null;
+        selectedGuestId = pickDefaultGuestId();
         selectedEventId = null;
         selectedDialogId = null;
         ensureSelectedEvent(getSelectedGuest());
@@ -902,12 +932,10 @@ export function createNpcGuestManagerPanel(options = {}) {
         if (versionId === "current") {
           try {
             clearStoredGuestBundle();
-            const modelEntries = getModelGuestEntries() || [];
+            const modelEntries = await resolveModelGuestEntries();
             bundle = mergeModelGuestsIntoBundle(await loadBaseGuestBundle(), modelEntries);
             dirty = false;
-            selectedGuestId = bundle.guests.find((guest) => guest.guestId === "Mark-2")?.guestId
-              || bundle.guests[0]?.guestId
-              || null;
+            selectedGuestId = pickDefaultGuestId();
             selectedEventId = null;
             selectedDialogId = null;
             ensureSelectedEvent(getSelectedGuest());
@@ -964,7 +992,7 @@ export function createNpcGuestManagerPanel(options = {}) {
     if (action === "export") {
       syncEditorBeforeAction();
       publishGuestBundle(bundle, { persist: true, source: "guest-manager-export" });
-      const modelEntries = getModelGuestEntries() || [];
+      const modelEntries = await resolveModelGuestEntries();
 
       void loadEffectiveGuestBundle(undefined, modelEntries).then((effective) => {
         const blob = new Blob([exportGuestBundleJson(effective)], { type: "application/json" });
@@ -994,17 +1022,15 @@ export function createNpcGuestManagerPanel(options = {}) {
         return;
       }
 
-      void loadGuestBundleFromFirestore().then((remote) => {
+      void loadGuestBundleFromFirestore().then(async (remote) => {
         if (!remote) {
           setStatus("Firestore에 저장된 NPC 데이터가 없습니다.");
           return;
         }
 
-        const modelEntries = getModelGuestEntries() || [];
+        const modelEntries = await resolveModelGuestEntries();
         bundle = mergeModelGuestsIntoBundle(remote, modelEntries);
-        selectedGuestId = bundle.guests.find((guest) => guest.guestId === "Mark-2")?.guestId
-          || bundle.guests[0]?.guestId
-          || null;
+        selectedGuestId = pickDefaultGuestId();
         selectedEventId = null;
         selectedDialogId = null;
         ensureSelectedEvent(getSelectedGuest());
@@ -1067,9 +1093,31 @@ export function createNpcGuestManagerPanel(options = {}) {
     }
   });
 
+  function handleExternalGuestBundle(next, meta = {}) {
+    const source = String(meta?.source || "");
+
+    if (source.startsWith("guest-manager")) {
+      return;
+    }
+
+    void resolveModelGuestEntries().then((modelEntries) => {
+      if (dirty) {
+        applyCatalogToBundle(bundle, modelEntries);
+      } else {
+        applyCatalogToBundle(next, modelEntries);
+      }
+
+      render();
+    });
+  }
+
+  subscribeGuestBundleUpdates(handleExternalGuestBundle);
+  subscribeGuestBundleRemote(handleExternalGuestBundle);
+
   return {
     root,
     load,
+    syncCatalog,
     open,
     close: closePanel,
     toggle,

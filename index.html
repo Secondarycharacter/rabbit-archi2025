@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>토끼 건축사사무소 워크패드 스튜디오</title>
-<link rel="stylesheet" href="css/homepage-shell.css?v=remove-full-menu-20260907">
+<link rel="stylesheet" href="css/homepage-shell.css?v=metaverse-playback-select-20260912">
 <link rel="stylesheet" href="chat/css/metaverse-chat.css">
 </head>
 <body class="homepage-shell">
@@ -57,12 +57,17 @@
 
       <section class="h0-view" id="h0ViewMetaversePreview">
         <div class="h0-metaverse-layout">
-          <aside class="h0-metaverse-overview" id="metaverseOverview" aria-label="설계개요"></aside>
-          <div class="h0-metaverse-preview-pane">
-            <div class="h0-metaverse-preview-stage">
-              <div class="h0-preview-media h0-preview-media--metaverse" id="metaversePreviewMedia"></div>
+          <div class="h0-metaverse-gallery" id="metaverseGallery" aria-label="메타버스 프로젝트">
+            <div class="h0-metaverse-gallery-viewport" id="metaverseGalleryViewport">
+              <div class="h0-metaverse-gallery-track" id="metaverseGalleryTrack"></div>
             </div>
-            <p class="h0-preview-hint" id="metaversePreviewHint">프로젝트를 선택하면 Preview가 표시됩니다.</p>
+            <button
+              type="button"
+              class="h0-metaverse-gallery-arrow"
+              id="metaverseGalleryArrow"
+              hidden
+              aria-label="아래 프로젝트 보기"
+            >↓</button>
           </div>
           <aside class="h0-split-chat h0-metaverse-chat" id="metaverseChat" aria-label="채팅">
             <h3 class="h0-split-chat__title">CHAT</h3>
@@ -187,7 +192,7 @@
   </aside>
 </div>
 
-<script type="module" src="js/homepage-shell.js?v=remove-full-menu-20260907"></script>
+<script type="module" src="js/homepage-shell.js?v=metaverse-hover-list-20260912"></script>
 <script type="module" src="chat/js/metaverse-chat.js"></script>
 
 </body>

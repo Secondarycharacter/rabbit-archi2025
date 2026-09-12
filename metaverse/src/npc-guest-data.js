@@ -3,10 +3,24 @@
  * Base JSON → localStorage overlay. Global → Guest → Dialog override order.
  */
 
-export const NPC_GUEST_DATA_VERSION = "angji-npc-korean-names-20260822";
+import { getMetaverseProjectContext } from "./metaverse-project-context.js?v=editor-shared-20260908";
+
+export const NPC_GUEST_DATA_VERSION = "npc-list-sync-20260908";
 export const NPC_GUEST_STORAGE_KEY = "angji-npc-guest-manager-v1";
 export const NPC_GUEST_PROGRESS_KEY = "angji-npc-conversation-progress-v1";
 export const NPC_GUEST_DATA_URL = "./data/npc/guests.json";
+
+function guestStorageKey() {
+  return getMetaverseProjectContext().npc.guestStorageKey;
+}
+
+function guestProgressKey() {
+  return getMetaverseProjectContext().npc.progressKey;
+}
+
+function guestDataUrl() {
+  return getMetaverseProjectContext().npc.guestsUrl;
+}
 
 export const NPC_GLOBAL_DEFAULTS = {
   interactionDistance: 1.5,
@@ -272,7 +286,7 @@ function writeStorage(key, value) {
 }
 
 export function loadConversationProgress() {
-  const raw = readStorage(NPC_GUEST_PROGRESS_KEY);
+  const raw = readStorage(guestProgressKey());
   const completed = Array.isArray(raw?.completedGuestIds) ? raw.completedGuestIds : [];
   const byGuest = {};
 
@@ -292,7 +306,7 @@ export function loadConversationProgress() {
 }
 
 export function saveConversationProgress(progress) {
-  writeStorage(NPC_GUEST_PROGRESS_KEY, {
+  writeStorage(guestProgressKey(), {
     completedGuestIds: [...new Set((progress?.completedGuestIds || []).map(String))],
     byGuest: progress?.byGuest || {}
   });
@@ -426,13 +440,13 @@ export function clearConversationCompleted(guestId) {
 }
 
 export function loadStoredGuestBundle() {
-  const stored = readStorage(NPC_GUEST_STORAGE_KEY);
+  const stored = readStorage(guestStorageKey());
   return stored ? normalizeGuestBundle(stored) : null;
 }
 
 export function saveGuestBundle(bundle) {
   const normalized = normalizeGuestBundle(bundle);
-  writeStorage(NPC_GUEST_STORAGE_KEY, normalized);
+  writeStorage(guestStorageKey(), normalized);
   return normalized;
 }
 
@@ -456,7 +470,7 @@ function notifyGuestBundleListeners(bundle, meta = {}) {
     }
   });
 
-  void import("./editor-mode/editor-broadcast-sync.js?v=editor-broadcast-sync-20260902")
+  void import("./editor-mode/editor-broadcast-sync.js?v=project-scope-20260908")
     .then(({ postGuestBundleBroadcast }) => postGuestBundleBroadcast(bundle, meta))
     .catch(() => {});
 }
@@ -483,24 +497,31 @@ export function publishGuestBundle(bundle, options = {}) {
 
 /** Runtime loader shared by NORMAL MODE and Editor Mode. */
 export async function loadRuntimeGuestBundle(
-  url = NPC_GUEST_DATA_URL,
+  url = guestDataUrl(),
   modelGuestEntries = null
 ) {
   return loadEffectiveGuestBundle(url, modelGuestEntries);
 }
 
 export function clearStoredGuestBundle() {
-  localStorage.removeItem(NPC_GUEST_STORAGE_KEY);
+  localStorage.removeItem(guestStorageKey());
 }
 
-export async function loadBaseGuestBundle(url = NPC_GUEST_DATA_URL) {
+export async function loadBaseGuestBundle(url = guestDataUrl()) {
   const response = await fetch(`${url}?v=${NPC_GUEST_DATA_VERSION}`, { cache: "no-cache" });
 
-  if (!response.ok) {
-    throw new Error(`Failed to load NPC guest data (${response.status})`);
+  if (response.ok) {
+    return normalizeGuestBundle(await response.json());
   }
 
-  return normalizeGuestBundle(await response.json());
+  // Missing per-project guests.json is expected (Jinju/Geochang/Chungju).
+  // Never fall back to Angji guests.json — that mixed another project's NPC list
+  // into the editor popup.
+  if (url !== NPC_GUEST_DATA_URL && (response.status === 404 || response.status === 0)) {
+    return normalizeGuestBundle({ guests: [] });
+  }
+
+  throw new Error(`Failed to load NPC guest data (${response.status})`);
 }
 
 function guestHasDialogContent(guest) {
@@ -580,7 +601,7 @@ export function mergeGuestBundleWithJson(jsonBundle, storedBundle) {
 /**
  * Merge guests.json with localStorage overlay, then expand to every model guest.
  */
-export async function loadEffectiveGuestBundle(url = NPC_GUEST_DATA_URL, modelGuestEntries = null) {
+export async function loadEffectiveGuestBundle(url = guestDataUrl(), modelGuestEntries = null) {
   const stored = loadStoredGuestBundle();
   let jsonBundle = null;
   let remoteBundle = null;
@@ -588,7 +609,7 @@ export async function loadEffectiveGuestBundle(url = NPC_GUEST_DATA_URL, modelGu
   if (!stored) {
     try {
       const { isGuestBundleFirestoreConfigured, loadGuestBundleFromFirestore } = await import(
-        "./editor-mode/guest-bundle-firestore.js?v=guest-base-firestore-20260905"
+        "./editor-mode/guest-bundle-firestore.js?v=project-scope-20260908"
       );
 
       if (isGuestBundleFirestoreConfigured()) {
@@ -657,6 +678,19 @@ export function mergeModelGuestsIntoBundle(bundle, modelGuestEntries = null) {
       interactionEnabled: false,
       dialogLines: []
     });
+  });
+
+  const seen = new Set(merged.map((guest) => guest.guestId));
+  normalized.guests.forEach((guest) => {
+    if (!guest?.guestId || seen.has(guest.guestId)) {
+      return;
+    }
+
+    // Keep editor-created NPCs that are not in the builtin catalog yet.
+    if (String(guest.guestId).startsWith("npc_")) {
+      merged.push(guest);
+      seen.add(guest.guestId);
+    }
   });
 
   return {

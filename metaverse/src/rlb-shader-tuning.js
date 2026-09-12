@@ -9,12 +9,26 @@ import {
   RLB_SHAPE,
   RLB_TUNING_TYPE_ORDER,
   resolveRlbSpillShapeCode
-} from "./rlb-fixture-types.js";
+} from "./rlb-fixture-types.js?v=editor-shared-20260908";
 import { RLB_ANGJI_NIGHT_PRESET } from "./rlb-angji-night-preset.js?v=rlb-range-restore-20260907j";
+import { getMetaverseProjectContext, getMetaverseProjectId } from "./metaverse-project-context.js?v=editor-shared-20260908";
 
 export const RLB_TUNING_STORAGE_KEY = "angji-rlb-shader-tuning-v9";
 export const RLB_PRESET_BUILD_KEY = "angji-rlb-preset-build";
 export const RLB_PRESET_BUILD = "rlb-range-restore-20260907j";
+
+function rlbStorageKey() {
+  return getMetaverseProjectContext().rlb?.storageKey || RLB_TUNING_STORAGE_KEY;
+}
+
+function rlbPresetBuildKey() {
+  return getMetaverseProjectContext().rlb?.presetBuildKey || RLB_PRESET_BUILD_KEY;
+}
+
+function isDefaultRlbProject() {
+  return getMetaverseProjectId() === "angji";
+}
+
 const RLB_TUNING_STORAGE_FALLBACK_KEYS = [
   "angji-rlb-shader-tuning-v10",
   "angji-rlb-shader-tuning-v8",
@@ -624,7 +638,15 @@ function isRlbLocalDevHost() {
 }
 
 function bakedNightPresetState() {
-  return mergeTuningState(RLB_ANGJI_NIGHT_PRESET);
+  const merged = mergeTuningState(RLB_ANGJI_NIGHT_PRESET);
+
+  if (!isDefaultRlbProject()) {
+    merged.groups = {};
+    merged.lightGroups = {};
+    rebuildRlbLightGroups(merged);
+  }
+
+  return merged;
 }
 
 function maybeCaptureLocalTuningPreset(raw) {
@@ -655,10 +677,14 @@ function maybeCaptureLocalTuningPreset(raw) {
 }
 
 function readStoredTuningRaw() {
-  const primary = localStorage.getItem(RLB_TUNING_STORAGE_KEY);
+  const primary = localStorage.getItem(rlbStorageKey());
 
   if (primary) {
-    return { raw: primary, source: RLB_TUNING_STORAGE_KEY };
+    return { raw: primary, source: rlbStorageKey() };
+  }
+
+  if (!isDefaultRlbProject()) {
+    return { raw: null, source: null };
   }
 
   for (let index = 0; index < RLB_TUNING_STORAGE_FALLBACK_KEYS.length; index += 1) {
@@ -685,13 +711,17 @@ export function loadRlbTuningState() {
   try {
     const params = new URLSearchParams(window.location.search);
     const forceReset = params.get("rlbReset") === "1" || params.get("rlbReset") === "true";
-    const storedBuild = localStorage.getItem(RLB_PRESET_BUILD_KEY);
+    const storedBuild = localStorage.getItem(rlbPresetBuildKey());
     const buildStale = storedBuild !== RLB_PRESET_BUILD;
 
     if (forceReset || buildStale) {
-      localStorage.removeItem(RLB_TUNING_STORAGE_KEY);
-      RLB_TUNING_STORAGE_FALLBACK_KEYS.forEach((key) => localStorage.removeItem(key));
-      localStorage.setItem(RLB_PRESET_BUILD_KEY, RLB_PRESET_BUILD);
+      localStorage.removeItem(rlbStorageKey());
+
+      if (isDefaultRlbProject()) {
+        RLB_TUNING_STORAGE_FALLBACK_KEYS.forEach((key) => localStorage.removeItem(key));
+      }
+
+      localStorage.setItem(rlbPresetBuildKey(), RLB_PRESET_BUILD);
       console.info(
         `[rlb-tune] using baked night preset (${forceReset ? "rlbReset" : `build ${RLB_PRESET_BUILD}`})`
       );
@@ -701,14 +731,14 @@ export function loadRlbTuningState() {
     const stored = readStoredTuningRaw();
 
     if (!stored.raw) {
-      localStorage.setItem(RLB_PRESET_BUILD_KEY, RLB_PRESET_BUILD);
+      localStorage.setItem(rlbPresetBuildKey(), RLB_PRESET_BUILD);
       return bakedNightPresetState();
     }
 
     maybeCaptureLocalTuningPreset(stored.raw);
     const merged = mergeTuningState(JSON.parse(stored.raw));
 
-    if (stored.source && stored.source !== RLB_TUNING_STORAGE_KEY) {
+    if (stored.source && stored.source !== rlbStorageKey()) {
       saveRlbTuningState(merged);
       console.info(`[rlb-tune] restored settings from ${stored.source}`);
     }
@@ -727,7 +757,7 @@ export function saveRlbTuningState(state) {
 
   try {
     const raw = JSON.stringify(state);
-    localStorage.setItem(RLB_TUNING_STORAGE_KEY, raw);
+    localStorage.setItem(rlbStorageKey(), raw);
     maybeCaptureLocalTuningPreset(raw);
     return true;
   } catch (error) {

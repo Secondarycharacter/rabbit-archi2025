@@ -1,15 +1,54 @@
 /**
- * Angji GUIDE tour data — base JSON + localStorage overlay (local dev).
+ * GUIDE tour data — base JSON + localStorage overlay (local dev).
+ * Paths and storage keys come from the active ?project= context.
  */
+
+import { getMetaverseProjectContext } from "./metaverse-project-context.js?v=editor-shared-20260908";
 
 export const ANGJI_GUIDE_TOUR_DATA_URL = "./data/guide/angji-guide-tour.json";
 export const ANGJI_GUIDE_MANAGER_VERSION = "restore-common-dialogues-20260907";
 export const ANGJI_GUIDE_STORAGE_KEY = "angji-guide-tour-manager-v1";
 
+function guideStorageKey() {
+  return getMetaverseProjectContext().guide.storageKey;
+}
+
+function guideDataUrl() {
+  return getMetaverseProjectContext().guide.dataUrl;
+}
+
 export const DEFAULT_GUIDE_SPAWN_TRANSFORM = {
   position: { x: -44.89, y: 21.95, z: 29.8 },
   rotationY: 4.6915
 };
+
+let projectGuideSpawnTransform = null;
+
+export function setProjectGuideSpawnTransform(transform) {
+  const x = Number(transform?.position?.x);
+  const y = Number(transform?.position?.y);
+  const z = Number(transform?.position?.z);
+  const rotationY = Number(transform?.rotationY);
+
+  projectGuideSpawnTransform = [x, y, z].every(Number.isFinite)
+    ? {
+      position: { x, y, z },
+      rotationY: Number.isFinite(rotationY) ? rotationY : 0
+    }
+    : null;
+}
+
+export function getProjectGuideSpawnTransform() {
+  if (getMetaverseProjectContext().projectId === "angji" || !projectGuideSpawnTransform) {
+    return DEFAULT_GUIDE_SPAWN_TRANSFORM;
+  }
+
+  return projectGuideSpawnTransform;
+}
+
+function isAngjiGuideAltitudeGuardEnabled() {
+  return getMetaverseProjectContext().projectId === "angji";
+}
 
 /** Shipped GUIDE 360° intro — matches GitHub `angji-guide-tour.json`. */
 export const DEFAULT_ORBIT_SPIN = {
@@ -39,7 +78,15 @@ export function isInvalidGuideWorldPosition(position) {
 }
 
 export function isImplausibleGuideAltitude(y) {
-  return !Number.isFinite(Number(y)) || Number(y) < MIN_GUIDE_SITE_Y;
+  if (!Number.isFinite(Number(y))) {
+    return true;
+  }
+
+  if (!isAngjiGuideAltitudeGuardEnabled()) {
+    return false;
+  }
+
+  return Number(y) < MIN_GUIDE_SITE_Y;
 }
 
 export function isImplausibleOrbitSpin(spin) {
@@ -179,6 +226,10 @@ export function normalizeOrbitSequences(raw = {}) {
 
   if (raw.orbitSpin && !isImplausibleOrbitSpin(raw.orbitSpin)) {
     return [normalizeOrbitSequence({ ...raw.orbitSpin, id: raw.orbitSpin.id || "orbit_spin" }, 0)];
+  }
+
+  if (getMetaverseProjectContext().projectId !== "angji") {
+    return [];
   }
 
   return [normalizeOrbitSequence(DEFAULT_ORBIT_SPIN, 0)];
@@ -340,23 +391,24 @@ export function normalizeTourEvent(event = {}, index = 0) {
     ? event.dialogues.map((line, lineIndex) => normalizeDialogueLine(line, lineIndex, id))
     : [];
   const spawnFallback = id === "00" || index === 0;
+  const spawnTransform = getProjectGuideSpawnTransform();
   let guidePosition = normalizePosition(
     event.guidePosition,
-    spawnFallback ? DEFAULT_GUIDE_SPAWN_TRANSFORM.position : { x: 0, y: 0, z: 0 }
+    spawnFallback ? spawnTransform.position : { x: 0, y: 0, z: 0 }
   );
   let guideRotationY = asNumber(
     event.guideRotationY,
-    spawnFallback ? DEFAULT_GUIDE_SPAWN_TRANSFORM.rotationY : 0
+    spawnFallback ? spawnTransform.rotationY : 0
   );
 
   if (spawnFallback && isInvalidGuideWorldPosition(guidePosition)) {
-    guidePosition = { ...DEFAULT_GUIDE_SPAWN_TRANSFORM.position };
-    guideRotationY = asNumber(event.guideRotationY, DEFAULT_GUIDE_SPAWN_TRANSFORM.rotationY)
-      || DEFAULT_GUIDE_SPAWN_TRANSFORM.rotationY;
+    guidePosition = { ...spawnTransform.position };
+    guideRotationY = asNumber(event.guideRotationY, spawnTransform.rotationY)
+      || spawnTransform.rotationY;
   } else if (spawnFallback && isImplausibleGuideAltitude(guidePosition.y)) {
     guidePosition = {
       ...guidePosition,
-      y: DEFAULT_GUIDE_SPAWN_TRANSFORM.position.y
+      y: spawnTransform.position.y
     };
   }
 
@@ -460,14 +512,22 @@ export function createEmptyDialogueLine(eventId = "00", index = 0) {
 
 export function createEmptyTourEvent(index = 0) {
   const id = String(index).padStart(2, "0");
+  const spawnTransform = getProjectGuideSpawnTransform();
 
   return normalizeTourEvent({
     id,
-    title: `새 이벤트 ${id}`,
-    guidePosition: { ...DEFAULT_GUIDE_SPAWN_TRANSFORM.position },
-    guideRotationY: DEFAULT_GUIDE_SPAWN_TRANSFORM.rotationY,
+    title: index === 0 ? "가이드 등장" : `새 이벤트 ${id}`,
+    guidePosition: { ...spawnTransform.position },
+    guideRotationY: spawnTransform.rotationY,
     dialogues: [createEmptyDialogueLine(id, 0)]
   }, index);
+}
+
+export function createStarterTourData() {
+  return normalizeTourData({
+    guideSpawnId: "Angji-Guide",
+    events: [createEmptyTourEvent(0)]
+  });
 }
 
 function readStorage(key) {
@@ -485,7 +545,7 @@ function writeStorage(key, value) {
 }
 
 export function loadStoredTourData() {
-  const stored = readStorage(ANGJI_GUIDE_STORAGE_KEY);
+  const stored = readStorage(guideStorageKey());
 
   if (!stored) {
     return null;
@@ -494,11 +554,10 @@ export function loadStoredTourData() {
   const normalized = normalizeTourData(stored);
   const storedSpawn = stored.events?.find((event) => event.id === "00") || stored.events?.[0];
   const shouldPersist = isInvalidGuideWorldPosition(storedSpawn?.guidePosition)
-    || isImplausibleGuideAltitude(storedSpawn?.guidePosition?.y)
-    || isImplausibleOrbitSequences(normalized.orbitSequences);
+    || isImplausibleGuideAltitude(storedSpawn?.guidePosition?.y);
 
   if (shouldPersist) {
-    writeStorage(ANGJI_GUIDE_STORAGE_KEY, normalized);
+    writeStorage(guideStorageKey(), normalized);
   }
 
   return normalized;
@@ -506,7 +565,7 @@ export function loadStoredTourData() {
 
 export function saveTourData(data) {
   const normalized = normalizeTourData(data);
-  writeStorage(ANGJI_GUIDE_STORAGE_KEY, normalized);
+  writeStorage(guideStorageKey(), normalized);
   return normalized;
 }
 
@@ -530,7 +589,7 @@ function notifyTourDataListeners(data, meta = {}) {
     }
   });
 
-  void import("./editor-mode/editor-broadcast-sync.js?v=editor-broadcast-sync-20260902")
+  void import("./editor-mode/editor-broadcast-sync.js?v=project-scope-20260908")
     .then(({ postTourDataBroadcast }) => postTourDataBroadcast(data, meta))
     .catch(() => {});
 }
@@ -566,15 +625,15 @@ export async function importTourDataFromFile(file) {
 }
 
 /** Runtime loader shared by NORMAL MODE and Editor Mode preview. */
-export async function loadRuntimeTourData(url = ANGJI_GUIDE_TOUR_DATA_URL) {
+export async function loadRuntimeTourData(url = guideDataUrl()) {
   return loadEffectiveTourData(url);
 }
 
 export function clearStoredTourData() {
-  localStorage.removeItem(ANGJI_GUIDE_STORAGE_KEY);
+  localStorage.removeItem(guideStorageKey());
 }
 
-export async function loadBaseTourData(url = ANGJI_GUIDE_TOUR_DATA_URL) {
+export async function loadBaseTourData(url = guideDataUrl()) {
   const response = await fetch(`${url}?v=${ANGJI_GUIDE_MANAGER_VERSION}`, { cache: "no-cache" });
 
   if (!response.ok) {
@@ -705,7 +764,7 @@ function pinShippedGuideDefaults(data, base) {
   return data;
 }
 
-export async function loadEffectiveTourData(url = ANGJI_GUIDE_TOUR_DATA_URL) {
+export async function loadEffectiveTourData(url = guideDataUrl()) {
   const stored = loadStoredTourData();
   let base = null;
 
@@ -727,7 +786,7 @@ export async function loadEffectiveTourData(url = ANGJI_GUIDE_TOUR_DATA_URL) {
     const changed = JSON.stringify(repaired) !== JSON.stringify(stored);
 
     if (changed) {
-      writeStorage(ANGJI_GUIDE_STORAGE_KEY, repaired);
+      writeStorage(guideStorageKey(), repaired);
     }
 
     return repaired;
@@ -735,7 +794,7 @@ export async function loadEffectiveTourData(url = ANGJI_GUIDE_TOUR_DATA_URL) {
 
   try {
     const { isGuideTourFirestoreConfigured, loadGuideTourFromFirestore } = await import(
-      "./editor-mode/guide-tour-firestore.js?v=guide-base-firestore-20260905"
+        "./editor-mode/guide-tour-firestore.js?v=editor-guide-pose-20260908"
     );
 
     if (isGuideTourFirestoreConfigured()) {
@@ -755,7 +814,7 @@ export async function loadEffectiveTourData(url = ANGJI_GUIDE_TOUR_DATA_URL) {
     return base;
   }
 
-  throw new Error("Failed to load guide tour data");
+  return createStarterTourData();
 }
 
 export function exportTourDataJson(data) {

@@ -2,17 +2,22 @@
  * Standalone editor popup — Guide, NPC, RLB shader (second monitor).
  */
 
-import { createAngjiGuideManagerPanel } from "../angji-guide-manager-panel.js?v=restore-common-dialogues-20260907";
-import { createNpcGuestManagerPanel } from "../npc-guest-manager-panel.js?v=guide-event-list-scroll-20260906";
-import { createRlbShaderTuningPanel } from "../rlb-shader-tuning-panel.js?v=rlb-range-restore-20260907j";
+import { createAngjiGuideManagerPanel } from "../angji-guide-manager-panel.js?v=guide-add-line-20260908";
+import { createNpcGuestManagerPanel } from "../npc-guest-manager-panel.js?v=npc-list-sync-20260908";
+import { createRlbShaderTuningPanel } from "../rlb-shader-tuning-panel.js?v=editor-shared-20260908";
 import { createOpenerRpc, listenPopupUiCommands } from "./editor-popup-bridge.js?v=editor-popup-rlb-body-20260903";
-import { createRlbGlowRemote } from "./editor-popup-rlb-glow.js?v=rlb-range-restore-20260907j";
+import { createRlbGlowRemote } from "./editor-popup-rlb-glow.js?v=editor-shared-20260908";
+import { getMetaverseProjectContext } from "../metaverse-project-context.js?v=editor-shared-20260908";
 
 const TAB = {
   GUIDE: "guide",
   GUEST: "guest",
   RLB: "rlb"
 };
+
+function isRlbTabEnabled() {
+  return getMetaverseProjectContext().features.rlb === true;
+}
 
 function getInitialTab() {
   const tab = new URLSearchParams(window.location.search).get("tab");
@@ -21,11 +26,19 @@ function getInitialTab() {
     return TAB.GUEST;
   }
 
-  if (tab === TAB.RLB) {
+  if (tab === TAB.RLB && isRlbTabEnabled()) {
     return TAB.RLB;
   }
 
   return TAB.GUIDE;
+}
+
+function syncRlbTabVisibility() {
+  const rlbButton = document.querySelector('#editorPopupTabs [data-tab="rlb"]');
+
+  if (rlbButton) {
+    rlbButton.hidden = !isRlbTabEnabled();
+  }
 }
 
 function setStatus(message) {
@@ -112,6 +125,7 @@ async function bootstrap() {
 
   const rpc = createOpenerRpc();
   const rlbGlowRemote = createRlbGlowRemote(rpc);
+  const rlbEnabled = isRlbTabEnabled();
   let activeTab = getInitialTab();
   let guidePanel = null;
   let guestPanel = null;
@@ -148,11 +162,12 @@ async function bootstrap() {
   });
 
   wireCloseButtons(guidePanel.root, guestPanel.root);
+  syncRlbTabVisibility();
 
   async function showTab(tabId) {
     activeTab = tabId === TAB.GUEST
       ? TAB.GUEST
-      : (tabId === TAB.RLB ? TAB.RLB : TAB.GUIDE);
+      : (tabId === TAB.RLB && rlbEnabled ? TAB.RLB : TAB.GUIDE);
 
     try {
       await rpc.call("editorTabChanged", activeTab);
@@ -163,19 +178,27 @@ async function bootstrap() {
     guidePanel.root.hidden = activeTab !== TAB.GUIDE;
     guestPanel.root.hidden = activeTab !== TAB.GUEST;
 
+    if (activeTab === TAB.GUEST) {
+      try {
+        await guestPanel.syncCatalog?.();
+      } catch (error) {
+        console.warn("[editor-popup] NPC catalog sync failed", error);
+      }
+    }
+
     const rlbRoot = document.getElementById("rlbTuningPanel");
 
     if (rlbRoot) {
       rlbRoot.hidden = activeTab !== TAB.RLB;
     }
 
-    if (activeTab === TAB.RLB) {
+    if (activeTab === TAB.RLB && rlbEnabled) {
       try {
         const available = await rpc.call("isRlbTuningAvailable");
 
         if (!available) {
           rlbAvailable = false;
-          setStatus("RLB 쉐이더는 Angji 프로젝트 + Orbit View에서 사용할 수 있습니다.");
+          setStatus("RLB 쉐이더는 Orbit View에서 사용할 수 있습니다.");
           rlbPanel.closePanel?.();
         } else {
           setStatus("");

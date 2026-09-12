@@ -230,8 +230,10 @@ body.walk-mode-active .project-overview {
 
 .hud__top strong {
   display: block;
-  font-size: 22.5px;
-  letter-spacing: 0.08em;
+  font-size: 20px;
+  line-height: 1.35;
+  letter-spacing: 0.02em;
+  word-break: keep-all;
 }
 
 #floorLabel {
@@ -3561,6 +3563,33 @@ body.npc-scene-editor-active .hud__actions .local-dev-only:not(#editorModeButton
   line-height: 1.25;
 }
 
+.npc-scene-editor-section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 0 8px;
+}
+
+.npc-scene-editor-section-title h3 {
+  margin: 0;
+}
+
+.npc-scene-editor-section-title__check {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.npc-scene-editor-section-title__check input {
+  width: auto;
+  margin: 0;
+}
+
 .npc-scene-editor-inspector .npc-scene-editor-subsection h4,
 .npc-scene-editor-inspector .npc-scene-editor-dialog-camera h4 {
   margin: 0 0 6px;
@@ -3586,6 +3615,10 @@ body.npc-scene-editor-active .hud__actions .local-dev-only:not(#editorModeButton
   font-size: var(--so-fs-body);
   line-height: 1.25;
   padding: var(--so-control-pad-y) var(--so-control-pad-x);
+}
+
+.npc-scene-editor-inspector .npc-scene-editor-waypoint-list select {
+  padding: 2px 3px;
 }
 
 .npc-scene-editor-inspector .npc-scene-editor-fields {
@@ -3622,7 +3655,7 @@ body.npc-scene-editor-active .hud__actions .local-dev-only:not(#editorModeButton
 .npc-scene-editor-inspector .npc-scene-editor-subsection > button,
 .npc-scene-editor-inspector .npc-scene-editor-waypoint-list button {
   font-size: var(--so-fs-label);
-  padding: 4px 8px;
+  padding: 3px 4px;
   line-height: 1.2;
 }
 
@@ -3657,6 +3690,39 @@ body.npc-scene-editor-active .hud__actions .local-dev-only:not(#editorModeButton
 }
 
 /* Pastel tone blocks — readable on dark inspector */
+.npc-scene-editor-model-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.npc-scene-editor-model-row__select {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.npc-scene-editor-model-row__random {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0 0 2px;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.npc-scene-editor-model-row__random input {
+  width: auto;
+  margin: 0;
+}
+
+.npc-scene-editor-model-row__select select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .npc-scene-editor-inspector .npc-scene-editor-section--tone-model {
   --so-tone: 168, 198, 230;
   border-color: rgba(var(--so-tone), 0.42);
@@ -3708,6 +3774,14 @@ body.npc-scene-editor-active .hud__actions .local-dev-only:not(#editorModeButton
 .npc-scene-editor-inspector .npc-scene-editor-section[class*="--tone-"] .npc-scene-editor-subsection {
   border-color: rgba(var(--so-tone), 0.28);
   background: rgba(0, 0, 0, 0.18);
+}
+
+.npc-scene-editor-inspector fieldset.npc-scene-editor-subsection {
+  min-inline-size: 0;
+}
+
+.npc-scene-editor-inspector fieldset.npc-scene-editor-subsection:disabled {
+  opacity: 0.42;
 }
 
 .npc-scene-editor-inspector .npc-scene-editor-section--tone-camera .npc-scene-editor-dialog-camera {
@@ -3778,8 +3852,15 @@ body.npc-scene-editor-active .hud__actions .local-dev-only:not(#editorModeButton
   padding: 0;
   display: grid;
   gap: 4px;
-  max-height: 160px;
+  max-height: calc(5 * 44px + 16px);
   overflow: auto;
+}
+
+.npc-scene-editor-waypoint-list__row {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 3px;
+  align-items: center;
 }
 
 .npc-scene-editor-sequence-list {
@@ -3966,11 +4047,8 @@ body.npc-scene-editor-active .hud__actions .local-dev-only:not(#editorModeButton
 }
 
 .npc-scene-editor-waypoint-list li {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 4px;
-  align-items: stretch;
-  padding: 6px;
+  display: block;
+  padding: 3px 2px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 4px;
 }
@@ -3979,20 +4057,28 @@ body.npc-scene-editor-active .hud__actions .local-dev-only:not(#editorModeButton
   border-color: rgba(244, 211, 94, 0.7);
 }
 
-.npc-scene-editor-waypoint-list li > button[data-action="patrol-select-wp"] {
-  text-align: left;
+.npc-scene-editor-waypoint-list button[data-action="patrol-select-wp"],
+.npc-scene-editor-waypoint-list button[data-action="patrol-remove-wp"] {
+  text-align: center;
 }
 
+.npc-scene-editor-inspector .npc-scene-editor-waypoint-list__row label,
 .npc-scene-editor-waypoint-list label {
   display: grid;
-  grid-template-columns: 36px 1fr;
-  gap: 6px;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 2px;
   align-items: center;
   font-size: 11px;
+  min-width: 0;
+  margin-bottom: 0;
 }
 
 .npc-scene-editor-waypoint-list select {
   width: 100%;
+  appearance: auto;
+  -webkit-appearance: menulist;
+  text-align: center;
+  text-align-last: center;
 }
 
 .npc-scene-editor-fields dd {

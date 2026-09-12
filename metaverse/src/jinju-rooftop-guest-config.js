@@ -20,8 +20,6 @@ export const JINJU_ROOFTOP_SIMULTANEOUS_GUEST_IDS = [
 
 const SIT_CLIP_PATTERN = /^(sit|seat)/i;
 
-export const JINJU_ROOFTOP_SIT_GUEST_Y_OFFSET = 0.1;
-
 const ROOFTOP_MARK_LAYOUT = [
   { mark: 1, position: { x: -27.33, y: 10.1, z: 5.38 }, rotationY: -3.2437, role: "randomSitSeat" },
   { mark: 2, position: { x: -26.48, y: 10.1, z: 5.3 }, rotationY: -9.5305, role: "randomSitSeat" },
@@ -113,8 +111,7 @@ const ROOFTOP_RANDOM_SIT_SEAT_GUEST_POOL = [
   },
   {
     file: "05 Edition/01 Marie Antoinette Fox/Edition_Marie.glb",
-    clips: ["Sit_Footcross", "Sit_Footswing"],
-    sitYOffsetOverride: 0.06
+    clips: ["Sit_Footcross", "Sit_Footswing"]
   }
 ];
 
@@ -133,8 +130,7 @@ const ROOFTOP_SIT_SEAT_POOL = [
   },
   {
     file: "05 Edition/01 Marie Antoinette Fox/Edition_Marie.glb",
-    clips: ["Sit_Footcross", "Sit_Footswing"],
-    sitYOffsetOverride: 0.06
+    clips: ["Sit_Footcross", "Sit_Footswing"]
   }
 ];
 
@@ -183,8 +179,7 @@ function pickRandomSitSeatGuestAssignment() {
 
   return {
     file: entry.file,
-    clip,
-    sitYOffsetOverride: entry.sitYOffsetOverride
+    clip
   };
 }
 
@@ -193,11 +188,9 @@ function buildRandomSitSeatPickSpawn(baseSpawn) {
 
   return {
     ...baseSpawn,
+    randomModel: true,
     file: assignment.file,
-    animation: { type: "loop", clips: [assignment.clip] },
-    sitYOffsetOverride: typeof assignment.sitYOffsetOverride === "number"
-      ? assignment.sitYOffsetOverride
-      : JINJU_ROOFTOP_SIT_GUEST_Y_OFFSET
+    animation: { type: "loop", clips: [assignment.clip] }
   };
 }
 
@@ -252,6 +245,7 @@ export function getJinjuRooftopGuestSpawns() {
       if (layout.role === "fixedSambaSequence") {
         return {
           ...baseSpawn,
+          randomModel: false,
           file: layout.file,
           animation: { type: "sequence", clips: layout.sambaClips }
         };
@@ -264,6 +258,7 @@ export function getJinjuRooftopGuestSpawns() {
 
         return {
           ...baseSpawn,
+          randomModel: false,
           file,
           animation: { type: "sequence", clips: THRILLER_CLIPS },
           movement: { type: "rootMotion" }
@@ -277,6 +272,7 @@ export function getJinjuRooftopGuestSpawns() {
       if (layout.role === "runLoop") {
         return {
           ...baseSpawn,
+          randomModel: false,
           file: "01 Happycats/04 Happycat_Ninja/Happycats_Ninja_Samba Dancer.glb",
           movement: {
             type: "patrol",
@@ -291,6 +287,7 @@ export function getJinjuRooftopGuestSpawns() {
       if (layout.role === "randomIdle") {
         return {
           ...baseSpawn,
+          randomModel: true,
           file: idleAssignments[idleIndex++],
           animation: { type: "loop", clips: ["Idle"] }
         };
@@ -302,11 +299,9 @@ export function getJinjuRooftopGuestSpawns() {
 
       return {
         ...baseSpawn,
+        randomModel: true,
         file: entry.file,
-        animation: { type: "loop", clips: [sitClip] },
-        sitYOffsetOverride: typeof entry.sitYOffsetOverride === "number"
-          ? entry.sitYOffsetOverride
-          : (sitClips.length ? JINJU_ROOFTOP_SIT_GUEST_Y_OFFSET : undefined)
+        animation: { type: "loop", clips: [sitClip] }
       };
     });
 

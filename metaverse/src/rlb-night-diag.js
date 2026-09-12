@@ -6,7 +6,7 @@
 import {
   RLB_TUNING_STORAGE_KEY,
   loadRlbTuningState
-} from "./rlb-shader-tuning.js?v=rlb-range-restore-20260907j";
+} from "./rlb-shader-tuning.js?v=editor-shared-20260908";
 import { RLB_ANGJI_NIGHT_PRESET } from "./rlb-angji-night-preset.js?v=rlb-range-restore-20260907j";
 import { isLocalDevEnvironment } from "./local-dev.js?v=local-dev-20260819";
 

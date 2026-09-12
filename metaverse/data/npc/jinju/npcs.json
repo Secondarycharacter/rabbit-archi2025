@@ -1,0 +1,2467 @@
+{
+  "version": "1.0",
+  "projectId": "jinju",
+  "npcs": [
+    {
+      "id": "Angji-Guide",
+      "name": "GUIDE",
+      "type": "guide",
+      "deleted": false,
+      "model": {
+        "path": "00 Guide/Guide.glb"
+      },
+      "transform": {
+        "position": {
+          "x": 26.824003219604492,
+          "y": 1.99999947821658,
+          "z": 5.988270282745361
+        },
+        "rotationY": 89.46449402849683,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Idle",
+        "loop": true,
+        "clips": [
+          "Idle"
+        ],
+        "pivots": {}
+      },
+      "randomModel": false,
+      "movement": null
+    },
+    {
+      "id": "Jinju-Indoor-Mark-1",
+      "name": "I01",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "02 Shrooms/04 Shroom_Gangnam style Dancer/Shroom_Gangnam style Dancer.glb"
+      },
+      "transform": {
+        "position": {
+          "x": 7.15,
+          "y": 5.900000094901425,
+          "z": 5.17
+        },
+        "rotationY": -300.8658678011466,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Idle",
+        "loop": true,
+        "clips": [
+          "Idle"
+        ],
+        "pivots": {}
+      },
+      "randomModel": true,
+      "movement": null
+    },
+    {
+      "id": "Jinju-Indoor-Mark-2",
+      "name": "I02",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "01 Happycats/01 Skeleton_Dancer/Happycats_Skeleton_Dancer.glb"
+      },
+      "transform": {
+        "position": {
+          "x": 15.76,
+          "y": 5.900000094845518,
+          "z": 6.42
+        },
+        "rotationY": -275.79896426417304,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Idle",
+        "loop": true,
+        "clips": [
+          "Idle"
+        ],
+        "pivots": {}
+      },
+      "randomModel": true,
+      "movement": null
+    },
+    {
+      "id": "Jinju-Indoor-Mark-3",
+      "name": "I03",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "01 Happycats/04 Happycat_Ninja/Happycats_Ninja_Samba Dancer.glb"
+      },
+      "transform": {
+        "position": {
+          "x": 13.6,
+          "y": 5.900000095198853,
+          "z": -1.45
+        },
+        "rotationY": -201.17694102633465,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Samba Dancing01",
+        "loop": true,
+        "clips": [
+          "Samba Dancing01"
+        ],
+        "pivots": {}
+      },
+      "randomModel": false,
+      "movement": null
+    },
+    {
+      "id": "Jinju-Indoor-Mark-4",
+      "name": "I04",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "02 Shrooms/04 Shroom_Gangnam style Dancer/Shroom_Gangnam style Dancer.glb"
+      },
+      "transform": {
+        "position": {
+          "x": 6.35,
+          "y": 6.000000095131308,
+          "z": 0.05
+        },
+        "rotationY": -488.3147400561467,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0.1,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Sit_Clap",
+        "loop": true,
+        "clips": [
+          "Sit_Clap"
+        ],
+        "pivots": {}
+      },
+      "randomModel": true,
+      "movement": null
+    },
+    {
+      "id": "Jinju-Indoor-Mark-5",
+      "name": "I05",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "05 Edition/01 Marie Antoinette Fox/Edition_Marie.glb"
+      },
+      "transform": {
+        "position": {
+          "x": 5.19,
+          "y": 5.960000095174437,
+          "z": -0.91
+        },
+        "rotationY": -688.2139851993395,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0.06,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Sit_Footcross",
+        "loop": true,
+        "clips": [
+          "Sit_Footcross"
+        ],
+        "pivots": {}
+      },
+      "randomModel": true,
+      "movement": null
+    },
+    {
+      "id": "Jinju-Indoor-Mark-6",
+      "name": "I06",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "02 Shrooms/05 Shroom_Swing Dancer/Shroom_Swing Dancer.glb"
+      },
+      "transform": {
+        "position": {
+          "x": 1,
+          "y": 6.000000095163698,
+          "z": -0.67
+        },
+        "rotationY": -700.9622961410005,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0.1,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Sitting Talking",
+        "loop": true,
+        "clips": [
+          "Sitting Talking"
+        ],
+        "pivots": {}
+      },
+      "randomModel": true,
+      "movement": null
+    },
+    {
+      "id": "Jinju-Indoor-Mark-7",
+      "name": "I07",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "02 Shrooms/05 Shroom_Swing Dancer/Shroom_Swing Dancer.glb"
+      },
+      "transform": {
+        "position": {
+          "x": -5.36,
+          "y": 6.000000095089633,
+          "z": 0.98
+        },
+        "rotationY": -454.544607611136,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0.1,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Sitting Talking",
+        "loop": true,
+        "clips": [
+          "Sitting Talking"
+        ],
+        "pivots": {}
+      },
+      "randomModel": true,
+      "movement": null
+    },
+    {
+      "id": "Jinju-Indoor-Mark-8",
+      "name": "I08",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "02 Shrooms/05 Shroom_Swing Dancer/Shroom_Swing Dancer.glb"
+      },
+      "transform": {
+        "position": {
+          "x": -6.24,
+          "y": 6.000000095103564,
+          "z": 0.67
+        },
+        "rotationY": -629.0560928520822,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0.1,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Sitting Talking",
+        "loop": true,
+        "clips": [
+          "Sitting Talking"
+        ],
+        "pivots": {}
+      },
+      "randomModel": true,
+      "movement": null
+    },
+    {
+      "id": "Jinju-Indoor-Mark-9",
+      "name": "I09",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "05 Edition/01 Marie Antoinette Fox/Edition_Marie.glb"
+      },
+      "transform": {
+        "position": {
+          "x": -8.49,
+          "y": 6.000000095264811,
+          "z": -2.92
+        },
+        "rotationY": -357.32512893333796,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0.1,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Sit_Clap",
+        "loop": true,
+        "clips": [
+          "Sit_Clap"
+        ],
+        "pivots": {}
+      },
+      "randomModel": true,
+      "movement": null
+    },
+    {
+      "id": "Jinju-Indoor-Mark-10",
+      "name": "I10",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "02 Shrooms/04 Shroom_Gangnam style Dancer/Shroom_Gangnam style Dancer.glb"
+      },
+      "transform": {
+        "position": {
+          "x": -13.31,
+          "y": 6.000000095198381,
+          "z": -1.44
+        },
+        "rotationY": -370.468780753639,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0.1,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Seat_Clapping",
+        "loop": true,
+        "clips": [
+          "Seat_Clapping"
+        ],
+        "pivots": {}
+      },
+      "randomModel": true,
+      "movement": null
+    },
+    {
+      "id": "Jinju-Indoor-Mark-11",
+      "name": "I11",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "02 Shrooms/04 Shroom_Gangnam style Dancer/Shroom_Gangnam style Dancer.glb"
+      },
+      "transform": {
+        "position": {
+          "x": -13.35,
+          "y": 6.000000095094189,
+          "z": 0.88
+        },
+        "rotationY": -183.11731132381112,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0.1,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Seat_Clapping",
+        "loop": true,
+        "clips": [
+          "Seat_Clapping"
+        ],
+        "pivots": {}
+      },
+      "randomModel": true,
+      "movement": null
+    },
+    {
+      "id": "Jinju-Indoor-Mark-12",
+      "name": "I12",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "01 Happycats/01 Skeleton_Dancer/Happycats_Skeleton_Dancer.glb"
+      },
+      "transform": {
+        "position": {
+          "x": -17.89,
+          "y": 5.90000009529131,
+          "z": -3.49
+        },
+        "rotationY": -134.1122311062718,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Idle",
+        "loop": true,
+        "clips": [
+          "Idle"
+        ],
+        "pivots": {}
+      },
+      "randomModel": true,
+      "movement": null
+    },
+    {
+      "id": "Jinju-Indoor-Mark-13",
+      "name": "I13",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "01 Happycats/01 Skeleton_Dancer/Happycats_Skeleton_Dancer.glb"
+      },
+      "transform": {
+        "position": {
+          "x": -16.34,
+          "y": 5.900000095088371,
+          "z": 1.01
+        },
+        "rotationY": 37.48862853540977,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Idle",
+        "loop": true,
+        "clips": [
+          "Idle"
+        ],
+        "pivots": {}
+      },
+      "randomModel": true,
+      "movement": null
+    },
+    {
+      "id": "Jinju-Indoor-Mark-14",
+      "name": "I14",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "02 Shrooms/04 Shroom_Gangnam style Dancer/Shroom_Gangnam style Dancer.glb"
+      },
+      "transform": {
+        "position": {
+          "x": -23.83,
+          "y": 5.900000095188185,
+          "z": -1.21
+        },
+        "rotationY": -54.08721586034971,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Idle",
+        "loop": true,
+        "clips": [
+          "Idle"
+        ],
+        "pivots": {}
+      },
+      "randomModel": true,
+      "movement": null
+    },
+    {
+      "id": "Jinju-Indoor-Mark-15",
+      "name": "I15",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "04 Monkey/01 Monkey1/Monkey_Thriller Dancer_Ver1.glb"
+      },
+      "transform": {
+        "position": {
+          "x": -24.73,
+          "y": 5.900000095186292,
+          "z": -1.17
+        },
+        "rotationY": 52.6147143268635,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Idle",
+        "loop": true,
+        "clips": [
+          "Idle"
+        ],
+        "pivots": {}
+      },
+      "randomModel": true,
+      "movement": null
+    },
+    {
+      "id": "Jinju-Indoor-Mark-16",
+      "name": "I16",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "02 Shrooms/05 Shroom_Swing Dancer/Shroom_Swing Dancer.glb"
+      },
+      "transform": {
+        "position": {
+          "x": -27.83,
+          "y": 5.900000095084361,
+          "z": 1.1
+        },
+        "rotationY": 142.5518994285488,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Idle",
+        "loop": true,
+        "clips": [
+          "Idle"
+        ],
+        "pivots": {}
+      },
+      "randomModel": true,
+      "movement": null
+    },
+    {
+      "id": "Jinju-Mark-1",
+      "name": "E01",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "05 Edition/01 Marie Antoinette Fox/Edition_Marie.glb"
+      },
+      "transform": {
+        "position": {
+          "x": 13.64,
+          "y": 2.0599994782605484,
+          "z": 5.01
+        },
+        "rotationY": 529.6651041307383,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0.06,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Sit_Footcross",
+        "loop": true,
+        "clips": [
+          "Sit_Footcross"
+        ],
+        "pivots": {}
+      },
+      "randomModel": false,
+      "movement": null
+    },
+    {
+      "id": "Jinju-Mark-2",
+      "name": "E02",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "01 Happycats/04 Happycat_Ninja/Happycats_Ninja_Samba Dancer.glb"
+      },
+      "transform": {
+        "position": {
+          "x": 7.33,
+          "y": 2.099999411570634,
+          "z": 3.84
+        },
+        "rotationY": -104.53614972161871,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Idle",
+        "loop": true,
+        "clips": [
+          "Idle"
+        ],
+        "pivots": {}
+      },
+      "randomModel": false,
+      "movement": null
+    },
+    {
+      "id": "Jinju-Mark-3",
+      "name": "E03",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "04 Monkey/02 Monkey2/Monkey_Thriller Dancer_Ver2.glb"
+      },
+      "transform": {
+        "position": {
+          "x": -12.92,
+          "y": 1.9999994052307049,
+          "z": -8.36
+        },
+        "rotationY": -277.09957845912,
+        "scale": 0.75
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Idle",
+        "loop": true,
+        "clips": [
+          "Idle"
+        ],
+        "pivots": {}
+      },
+      "randomModel": false,
+      "movement": null
+    },
+    {
+      "id": "Jinju-Mark-4",
+      "name": "E04",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "01 Happycats/01 Skeleton_Dancer/Happycats_Skeleton_Dancer.glb"
+      },
+      "transform": {
+        "position": {
+          "x": -44.9,
+          "y": 1.9999994787521622,
+          "z": -5.94
+        },
+        "rotationY": -598.4830649039013,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Idle",
+        "loop": true,
+        "clips": [
+          "Idle"
+        ],
+        "pivots": {}
+      },
+      "randomModel": true,
+      "movement": null
+    },
+    {
+      "id": "Jinju-Mark-5",
+      "name": "E05",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "02 Shrooms/05 Shroom_Swing Dancer/Shroom_Swing Dancer.glb"
+      },
+      "transform": {
+        "position": {
+          "x": -54.26849245191247,
+          "y": 2,
+          "z": -9.566132059836118
+        },
+        "rotationY": -0.4235919665739153,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Idle",
+        "loop": true,
+        "clips": [
+          "Idle"
+        ],
+        "pivots": {}
+      },
+      "randomModel": true,
+      "movement": {
+        "type": "patrol",
+        "clip": "Walking",
+        "speed": 0.135,
+        "patrolTargets": [
+          {
+            "x": -54.51,
+            "y": 2,
+            "z": 23.1
+          },
+          {
+            "x": -54.24,
+            "y": 2,
+            "z": -13.42
+          }
+        ],
+        "easeSpeed": false,
+        "randomSpeedCycle": true
+      }
+    },
+    {
+      "id": "Jinju-Mark-6",
+      "name": "E06",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "02 Shrooms/05 Shroom_Swing Dancer/Shroom_Swing Dancer.glb"
+      },
+      "transform": {
+        "position": {
+          "x": -52.06854666060442,
+          "y": 2,
+          "z": 22.994081099472396
+        },
+        "rotationY": 90.94492717769681,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Idle",
+        "loop": true,
+        "clips": [
+          "Idle"
+        ],
+        "pivots": {}
+      },
+      "randomModel": true,
+      "movement": {
+        "type": "patrol",
+        "clip": "Walking",
+        "speed": 0.135,
+        "patrolTargets": [
+          {
+            "x": -20.9,
+            "y": 2,
+            "z": 22.48
+          },
+          {
+            "x": -53.64,
+            "y": 2,
+            "z": 23.02
+          }
+        ],
+        "easeSpeed": false,
+        "randomSpeedCycle": true
+      }
+    },
+    {
+      "id": "Jinju-Mark-7",
+      "name": "E07",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "01 Happycats/04 Happycat_Ninja/Happycats_Ninja_Samba Dancer.glb"
+      },
+      "transform": {
+        "position": {
+          "x": -28.23445086089617,
+          "y": 2,
+          "z": 24.332340800655558
+        },
+        "rotationY": -95.93703884332012,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Idle",
+        "loop": true,
+        "clips": [
+          "Idle"
+        ],
+        "pivots": {}
+      },
+      "randomModel": true,
+      "movement": {
+        "type": "patrol",
+        "clip": "Walking",
+        "speed": 0.135,
+        "patrolTargets": [
+          {
+            "x": -51.72,
+            "y": 2,
+            "z": 21.89
+          },
+          {
+            "x": -27.68,
+            "y": 2,
+            "z": 24.39
+          }
+        ],
+        "easeSpeed": false,
+        "randomSpeedCycle": true
+      }
+    },
+    {
+      "id": "Jinju-Mark-8",
+      "name": "E08",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "02 Shrooms/05 Shroom_Swing Dancer/Shroom_Swing Dancer.glb"
+      },
+      "transform": {
+        "position": {
+          "x": -47.51,
+          "y": 2.0999994842875473,
+          "z": 24.18
+        },
+        "rotationY": 461.82117160929744,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Idle",
+        "loop": true,
+        "clips": [
+          "Idle"
+        ],
+        "pivots": {}
+      },
+      "randomModel": true,
+      "movement": {
+        "type": "patrol",
+        "clip": "Walking",
+        "speed": 0.135,
+        "patrolTargets": [
+          {
+            "x": -8.02,
+            "y": 2,
+            "z": 22.46
+          },
+          {
+            "x": -47.51,
+            "y": 2,
+            "z": 24.18
+          }
+        ],
+        "easeSpeed": false,
+        "randomSpeedCycle": true
+      }
+    },
+    {
+      "id": "Jinju-Mark-9",
+      "name": "E09",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "01 Happycats/02_Happycat_Ultra_General/Happycats_Ultra_gen.glb"
+      },
+      "transform": {
+        "position": {
+          "x": 18.94,
+          "y": 1.9999994773778784,
+          "z": 24.67
+        },
+        "rotationY": 243.2435023448397,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Idle",
+        "loop": true,
+        "clips": [
+          "Idle"
+        ],
+        "pivots": {}
+      },
+      "randomModel": true,
+      "movement": {
+        "type": "patrol",
+        "clip": "Walking",
+        "speed": 0.135,
+        "patrolTargets": [
+          {
+            "x": -9.55,
+            "y": 2,
+            "z": 23.68
+          },
+          {
+            "x": -9.89,
+            "y": 2,
+            "z": 36.87
+          },
+          {
+            "x": -9.55,
+            "y": 2,
+            "z": 23.68
+          },
+          {
+            "x": 18.94,
+            "y": 2,
+            "z": 24.67
+          }
+        ],
+        "easeSpeed": false,
+        "randomSpeedCycle": true
+      }
+    },
+    {
+      "id": "Jinju-Mark-10",
+      "name": "E10",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "04 Monkey/01 Monkey1/Monkey_Thriller Dancer_Ver1.glb"
+      },
+      "transform": {
+        "position": {
+          "x": -16.79,
+          "y": 2.099999484482847,
+          "z": 19.83
+        },
+        "rotationY": -188.82970054126542,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Idle",
+        "loop": true,
+        "clips": [
+          "Idle"
+        ],
+        "pivots": {}
+      },
+      "randomModel": true,
+      "movement": {
+        "type": "patrol",
+        "clip": "Walking",
+        "speed": 0.135,
+        "patrolTargets": [
+          {
+            "x": -17.35,
+            "y": 2,
+            "z": 7.37
+          },
+          {
+            "x": -40.06,
+            "y": 2,
+            "z": 7.31
+          },
+          {
+            "x": -41.38,
+            "y": 2,
+            "z": 4.44
+          },
+          {
+            "x": -53.61,
+            "y": 2,
+            "z": 4.93
+          },
+          {
+            "x": -54.6,
+            "y": 2,
+            "z": 21.98
+          },
+          {
+            "x": -17.68,
+            "y": 2,
+            "z": 23.16
+          },
+          {
+            "x": -16.79,
+            "y": 2,
+            "z": 19.83
+          }
+        ],
+        "easeSpeed": false,
+        "randomSpeedCycle": true
+      }
+    },
+    {
+      "id": "Jinju-Mark-11",
+      "name": "E11",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "02 Shrooms/01 Shroom_Hip Hop Dancer/Shroom_Hip Hop Dancer.glb"
+      },
+      "transform": {
+        "position": {
+          "x": 19.05,
+          "y": 1.9999994778699417,
+          "z": 13.71
+        },
+        "rotationY": 175.8865839492601,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Idle",
+        "loop": true,
+        "clips": [
+          "Idle"
+        ],
+        "pivots": {}
+      },
+      "randomModel": false,
+      "movement": {
+        "type": "patrol",
+        "clip": "Walking",
+        "speed": 0.135,
+        "patrolTargets": [
+          {
+            "x": 18.52,
+            "y": 2,
+            "z": 3.74
+          },
+          {
+            "x": 7.67,
+            "y": 2,
+            "z": 2.47
+          },
+          {
+            "x": 18.1,
+            "y": 2,
+            "z": 2.56
+          },
+          {
+            "x": 15.94,
+            "y": 2,
+            "z": 0.94
+          },
+          {
+            "x": 18.77,
+            "y": 2,
+            "z": -2.74
+          },
+          {
+            "x": 18.84,
+            "y": 2,
+            "z": -23.18
+          },
+          {
+            "x": 21.97,
+            "y": 2,
+            "z": 2.21
+          },
+          {
+            "x": 19.05,
+            "y": 2,
+            "z": 13.71
+          }
+        ],
+        "easeSpeed": false,
+        "randomSpeedCycle": true
+      }
+    },
+    {
+      "id": "Jinju-Mark-12",
+      "name": "E12",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "04 Monkey/01 Monkey1/Monkey_Thriller Dancer_Ver1.glb"
+      },
+      "transform": {
+        "position": {
+          "x": 14.8,
+          "y": 1.9999994784405928,
+          "z": 1
+        },
+        "rotationY": 255.4360442252236,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Idle",
+        "loop": true,
+        "clips": [
+          "Idle"
+        ],
+        "pivots": {}
+      },
+      "randomModel": true,
+      "movement": {
+        "type": "patrol",
+        "clip": "Walking",
+        "speed": 0.135,
+        "patrolTargets": [
+          {
+            "x": -50.13,
+            "y": 2,
+            "z": 0.06
+          },
+          {
+            "x": 14.8,
+            "y": 2,
+            "z": 1
+          }
+        ],
+        "easeSpeed": false,
+        "randomSpeedCycle": true
+      }
+    },
+    {
+      "id": "Jinju-Mark-13",
+      "name": "E13",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "01 Happycats/04 Happycat_Ninja/Happycats_Ninja_Samba Dancer.glb"
+      },
+      "transform": {
+        "position": {
+          "x": -49.28,
+          "y": 1.9999994786421684,
+          "z": -3.49
+        },
+        "rotationY": 119.53618479814365,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Idle",
+        "loop": true,
+        "clips": [
+          "Idle"
+        ],
+        "pivots": {}
+      },
+      "randomModel": true,
+      "movement": {
+        "type": "patrol",
+        "clip": "Walking",
+        "speed": 0.135,
+        "patrolTargets": [
+          {
+            "x": -34.17,
+            "y": 2,
+            "z": 1.19
+          },
+          {
+            "x": -11.67,
+            "y": 2,
+            "z": -6.38
+          },
+          {
+            "x": -7.6,
+            "y": 2,
+            "z": -14.46
+          },
+          {
+            "x": -6.06,
+            "y": 2,
+            "z": -3.3
+          },
+          {
+            "x": 6.64,
+            "y": 2,
+            "z": 0.21
+          },
+          {
+            "x": 7.77,
+            "y": 2,
+            "z": 1.89
+          },
+          {
+            "x": 7.16,
+            "y": 2,
+            "z": 2.97
+          },
+          {
+            "x": -49.28,
+            "y": 2,
+            "z": -3.49
+          }
+        ],
+        "easeSpeed": false,
+        "randomSpeedCycle": true
+      }
+    },
+    {
+      "id": "Jinju-Rooftop-Mark-1",
+      "name": "R01",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "02 Shrooms/05 Shroom_Swing Dancer/Shroom_Swing Dancer.glb"
+      },
+      "transform": {
+        "position": {
+          "x": -27.33,
+          "y": 10.16,
+          "z": 5.38
+        },
+        "rotationY": -185.85032000658512,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0.06,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Sit_Footcross",
+        "loop": true,
+        "clips": [
+          "Sit_Footcross"
+        ],
+        "pivots": {}
+      },
+      "randomModel": true,
+      "movement": null
+    },
+    {
+      "id": "Jinju-Rooftop-Mark-2",
+      "name": "R02",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "02 Shrooms/04 Shroom_Gangnam style Dancer/Shroom_Gangnam style Dancer.glb"
+      },
+      "transform": {
+        "position": {
+          "x": -26.48,
+          "y": 10.2,
+          "z": 5.3
+        },
+        "rotationY": -546.0574266494311,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0.1,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Sitting Talking",
+        "loop": true,
+        "clips": [
+          "Sitting Talking"
+        ],
+        "pivots": {}
+      },
+      "randomModel": true,
+      "movement": null
+    },
+    {
+      "id": "Jinju-Rooftop-Mark-3",
+      "name": "R03",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "01 Happycats/04 Happycat_Ninja/Happycats_Ninja_Samba Dancer.glb"
+      },
+      "transform": {
+        "position": {
+          "x": -26.87,
+          "y": 10.1,
+          "z": 4.3
+        },
+        "rotationY": -362.79114629888596,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "sequence",
+        "type": "sequence",
+        "default": "Samba Dancing01",
+        "loop": true,
+        "clips": [
+          "Samba Dancing01",
+          "Samba Dancing02",
+          "Samba Dancing03",
+          "Samba Dancing04",
+          "Samba Dancing05",
+          "Samba Dancing06"
+        ],
+        "pivots": {}
+      },
+      "randomModel": false,
+      "movement": null
+    },
+    {
+      "id": "Jinju-Rooftop-Mark-4",
+      "name": "R04",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "02 Shrooms/05 Shroom_Swing Dancer/Shroom_Swing Dancer.glb"
+      },
+      "transform": {
+        "position": {
+          "x": -26.96,
+          "y": 10.65,
+          "z": -4.91
+        },
+        "rotationY": 374.2904092471616,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0.1,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Sit_Clap",
+        "loop": true,
+        "clips": [
+          "Sit_Clap"
+        ],
+        "pivots": {}
+      },
+      "randomModel": true,
+      "movement": null
+    },
+    {
+      "id": "Jinju-Rooftop-Mark-5",
+      "name": "R05",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "05 Edition/01 Marie Antoinette Fox/Edition_Marie.glb"
+      },
+      "transform": {
+        "position": {
+          "x": -26.24,
+          "y": 10.16,
+          "z": -4.91
+        },
+        "rotationY": 363.28389000269846,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0.06,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Sit_Footcross",
+        "loop": true,
+        "clips": [
+          "Sit_Footcross"
+        ],
+        "pivots": {}
+      },
+      "randomModel": true,
+      "movement": null
+    },
+    {
+      "id": "Jinju-Rooftop-Mark-6",
+      "name": "R06",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "04 Monkey/01 Monkey1/Monkey_Thriller Dancer_Ver1.glb"
+      },
+      "transform": {
+        "position": {
+          "x": -21.78,
+          "y": 10.1,
+          "z": -3.8
+        },
+        "rotationY": 500.85105661360916,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Idle",
+        "loop": true,
+        "clips": [
+          "Idle"
+        ],
+        "pivots": {}
+      },
+      "randomModel": true,
+      "movement": null
+    },
+    {
+      "id": "Jinju-Rooftop-Mark-7",
+      "name": "R07",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "02 Shrooms/04 Shroom_Gangnam style Dancer/Shroom_Gangnam style Dancer.glb"
+      },
+      "transform": {
+        "position": {
+          "x": -20.66,
+          "y": 10.16,
+          "z": -4.82
+        },
+        "rotationY": 306.3605330564512,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0.06,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Sit_Footcross",
+        "loop": true,
+        "clips": [
+          "Sit_Footcross"
+        ],
+        "pivots": {}
+      },
+      "randomModel": true,
+      "movement": null
+    },
+    {
+      "id": "Jinju-Rooftop-Mark-8",
+      "name": "R08",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "05 Edition/01 Marie Antoinette Fox/Edition_Marie.glb"
+      },
+      "transform": {
+        "position": {
+          "x": -6.13,
+          "y": 10.2,
+          "z": -6.09
+        },
+        "rotationY": 357.35950640104573,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0.1,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Seat_Clapping",
+        "loop": true,
+        "clips": [
+          "Seat_Clapping"
+        ],
+        "pivots": {}
+      },
+      "randomModel": true,
+      "movement": null
+    },
+    {
+      "id": "Jinju-Rooftop-Mark-9",
+      "name": "R09",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "02 Shrooms/04 Shroom_Gangnam style Dancer/Shroom_Gangnam style Dancer.glb"
+      },
+      "transform": {
+        "position": {
+          "x": -8.35,
+          "y": 10.2,
+          "z": -6.09
+        },
+        "rotationY": 364.5042901063271,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0.1,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Sit_Clap",
+        "loop": true,
+        "clips": [
+          "Sit_Clap"
+        ],
+        "pivots": {}
+      },
+      "randomModel": true,
+      "movement": null
+    },
+    {
+      "id": "Jinju-Rooftop-Mark-10",
+      "name": "R10",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "02 Shrooms/04 Shroom_Gangnam style Dancer/Shroom_Gangnam style Dancer.glb"
+      },
+      "transform": {
+        "position": {
+          "x": -9.83,
+          "y": 10.5,
+          "z": -6.99
+        },
+        "rotationY": 374.2904092471616,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0.1,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Sitting Talking",
+        "loop": true,
+        "clips": [
+          "Sitting Talking"
+        ],
+        "pivots": {}
+      },
+      "randomModel": true,
+      "movement": null
+    },
+    {
+      "id": "Jinju-Rooftop-Mark-11",
+      "name": "R11",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "01 Happycats/02_Happycat_Ultra_General/Happycats_Ultra_gen.glb"
+      },
+      "transform": {
+        "position": {
+          "x": -7.68,
+          "y": 10.76,
+          "z": -7.95
+        },
+        "rotationY": 712.8225225002085,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0.06,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Sit_Footswing",
+        "loop": true,
+        "clips": [
+          "Sit_Footswing"
+        ],
+        "pivots": {}
+      },
+      "randomModel": true,
+      "movement": null
+    },
+    {
+      "id": "Jinju-Rooftop-Mark-12",
+      "name": "R12",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "02 Shrooms/04 Shroom_Gangnam style Dancer/Shroom_Gangnam style Dancer.glb"
+      },
+      "transform": {
+        "position": {
+          "x": -5.7,
+          "y": 10.82,
+          "z": -7.89
+        },
+        "rotationY": 1068.130839994686,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0.06,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Sit_Footcross",
+        "loop": true,
+        "clips": [
+          "Sit_Footcross"
+        ],
+        "pivots": {}
+      },
+      "randomModel": true,
+      "movement": null
+    },
+    {
+      "id": "Jinju-Rooftop-Mark-13",
+      "name": "R13",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "04 Monkey/01 Monkey1/Monkey_Thriller Dancer_Ver1.glb"
+      },
+      "transform": {
+        "position": {
+          "x": -7.876020431518555,
+          "y": 10.09999942779541,
+          "z": -1.9781396389007568
+        },
+        "rotationY": 177.23497574304074,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "sequence",
+        "type": "sequence",
+        "default": "Dance_Thriller0",
+        "loop": true,
+        "clips": [
+          "Dance_Thriller0",
+          "Dance_Thriller1",
+          "Dance_Thriller2",
+          "Dance_Thriller3",
+          "Dance_Thriller4"
+        ],
+        "pivots": {}
+      },
+      "randomModel": false,
+      "movement": null
+    },
+    {
+      "id": "Jinju-Rooftop-Mark-14",
+      "name": "R14",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "04 Monkey/02 Monkey2/Monkey_Thriller Dancer_Ver2.glb"
+      },
+      "transform": {
+        "position": {
+          "x": -10.53377914428711,
+          "y": 10.09999942779541,
+          "z": -1.8525288105010986
+        },
+        "rotationY": -179.54830984683758,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "sequence",
+        "type": "sequence",
+        "default": "Dance_Thriller0",
+        "loop": true,
+        "clips": [
+          "Dance_Thriller0",
+          "Dance_Thriller1",
+          "Dance_Thriller2",
+          "Dance_Thriller3",
+          "Dance_Thriller4"
+        ],
+        "pivots": {}
+      },
+      "randomModel": false,
+      "movement": null
+    },
+    {
+      "id": "Jinju-Rooftop-Mark-15",
+      "name": "R15",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "04 Monkey/02 Monkey2/Monkey_Thriller Dancer_Ver2.glb"
+      },
+      "transform": {
+        "position": {
+          "x": -5.295347690582275,
+          "y": 10.09999942779541,
+          "z": -1.7585513591766357
+        },
+        "rotationY": -179.9054241748291,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "sequence",
+        "type": "sequence",
+        "default": "Dance_Thriller0",
+        "loop": true,
+        "clips": [
+          "Dance_Thriller0",
+          "Dance_Thriller1",
+          "Dance_Thriller2",
+          "Dance_Thriller3",
+          "Dance_Thriller4"
+        ],
+        "pivots": {}
+      },
+      "randomModel": false,
+      "movement": null
+    },
+    {
+      "id": "Jinju-Rooftop-Mark-16",
+      "name": "R16",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "02 Shrooms/05 Shroom_Swing Dancer/Shroom_Swing Dancer.glb"
+      },
+      "transform": {
+        "position": {
+          "x": -10.38,
+          "y": 10.299999999999999,
+          "z": 0.86
+        },
+        "rotationY": 1223.3279179617716,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0.1,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Sit_Clap",
+        "loop": true,
+        "clips": [
+          "Sit_Clap"
+        ],
+        "pivots": {}
+      },
+      "randomModel": true,
+      "movement": null
+    },
+    {
+      "id": "Jinju-Rooftop-Mark-17",
+      "name": "R17",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "02 Shrooms/04 Shroom_Gangnam style Dancer/Shroom_Gangnam style Dancer.glb"
+      },
+      "transform": {
+        "position": {
+          "x": -7.67,
+          "y": 10.299999999999999,
+          "z": 1.02
+        },
+        "rotationY": 1250.0506695266736,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0.1,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Sitting Talking",
+        "loop": true,
+        "clips": [
+          "Sitting Talking"
+        ],
+        "pivots": {}
+      },
+      "randomModel": true,
+      "movement": null
+    },
+    {
+      "id": "Jinju-Rooftop-Mark-18",
+      "name": "R18",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "02 Shrooms/01 Shroom_Hip Hop Dancer/Shroom_Hip Hop Dancer.glb"
+      },
+      "transform": {
+        "position": {
+          "x": -5.14,
+          "y": 10.299999999999999,
+          "z": -6.08
+        },
+        "rotationY": 1039.6261896869273,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0.1,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Sit_Clap",
+        "loop": true,
+        "clips": [
+          "Sit_Clap"
+        ],
+        "pivots": {}
+      },
+      "randomModel": true,
+      "movement": null
+    },
+    {
+      "id": "Jinju-Rooftop-Mark-19",
+      "name": "R19",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "02 Shrooms/05 Shroom_Swing Dancer/Shroom_Swing Dancer.glb"
+      },
+      "transform": {
+        "position": {
+          "x": 9.56,
+          "y": 10.75,
+          "z": 1.79
+        },
+        "rotationY": 1263.8818707011314,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0.1,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Seat_Stand Up",
+        "loop": true,
+        "clips": [
+          "Seat_Stand Up"
+        ],
+        "pivots": {}
+      },
+      "randomModel": true,
+      "movement": null
+    },
+    {
+      "id": "Jinju-Rooftop-Mark-20",
+      "name": "R20",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "05 Edition/01 Marie Antoinette Fox/Edition_Marie.glb"
+      },
+      "transform": {
+        "position": {
+          "x": 11.01,
+          "y": 10.75,
+          "z": 1.82
+        },
+        "rotationY": 1254.4739037050836,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0.1,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Sitting Talking",
+        "loop": true,
+        "clips": [
+          "Sitting Talking"
+        ],
+        "pivots": {}
+      },
+      "randomModel": true,
+      "movement": null
+    },
+    {
+      "id": "Jinju-Rooftop-Mark-21",
+      "name": "R21",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "02 Shrooms/04 Shroom_Gangnam style Dancer/Shroom_Gangnam style Dancer.glb"
+      },
+      "transform": {
+        "position": {
+          "x": 14.65,
+          "y": 10.75,
+          "z": 3.71
+        },
+        "rotationY": 987.6245402008541,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0.1,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Sitting Talking",
+        "loop": true,
+        "clips": [
+          "Sitting Talking"
+        ],
+        "pivots": {}
+      },
+      "randomModel": true,
+      "movement": null
+    },
+    {
+      "id": "Jinju-Rooftop-Mark-22",
+      "name": "R22",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "02 Shrooms/05 Shroom_Swing Dancer/Shroom_Swing Dancer.glb"
+      },
+      "transform": {
+        "position": {
+          "x": 14.6,
+          "y": 10.75,
+          "z": 2.7
+        },
+        "rotationY": 1018.186108993132,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0.1,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Sit_Clap",
+        "loop": true,
+        "clips": [
+          "Sit_Clap"
+        ],
+        "pivots": {}
+      },
+      "randomModel": true,
+      "movement": null
+    },
+    {
+      "id": "Jinju-Rooftop-Mark-23",
+      "name": "R23",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "04 Monkey/02 Monkey2/Monkey_Thriller Dancer_Ver2.glb"
+      },
+      "transform": {
+        "position": {
+          "x": 9.03,
+          "y": 10.75,
+          "z": 5.27
+        },
+        "rotationY": 899.8645947206658,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0.1,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Seat_Stand Up",
+        "loop": true,
+        "clips": [
+          "Seat_Stand Up"
+        ],
+        "pivots": {}
+      },
+      "randomModel": true,
+      "movement": null
+    },
+    {
+      "id": "Jinju-Rooftop-Mark-24",
+      "name": "R24",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "02 Shrooms/04 Shroom_Gangnam style Dancer/Shroom_Gangnam style Dancer.glb"
+      },
+      "transform": {
+        "position": {
+          "x": 15.73,
+          "y": 10.33,
+          "z": -0.15
+        },
+        "rotationY": 800.7830032086924,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Idle",
+        "loop": true,
+        "clips": [
+          "Idle"
+        ],
+        "pivots": {}
+      },
+      "randomModel": true,
+      "movement": null
+    },
+    {
+      "id": "Jinju-Rooftop-Mark-25",
+      "name": "R25",
+      "type": "npc",
+      "deleted": false,
+      "model": {
+        "path": "01 Happycats/04 Happycat_Ninja/Happycats_Ninja_Samba Dancer.glb"
+      },
+      "transform": {
+        "position": {
+          "x": 8.02,
+          "y": 10.1,
+          "z": -0.17
+        },
+        "rotationY": 622.8337711969614,
+        "scale": 1
+      },
+      "footOffset": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "interaction": {
+        "enabled": true,
+        "triggerDistance": 1.5
+      },
+      "animation": {
+        "mode": "loop",
+        "type": "loop",
+        "default": "Idle",
+        "loop": true,
+        "clips": [
+          "Idle"
+        ],
+        "pivots": {}
+      },
+      "randomModel": false,
+      "movement": {
+        "type": "patrol",
+        "clip": "Run_Goofy",
+        "speed": 0.0255,
+        "patrolTargets": [
+          {
+            "x": 8.02,
+            "y": 10.1,
+            "z": -0.17
+          },
+          {
+            "x": -27.48,
+            "y": 10.1,
+            "z": 0.58
+          },
+          {
+            "x": -27.58,
+            "y": 10.1,
+            "z": -2.72
+          },
+          {
+            "x": -17.53,
+            "y": 10.1,
+            "z": -2.05
+          },
+          {
+            "x": -7.9,
+            "y": 10.1,
+            "z": -4.78
+          },
+          {
+            "x": -1.52,
+            "y": 10.1,
+            "z": -0.61
+          },
+          {
+            "x": 8.02,
+            "y": 10.1,
+            "z": -0.17
+          }
+        ],
+        "easeSpeed": false
+      }
+    }
+  ]
+}

@@ -2,6 +2,8 @@
  * Rabbit Metaverse Editor — Event / Teleport / Tour point data (PHASE 3).
  */
 
+import { getMetaverseProjectContext, getMetaverseProjectId } from "../metaverse-project-context.js?v=editor-shared-20260908";
+
 export const MARKER_DATA_VERSION = "1.0";
 export const EVENT_DATA_URL = "./data/editor/events.json";
 export const TELEPORT_DATA_URL = "./data/editor/teleports.json";
@@ -9,6 +11,10 @@ export const TOUR_DATA_URL = "./data/editor/tours.json";
 export const EVENT_STORAGE_KEY = "rabbit-metaverse-events-v1";
 export const TELEPORT_STORAGE_KEY = "rabbit-metaverse-teleports-v1";
 export const TOUR_STORAGE_KEY = "rabbit-metaverse-tours-v1";
+
+function markerContext() {
+  return getMetaverseProjectContext().markers;
+}
 
 export const EDITOR_LAYERS = {
   NPC: "npc",
@@ -185,7 +191,7 @@ export function normalizeTourRecord(raw = {}) {
   };
 }
 
-function normalizeCollection(raw, key, normalizeItem, projectId = "angji") {
+function normalizeCollection(raw, key, normalizeItem, projectId = getMetaverseProjectId()) {
   const items = Array.isArray(raw?.[key])
     ? raw[key].map(normalizeItem).filter(Boolean)
     : [];
@@ -243,19 +249,19 @@ function readStorage(key, normalizeDoc) {
 
 export function writeEventStorage(document) {
   const normalized = normalizeEventDocument(document);
-  localStorage.setItem(EVENT_STORAGE_KEY, JSON.stringify(normalized));
+  localStorage.setItem(markerContext().eventsStorageKey, JSON.stringify(normalized));
   return normalized;
 }
 
 export function writeTeleportStorage(document) {
   const normalized = normalizeTeleportDocument(document);
-  localStorage.setItem(TELEPORT_STORAGE_KEY, JSON.stringify(normalized));
+  localStorage.setItem(markerContext().teleportsStorageKey, JSON.stringify(normalized));
   return normalized;
 }
 
 export function writeTourStorage(document) {
   const normalized = normalizeTourDocument(document);
-  localStorage.setItem(TOUR_STORAGE_KEY, JSON.stringify(normalized));
+  localStorage.setItem(markerContext().toursStorageKey, JSON.stringify(normalized));
   return normalized;
 }
 
@@ -287,14 +293,14 @@ function pickEffective(base, stored, seed, key, normalizeDoc) {
 }
 
 export async function loadEffectiveEventDocument() {
-  const stored = readStorage(EVENT_STORAGE_KEY, normalizeEventDocument);
-  const base = await loadBaseDocument(EVENT_DATA_URL, normalizeEventDocument);
+  const stored = readStorage(markerContext().eventsStorageKey, normalizeEventDocument);
+  const base = await loadBaseDocument(markerContext().eventsUrl, normalizeEventDocument);
   return pickEffective(base, stored, { events: [] }, "events", normalizeEventDocument);
 }
 
 export async function loadEffectiveTeleportDocument() {
-  const stored = readStorage(TELEPORT_STORAGE_KEY, normalizeTeleportDocument);
-  const base = await loadBaseDocument(TELEPORT_DATA_URL, normalizeTeleportDocument);
+  const stored = readStorage(markerContext().teleportsStorageKey, normalizeTeleportDocument);
+  const base = await loadBaseDocument(markerContext().teleportsUrl, normalizeTeleportDocument);
   return pickEffective(base, stored, { teleports: [] }, "teleports", normalizeTeleportDocument);
 }
 
@@ -312,8 +318,8 @@ export function tourPointsFromGuideEvents(events = []) {
 }
 
 export async function loadEffectiveTourDocument(guideEvents = []) {
-  const stored = readStorage(TOUR_STORAGE_KEY, normalizeTourDocument);
-  const base = await loadBaseDocument(TOUR_DATA_URL, normalizeTourDocument);
+  const stored = readStorage(markerContext().toursStorageKey, normalizeTourDocument);
+  const base = await loadBaseDocument(markerContext().toursUrl, normalizeTourDocument);
   const seed = { tours: tourPointsFromGuideEvents(guideEvents) };
   return pickEffective(base, stored, seed, "tours", normalizeTourDocument);
 }
@@ -379,7 +385,7 @@ function applyTourMarkerToGuideEvent(event, tour) {
  */
 export function applyEditorToursToGuideData(tourData, toursDoc = null, options = {}) {
   const pruneUnlinkedEvents = options.pruneUnlinkedEvents !== false;
-  const overlay = normalizeTourDocument(toursDoc || readStorage(TOUR_STORAGE_KEY, normalizeTourDocument) || {});
+  const overlay = normalizeTourDocument(toursDoc || readStorage(markerContext().toursStorageKey, normalizeTourDocument) || {});
   const base = cloneJson(tourData || { events: [] });
   let events = Array.isArray(base.events) ? base.events.map((event) => ({ ...event })) : [];
   const byId = new Map(events.map((event) => [String(event.id), event]));
@@ -428,11 +434,13 @@ export function applyEditorToursToGuideData(tourData, toursDoc = null, options =
     }
   });
 
-  if (pruneUnlinkedEvents) {
+  if (pruneUnlinkedEvents && tours.length) {
     const keep = new Set(
       tours.map((tour) => String(tour.sourceEventId || "").trim()).filter(Boolean)
     );
-    events = events.filter((event) => keep.has(String(event.id)));
+    if (keep.size) {
+      events = events.filter((event) => keep.has(String(event.id)));
+    }
   }
 
   return {
@@ -451,7 +459,7 @@ export function applyEditorToursToGuideData(tourData, toursDoc = null, options =
  * Rebuild editor Tour markers from GUIDE events (1:1 add/update/delete).
  */
 export function applyGuideDataToEditorTours(tourData, toursDoc = null) {
-  const overlay = normalizeTourDocument(toursDoc || readStorage(TOUR_STORAGE_KEY, normalizeTourDocument) || {});
+  const overlay = normalizeTourDocument(toursDoc || readStorage(markerContext().toursStorageKey, normalizeTourDocument) || {});
   const events = Array.isArray(tourData?.events) ? tourData.events : [];
   const existingBySource = new Map();
 
@@ -502,7 +510,7 @@ export function applyGuideDataToEditorTours(tourData, toursDoc = null) {
  * Runtime overlay: update linked GUIDE events from Tour markers (no new events).
  */
 export function overlayGuideTourWithEditorMarkers(tourData, toursDoc = null) {
-  const overlay = toursDoc || readStorage(TOUR_STORAGE_KEY, normalizeTourDocument);
+  const overlay = toursDoc || readStorage(markerContext().toursStorageKey, normalizeTourDocument);
 
   if (!tourData?.events?.length || !overlay?.tours?.length) {
     return tourData;

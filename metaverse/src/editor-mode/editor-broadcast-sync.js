@@ -1,6 +1,9 @@
 /**
  * Cross-window sync for editor saves (main metaverse ↔ popup editor).
+ * Channels are scoped by ?project= so projects do not overwrite each other.
  */
+
+import { getMetaverseProjectContext } from "../metaverse-project-context.js?v=editor-shared-20260908";
 
 const CLIENT_ID = typeof crypto !== "undefined" && crypto.randomUUID
   ? crypto.randomUUID()
@@ -11,6 +14,8 @@ const tourRemoteListeners = new Set();
 
 /** @type {Set<(bundle: unknown, meta: Record<string, unknown>) => void>} */
 const guestRemoteListeners = new Set();
+
+const channelCache = new Map();
 
 function createBroadcastChannel(channelName, onMessage) {
   if (typeof BroadcastChannel === "undefined") {
@@ -29,50 +34,68 @@ function createBroadcastChannel(channelName, onMessage) {
   return channel;
 }
 
-const tourBroadcast = createBroadcastChannel("angji-guide-tour-data-v1", (payload) => {
-  if (payload.type !== "tour-data" || !payload.data) {
-    return;
+function ensureProjectChannels() {
+  const ctx = getMetaverseProjectContext();
+  const cached = channelCache.get(ctx.projectId);
+
+  if (cached) {
+    return cached;
   }
 
-  tourRemoteListeners.forEach((listener) => {
-    try {
-      listener(payload.data, payload.meta || {});
-    } catch (error) {
-      console.error("[editor-broadcast-sync] tour remote listener failed", error);
+  const onTour = (payload) => {
+    if (payload.type !== "tour-data" || !payload.data) {
+      return;
     }
-  });
-});
 
-const guestBroadcast = createBroadcastChannel("angji-guest-bundle-v1", (payload) => {
-  if (payload.type !== "guest-bundle" || !payload.data) {
-    return;
-  }
+    tourRemoteListeners.forEach((listener) => {
+      try {
+        listener(payload.data, payload.meta || {});
+      } catch (error) {
+        console.error("[editor-broadcast-sync] tour remote listener failed", error);
+      }
+    });
+  };
 
-  guestRemoteListeners.forEach((listener) => {
-    try {
-      listener(payload.data, payload.meta || {});
-    } catch (error) {
-      console.error("[editor-broadcast-sync] guest remote listener failed", error);
+  const onGuest = (payload) => {
+    if (payload.type !== "guest-bundle" || !payload.data) {
+      return;
     }
-  });
-});
+
+    guestRemoteListeners.forEach((listener) => {
+      try {
+        listener(payload.data, payload.meta || {});
+      } catch (error) {
+        console.error("[editor-broadcast-sync] guest remote listener failed", error);
+      }
+    });
+  };
+
+  const tourNames = [ctx.broadcast.tour, ...ctx.broadcast.tourAliases];
+  const guestNames = [ctx.broadcast.guest, ...ctx.broadcast.guestAliases];
+  const tourChannels = tourNames.map((name) => createBroadcastChannel(name, onTour)).filter(Boolean);
+  const guestChannels = guestNames.map((name) => createBroadcastChannel(name, onGuest)).filter(Boolean);
+
+  const next = {
+    postTour(data, meta) {
+      const message = { type: "tour-data", data, meta, clientId: CLIENT_ID };
+      tourChannels.forEach((channel) => channel.postMessage(message));
+    },
+    postGuest(bundle, meta) {
+      const message = { type: "guest-bundle", data: bundle, meta, clientId: CLIENT_ID };
+      guestChannels.forEach((channel) => channel.postMessage(message));
+    }
+  };
+
+  channelCache.set(ctx.projectId, next);
+  return next;
+}
 
 export function postTourDataBroadcast(data, meta = {}) {
-  tourBroadcast?.postMessage({
-    type: "tour-data",
-    data,
-    meta,
-    clientId: CLIENT_ID
-  });
+  ensureProjectChannels().postTour(data, meta);
 }
 
 export function postGuestBundleBroadcast(bundle, meta = {}) {
-  guestBroadcast?.postMessage({
-    type: "guest-bundle",
-    data: bundle,
-    meta,
-    clientId: CLIENT_ID
-  });
+  ensureProjectChannels().postGuest(bundle, meta);
 }
 
 export function subscribeTourDataRemote(listener) {
@@ -80,6 +103,7 @@ export function subscribeTourDataRemote(listener) {
     return () => {};
   }
 
+  ensureProjectChannels();
   tourRemoteListeners.add(listener);
   return () => tourRemoteListeners.delete(listener);
 }
@@ -89,6 +113,7 @@ export function subscribeGuestBundleRemote(listener) {
     return () => {};
   }
 
+  ensureProjectChannels();
   guestRemoteListeners.add(listener);
   return () => guestRemoteListeners.delete(listener);
 }

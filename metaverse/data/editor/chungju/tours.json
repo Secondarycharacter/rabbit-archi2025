@@ -1,0 +1,26 @@
+{
+  "version": "1.0",
+  "projectId": "chungju",
+  "tours": [
+    {
+      "id": "tour_000",
+      "name": "가이드 등장",
+      "type": "tour",
+      "sourceEventId": "00",
+      "duration": 10,
+      "script": {
+        "ko": "",
+        "en": "",
+        "voice": ""
+      },
+      "transform": {
+        "position": {
+          "x": 21.36566734313965,
+          "y": 10.747722625732422,
+          "z": 5.371356010437012
+        },
+        "rotationY": 28.42702399048458
+      }
+    }
+  ]
+}

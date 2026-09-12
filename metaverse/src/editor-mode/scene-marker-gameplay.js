@@ -3,11 +3,12 @@
  * Markers stay editor-only; this module has no gizmos or 3D markers.
  */
 
+import { getMetaverseProjectId } from "../metaverse-project-context.js?v=editor-shared-20260908";
 import {
   loadEffectiveEventDocument,
   loadEffectiveTeleportDocument,
   loadEffectiveTourDocument
-} from "./scene-marker-data.js?v=npc-editor-phase4-20260903";
+} from "./scene-marker-data.js?v=editor-guide-pose-20260908";
 
 function horizontalDistance(a, b) {
   return Math.hypot((a?.x || 0) - (b?.x || 0), (a?.z || 0) - (b?.z || 0));
@@ -65,7 +66,7 @@ export function createSceneMarkerGameplay(options = {}) {
     startNpcDialog = null,
     getNpcWorldPose = () => null,
     onStatus = null,
-    getCurrentProjectId = () => "angji"
+    getCurrentProjectId = () => getMetaverseProjectId()
   } = options;
 
   const ui = ensureDom();

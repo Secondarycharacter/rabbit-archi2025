@@ -25,8 +25,6 @@ export const JINJU_INDOOR_FIXED_GUEST_IDS = [
 
 const SIT_CLIP_PATTERN = /^(sit|seat|sitting)/i;
 
-export const JINJU_INDOOR_SIT_GUEST_Y_OFFSET = 0.1;
-
 const JINJU_INDOOR_SAMBA_CLIPS = [
   "Samba Dancing01",
   "Samba Dancing02",
@@ -51,8 +49,7 @@ const JINJU_INDOOR_SIT_SEAT_CHARACTER_POOL = [
   },
   {
     file: "05 Edition/01 Marie Antoinette Fox/Edition_Marie.glb",
-    clips: ["Sit_Footcross", "Sit_Footswing"],
-    sitYOffsetOverride: 0.06
+    clips: ["Sit_Footcross", "Sit_Footswing"]
   }
 ];
 
@@ -120,16 +117,6 @@ function filterSitSeatClips(clips) {
   return clips.filter((clip) => SIT_CLIP_PATTERN.test(clip));
 }
 
-export function getJinjuIndoorGuestPositionYOffset(spawn) {
-  if (typeof spawn.sitYOffsetOverride === "number") {
-    return spawn.sitYOffsetOverride;
-  }
-
-  const clips = spawn.animation?.clips || [];
-
-  return clips.some((clip) => SIT_CLIP_PATTERN.test(clip)) ? JINJU_INDOOR_SIT_GUEST_Y_OFFSET : 0;
-}
-
 export function buildJinjuIndoorGuestSpawns() {
   const activeLayout = getActiveIndoorMarkLayout();
   const idleLayouts = activeLayout.filter((layout) => layout.role === "randomIdle");
@@ -152,19 +139,18 @@ export function buildJinjuIndoorGuestSpawns() {
     };
 
     if (layout.role === "fixed") {
-      const sitClips = filterSitSeatClips(layout.animation.clips);
-
       return {
         ...baseSpawn,
+        randomModel: false,
         file: layout.file,
-        animation: layout.animation,
-        sitYOffsetOverride: sitClips.length ? JINJU_INDOOR_SIT_GUEST_Y_OFFSET : undefined
+        animation: layout.animation
       };
     }
 
     if (layout.role === "randomIdle") {
       return {
         ...baseSpawn,
+        randomModel: true,
         file: idleAssignments[idleIndex++],
         animation: { type: "loop", clips: ["Idle"] }
       };
@@ -176,14 +162,12 @@ export function buildJinjuIndoorGuestSpawns() {
 
     return {
       ...baseSpawn,
+      randomModel: true,
       file: sitEntry.file,
       animation: {
         type: "loop",
         clips: [sitClip]
-      },
-      sitYOffsetOverride: typeof sitEntry.sitYOffsetOverride === "number"
-        ? sitEntry.sitYOffsetOverride
-        : (sitSeatClips.length ? JINJU_INDOOR_SIT_GUEST_Y_OFFSET : undefined)
+      }
     };
   });
 }

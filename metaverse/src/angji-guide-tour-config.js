@@ -3,10 +3,10 @@
 import {
   DEFAULT_GUIDE_SPAWN_TRANSFORM,
   loadRuntimeTourData
-} from "./angji-guide-tour-data.js?v=restore-common-dialogues-20260907";
+} from "./angji-guide-tour-data.js?v=editor-guide-pose-20260908";
 
 export const ANGJI_GUIDE_TOUR_VERSION = "restore-common-dialogues-20260907";
-export { ANGJI_GUIDE_TOUR_DATA_URL } from "./angji-guide-tour-data.js?v=restore-common-dialogues-20260907";
+export { ANGJI_GUIDE_TOUR_DATA_URL } from "./angji-guide-tour-data.js?v=editor-guide-pose-20260908";
 
 export const ANGJI_GUIDE_SPAWN = {
   id: "Angji-Guide",
@@ -48,7 +48,7 @@ export async function loadAngjiGuideTourData(url) {
 
   try {
     const { overlayGuideTourWithEditorMarkers } = await import(
-      "./editor-mode/scene-marker-data.js?v=guide-tour-bidirectional-20260903"
+      "./editor-mode/scene-marker-data.js?v=editor-guide-pose-20260908"
     );
     return overlayGuideTourWithEditorMarkers(data);
   } catch (error) {

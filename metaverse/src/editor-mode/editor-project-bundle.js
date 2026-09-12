@@ -3,16 +3,17 @@
  * Spec §30–33: final deliverable is exported JSON, not localStorage alone.
  */
 
+import { getMetaverseProjectContext, getMetaverseProjectId } from "../metaverse-project-context.js?v=editor-shared-20260908";
 import {
   normalizeNpcSceneDocument,
   exportNpcSceneJson
-} from "./npc-scene-editor-data.js?v=npc-pivot-offset-20260903";
+} from "./npc-scene-editor-data.js?v=project-scope-20260908";
 import {
   normalizeEventDocument,
   normalizeTeleportDocument,
   normalizeTourDocument,
   exportMarkerJson
-} from "./scene-marker-data.js?v=guide-tour-bidirectional-20260903";
+} from "./scene-marker-data.js?v=editor-guide-pose-20260908";
 
 export const PROJECT_BUNDLE_KIND = "rabbit-metaverse-project";
 export const PROJECT_BUNDLE_VERSION = "1.0";
@@ -27,7 +28,7 @@ export function isEditorProjectBundle(raw) {
 }
 
 export function buildEditorProjectBundle({
-  projectId = "angji",
+  projectId = getMetaverseProjectId(),
   npcs = null,
   events = null,
   teleports = null,
@@ -41,7 +42,7 @@ export function buildEditorProjectBundle({
   return {
     kind: PROJECT_BUNDLE_KIND,
     version: PROJECT_BUNDLE_VERSION,
-    projectId: String(projectId || npcDoc.projectId || "angji"),
+    projectId: String(projectId || npcDoc.projectId || getMetaverseProjectId()),
     exportedAt: new Date().toISOString(),
     npcs: npcDoc,
     events: eventDoc,
@@ -128,7 +129,7 @@ export function validateEditorProjectBundle(raw) {
 export function writeProjectImportBackup(bundle) {
   try {
     const normalized = normalizeEditorProjectBundle(bundle) || buildEditorProjectBundle(bundle);
-    localStorage.setItem(PROJECT_IMPORT_BACKUP_KEY, JSON.stringify({
+    localStorage.setItem(getMetaverseProjectContext().bundle.importBackupKey, JSON.stringify({
       savedAt: new Date().toISOString(),
       bundle: normalized
     }));
@@ -141,7 +142,7 @@ export function writeProjectImportBackup(bundle) {
 
 export function readProjectImportBackup() {
   try {
-    const raw = localStorage.getItem(PROJECT_IMPORT_BACKUP_KEY);
+    const raw = localStorage.getItem(getMetaverseProjectContext().bundle.importBackupKey);
 
     if (!raw) {
       return null;

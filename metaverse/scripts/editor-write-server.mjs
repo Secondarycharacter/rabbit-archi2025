@@ -16,14 +16,40 @@ const METAVERSE_ROOT = path.resolve(__dirname, "..");
 const HOST = "127.0.0.1";
 const PORT = Number(process.env.EDITOR_WRITE_PORT || 8091);
 
-const TARGETS = {
-  npcs: path.join(METAVERSE_ROOT, "data", "npc", "npcs.json"),
-  events: path.join(METAVERSE_ROOT, "data", "editor", "events.json"),
-  teleports: path.join(METAVERSE_ROOT, "data", "editor", "teleports.json"),
-  tours: path.join(METAVERSE_ROOT, "data", "editor", "tours.json")
-};
+const DEFAULT_PROJECT_ID = "angji";
 
-const GUIDE_BASE_FILE = path.join(METAVERSE_ROOT, "data", "guide", "angji-guide-tour.json");
+function normalizeProjectId(value) {
+  const id = String(value || "").trim().toLowerCase();
+  return /^[a-z0-9][a-z0-9_-]{0,47}$/.test(id) ? id : DEFAULT_PROJECT_ID;
+}
+
+function resolveProjectTargets(projectId) {
+  const id = normalizeProjectId(projectId);
+
+  if (id === DEFAULT_PROJECT_ID) {
+    return {
+      projectId: id,
+      npcs: path.join(METAVERSE_ROOT, "data", "npc", "npcs.json"),
+      events: path.join(METAVERSE_ROOT, "data", "editor", "events.json"),
+      teleports: path.join(METAVERSE_ROOT, "data", "editor", "teleports.json"),
+      tours: path.join(METAVERSE_ROOT, "data", "editor", "tours.json"),
+      guide: path.join(METAVERSE_ROOT, "data", "guide", "angji-guide-tour.json")
+    };
+  }
+
+  return {
+    projectId: id,
+    npcs: path.join(METAVERSE_ROOT, "data", "npc", id, "npcs.json"),
+    events: path.join(METAVERSE_ROOT, "data", "editor", id, "events.json"),
+    teleports: path.join(METAVERSE_ROOT, "data", "editor", id, "teleports.json"),
+    tours: path.join(METAVERSE_ROOT, "data", "editor", id, "tours.json"),
+    guide: path.join(METAVERSE_ROOT, "data", "guide", `${id}-guide-tour.json`)
+  };
+}
+
+const TARGETS = resolveProjectTargets(DEFAULT_PROJECT_ID);
+
+const GUIDE_BASE_FILE = TARGETS.guide;
 const GUIDE_BACKUP_DIR = path.join(METAVERSE_ROOT, "data", "guide", "backups");
 const GUIDE_MANIFEST_FILE = path.join(METAVERSE_ROOT, "data", "guide", "angji-guide-tour.versions.json");
 const GUIDE_BACKUP_LIMIT = 3;
@@ -236,25 +262,31 @@ function readBody(req) {
 
 function applyBundle(bundle = {}) {
   const written = [];
+  const targets = resolveProjectTargets(bundle.projectId);
 
   if (bundle.npcs) {
-    writePrettyJson(TARGETS.npcs, bundle.npcs);
-    written.push(path.relative(METAVERSE_ROOT, TARGETS.npcs));
+    writePrettyJson(targets.npcs, bundle.npcs);
+    written.push(path.relative(METAVERSE_ROOT, targets.npcs));
   }
 
   if (bundle.events) {
-    writePrettyJson(TARGETS.events, bundle.events);
-    written.push(path.relative(METAVERSE_ROOT, TARGETS.events));
+    writePrettyJson(targets.events, bundle.events);
+    written.push(path.relative(METAVERSE_ROOT, targets.events));
   }
 
   if (bundle.teleports) {
-    writePrettyJson(TARGETS.teleports, bundle.teleports);
-    written.push(path.relative(METAVERSE_ROOT, TARGETS.teleports));
+    writePrettyJson(targets.teleports, bundle.teleports);
+    written.push(path.relative(METAVERSE_ROOT, targets.teleports));
   }
 
   if (bundle.tours) {
-    writePrettyJson(TARGETS.tours, bundle.tours);
-    written.push(path.relative(METAVERSE_ROOT, TARGETS.tours));
+    writePrettyJson(targets.tours, bundle.tours);
+    written.push(path.relative(METAVERSE_ROOT, targets.tours));
+  }
+
+  if (bundle.guide) {
+    writePrettyJson(targets.guide, bundle.guide);
+    written.push(path.relative(METAVERSE_ROOT, targets.guide));
   }
 
   return written;
@@ -286,7 +318,7 @@ const server = http.createServer(async (req, res) => {
       const written = applyBundle(bundle);
 
       if (!written.length) {
-        sendJson(res, 400, { ok: false, error: "bundle.npcs/events/teleports/tours 중 하나 이상 필요" });
+        sendJson(res, 400, { ok: false, error: "bundle.npcs/events/teleports/tours/guide 중 하나 이상 필요" });
         return;
       }
 

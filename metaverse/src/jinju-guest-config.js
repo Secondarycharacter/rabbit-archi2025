@@ -24,8 +24,7 @@ const JINJU_MARK_LAYOUT = [
     rotationY: 9.2444,
     role: "fixed",
     file: "05 Edition/01 Marie Antoinette Fox/Edition_Marie.glb",
-    animation: { type: "loop", clips: ["Sit_Footcross"] },
-    sitYOffsetOverride: 0.06
+    animation: { type: "loop", clips: ["Sit_Footcross"] }
   },
   {
     id: `${JINJU_GUEST_ID_PREFIX}Mark-2`,
@@ -174,23 +173,6 @@ const JINJU_RANDOM_GUEST_POOL = [
 
 export const JINJU_GUEST_IDS = JINJU_MARK_LAYOUT.map((layout) => layout.id);
 
-const SIT_CLIP_PATTERN = /sit|seat|footcross/i;
-
-export const JINJU_SIT_GUEST_Y_OFFSET = 0.12;
-
-export function getJinjuGuestPositionYOffset(spawn) {
-  if (typeof spawn.sitYOffsetOverride === "number") {
-    return spawn.sitYOffsetOverride;
-  }
-
-  const clips = [
-    ...(spawn.animation?.clips || []),
-    spawn.movement?.clip
-  ].filter(Boolean);
-
-  return clips.some((clip) => SIT_CLIP_PATTERN.test(clip)) ? JINJU_SIT_GUEST_Y_OFFSET : 0;
-}
-
 function buildPatrolLoopTargets(waypoints) {
   if (!waypoints?.length) {
     return [];
@@ -235,9 +217,9 @@ export function buildJinjuGuestSpawns() {
     if (layout.role === "fixed") {
       return {
         ...baseSpawn,
+        randomModel: false,
         file: layout.file,
         animation: layout.animation,
-        sitYOffsetOverride: layout.sitYOffsetOverride,
         scaleMultiplier: layout.scaleMultiplier
       };
     }
@@ -248,6 +230,7 @@ export function buildJinjuGuestSpawns() {
     if (layout.role === "idle") {
       return {
         ...baseSpawn,
+        randomModel: true,
         file,
         animation: { type: "loop", clips: ["Idle"] }
       };
@@ -255,6 +238,7 @@ export function buildJinjuGuestSpawns() {
 
     return {
       ...baseSpawn,
+      randomModel: true,
       file,
       movement: {
         type: "patrol",

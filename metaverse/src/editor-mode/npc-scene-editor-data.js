@@ -3,10 +3,16 @@
  * Matches Rabbit Metaverse Editor 기술 요구사항.pdf §7, §19–22, §27–31.
  */
 
+import { getMetaverseProjectContext, getMetaverseProjectId } from "../metaverse-project-context.js?v=editor-shared-20260908";
+
 export const NPC_SCENE_DATA_VERSION = "1.0";
 export const NPC_SCENE_STORAGE_KEY = "rabbit-metaverse-npc-placements-v1";
 export const NPC_SCENE_DATA_URL = "./data/npc/npcs.json";
 export const EDITOR_NPC_ID_PREFIX = "npc_";
+
+function npcProjectContext() {
+  return getMetaverseProjectContext();
+}
 
 function asNumber(value, fallback = 0) {
   const n = Number(value);
@@ -351,6 +357,42 @@ export function resolveNpcYOffset(record, clipName = null) {
   return resolveNpcOffset(record, clipName).y;
 }
 
+function guestHasNamedClip(guest, clipName) {
+  const wanted = String(clipName || "").trim().toLowerCase();
+
+  if (!wanted || !guest?.animationGroups?.length) {
+    return false;
+  }
+
+  const compact = wanted.replace(/[_\s-]/g, "");
+  return guest.animationGroups.some((group) => {
+    const name = String(group.name || "").trim().toLowerCase();
+
+    if (!name) {
+      return false;
+    }
+
+    if (name === wanted || name.replace(/[_\s-]/g, "") === compact) {
+      return true;
+    }
+
+    return (group.targetedAnimations || []).some((targeted) => {
+      const animName = String(targeted.animation?.name || "").trim().toLowerCase();
+      return animName === wanted;
+    });
+  });
+}
+
+function spawnAnimationPlayableOnGuest(guest, spawnAnim) {
+  const names = [
+    ...(spawnAnim?.clipAliases || []),
+    ...(spawnAnim?.clips || []),
+    spawnAnim?.default
+  ].map((name) => String(name || "").trim()).filter(Boolean);
+
+  return names.some((name) => guestHasNamedClip(guest, name));
+}
+
 export function normalizeNpcRecord(raw = {}) {
   const id = String(raw.id || "").trim();
 
@@ -383,11 +425,39 @@ export function normalizeNpcRecord(raw = {}) {
     animation: normalizeNpcAnimation(raw.animation),
   };
 
+  if (typeof raw.randomModel === "boolean") {
+    record.randomModel = raw.randomModel;
+  }
+
   if (Object.prototype.hasOwnProperty.call(raw, "movement")) {
     record.movement = normalizeNpcMovement(raw.movement);
   }
 
   return record;
+}
+
+export function isNpcRandomModel(record, builtinSpawn = null) {
+  if (!record?.id || record.type === "guide" || isEditorCreatedNpcId(record.id)) {
+    return false;
+  }
+
+  if (typeof record.randomModel === "boolean") {
+    return record.randomModel;
+  }
+
+  if (typeof builtinSpawn?.randomModel === "boolean") {
+    return builtinSpawn.randomModel;
+  }
+
+  return false;
+}
+
+export function canToggleNpcRandomModel(record, builtinSpawn = null) {
+  if (!record?.id || record.type === "guide" || isEditorCreatedNpcId(record.id)) {
+    return false;
+  }
+
+  return typeof builtinSpawn?.randomModel === "boolean";
 }
 
 export function isEditorCreatedNpcId(id) {
@@ -471,7 +541,7 @@ export function normalizeNpcSceneDocument(raw = {}) {
 
   return {
     version: String(raw.version || NPC_SCENE_DATA_VERSION),
-    projectId: String(raw.projectId || "angji"),
+    projectId: String(raw.projectId || getMetaverseProjectId()),
     npcs
   };
 }
@@ -506,6 +576,7 @@ export function guestToNpcRecord(guest, options = {}) {
     id: spawn.id,
     name: spawn.devLabel || spawn.id,
     type: spawn.id === "Angji-Guide" ? "guide" : "npc",
+    randomModel: spawn.randomModel === true,
     model: { path: modelPath },
     transform: {
       position: {
@@ -537,7 +608,7 @@ export function buildNpcSceneFromGuests(guests = [], options = {}) {
 
   return normalizeNpcSceneDocument({
     version: NPC_SCENE_DATA_VERSION,
-    projectId: "angji",
+    projectId: getMetaverseProjectId(),
     npcs
   });
 }
@@ -587,19 +658,21 @@ export function applyNpcRecordToGuest(guest, record, options = {}) {
   // Mark-9/10/11 back to spawn mid-Samba (looked like a sudden group commute).
   // Same settle pass also yanked early-revealed patrol NPCs (e.g. Ethan) home
   // mid-first-leg, then force-restarted — looked like walk out → snap back → restart.
+  const isShown = guest.isVisibleShown === true || guest.root.isEnabled?.() === true;
   const preserveActiveDance = options.preserveActiveDance === true
+    && isShown
     && (
       guest.danceSequencePhase === "playing"
       || guest.danceSequencePhase === "returning"
     );
   const preserveActivePatrol = options.preserveActivePatrol === true
+    && isShown
     && (
       guest.patrolPhase === "moving"
       || guest.patrolPhase === "idle"
       || guest.patrolPhase === "turningToArrivalLook"
       || guest.patrolPhase === "turningToDepart"
-    )
-    && (guest.isVisibleShown === true || guest.root.isEnabled?.() === true);
+    );
 
   if (!preserveActiveDance && !preserveActivePatrol) {
     guest.root.position.set(homePose.x, homePose.y, homePose.z);
@@ -657,8 +730,9 @@ export function applyNpcRecordToGuest(guest, record, options = {}) {
     const movementChanged = previousMovementKey !== nextMovementKey;
 
     if (guest.spawn.movement?.type === "patrol") {
-      if (preserveActivePatrol && !movementChanged) {
-        // Keep in-progress waypoint index/phase; cast overlay must not restart.
+      if (preserveActivePatrol) {
+        // Cast overlay often re-stringifies the same path (Y snap / float noise).
+        // Resetting index to 0 made Rio/Ethan finish the first leg, walk home, then restart.
         guest._editorNeedsPatrolRestart = false;
       } else if (movementChanged || guest.patrolPhase == null) {
         guest.patrolTargetIndex = 0;
@@ -676,7 +750,17 @@ export function applyNpcRecordToGuest(guest, record, options = {}) {
         pivots: normalizeAnimPivots(record.animation?.pivots || resolvedAnimation.pivots)
       };
       const previousAnimKey = JSON.stringify(guest.spawn.animation || null);
-      guest.spawn.animation = editorAnimationToSpawn(record.animation);
+      const nextSpawnAnim = editorAnimationToSpawn(record.animation);
+      const groupsReady = Array.isArray(guest.animationGroups) && guest.animationGroups.length > 0;
+      if (!groupsReady || spawnAnimationPlayableOnGuest(guest, nextSpawnAnim)) {
+        guest.spawn.animation = nextSpawnAnim;
+      } else if (spawnAnimationPlayableOnGuest(guest, guest.spawn.animation)) {
+        // Keep the mesh-matched live clip (random GLB / swapped model).
+      } else if (builtinSpawn?.animation && spawnAnimationPlayableOnGuest(guest, builtinSpawn.animation)) {
+        guest.spawn.animation = cloneJson(builtinSpawn.animation);
+      } else {
+        guest.spawn.animation = nextSpawnAnim;
+      }
       const nextAnimKey = JSON.stringify(guest.spawn.animation || null);
 
       if (!preserveActiveDance) {
@@ -722,7 +806,7 @@ export function applyNpcSceneToGuests(guests = [], document, options = {}) {
 
 export function readNpcSceneStorage() {
   try {
-    const raw = localStorage.getItem(NPC_SCENE_STORAGE_KEY);
+    const raw = localStorage.getItem(npcProjectContext().npc.storageKey);
 
     if (!raw) {
       return null;
@@ -737,13 +821,13 @@ export function readNpcSceneStorage() {
 
 export function writeNpcSceneStorage(document) {
   const normalized = normalizeNpcSceneDocument(document);
-  localStorage.setItem(NPC_SCENE_STORAGE_KEY, JSON.stringify(normalized));
+  localStorage.setItem(npcProjectContext().npc.storageKey, JSON.stringify(normalized));
   return normalized;
 }
 
 export function clearNpcSceneStorage() {
   try {
-    localStorage.removeItem(NPC_SCENE_STORAGE_KEY);
+    localStorage.removeItem(npcProjectContext().npc.storageKey);
   } catch (error) {
     console.warn("[npc-scene-editor-data] storage clear failed", error);
   }
@@ -753,7 +837,7 @@ export function exportNpcSceneJson(document, pretty = true) {
   return JSON.stringify(normalizeNpcSceneDocument(document), null, pretty ? 2 : 0);
 }
 
-export async function loadBaseNpcScene(url = NPC_SCENE_DATA_URL) {
+export async function loadBaseNpcScene(url = npcProjectContext().npc.dataUrl) {
   try {
     const response = await fetch(`${url}?v=${Date.now()}`, { cache: "no-cache" });
 
@@ -766,6 +850,35 @@ export async function loadBaseNpcScene(url = NPC_SCENE_DATA_URL) {
     console.warn("[npc-scene-editor-data] base JSON load failed", error);
     return null;
   }
+}
+
+function applyStoredNpcModelLocks(document, stored) {
+  if (!stored?.npcs?.length) {
+    return document;
+  }
+
+  const storedById = new Map(
+    stored.npcs.filter((npc) => npc?.id).map((npc) => [String(npc.id), npc])
+  );
+
+  return normalizeNpcSceneDocument({
+    ...document,
+    npcs: (document?.npcs || []).map((npc) => {
+      const storedNpc = storedById.get(String(npc.id));
+
+      if (!storedNpc || isEditorCreatedNpcId(npc.id) || typeof storedNpc.randomModel !== "boolean") {
+        return npc;
+      }
+
+      return {
+        ...npc,
+        randomModel: storedNpc.randomModel,
+        ...(storedNpc.randomModel === false && storedNpc.model?.path
+          ? { model: { path: String(storedNpc.model.path) } }
+          : {})
+      };
+    })
+  });
 }
 
 function enforceBuiltinModelIdentity(document, options = {}) {
@@ -789,9 +902,12 @@ function enforceBuiltinModelIdentity(document, options = {}) {
         return npc;
       }
 
+      const randomModel = isNpcRandomModel(npc, builtin);
+
       return {
         ...npc,
-        model: { path: builtin.file },
+        randomModel,
+        ...(randomModel || wasNightKind ? { model: { path: builtin.file } } : {}),
         ...(wasNightKind
           ? {
             animation: spawnAnimationToEditor(builtin.animation),
@@ -805,7 +921,7 @@ function enforceBuiltinModelIdentity(document, options = {}) {
 
 export async function loadEffectiveNpcScene(
   guests = [],
-  url = NPC_SCENE_DATA_URL,
+  url = npcProjectContext().npc.dataUrl,
   options = {}
 ) {
   const fromGuests = buildNpcSceneFromGuests(guests, options);
@@ -833,6 +949,8 @@ export async function loadEffectiveNpcScene(
     if (editorOnly.npcs.length) {
       document = mergeNpcSceneDocuments(document, editorOnly);
     }
+
+    document = applyStoredNpcModelLocks(document, stored);
   }
 
   return enforceBuiltinModelIdentity(document, options);

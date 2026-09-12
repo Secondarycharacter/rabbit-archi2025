@@ -8,8 +8,9 @@
 import {
   listPresentRlbTuningTypes,
   resolveRlbFixtureTypeFromMesh,
+  resolveRlbFixtureTypeFromMaterialName,
   isRlbSpotlightAimMaterialName
-} from "./rlb-fixture-types.js";
+} from "./rlb-fixture-types.js?v=editor-shared-20260908";
 import {
   applyRlbTuningToShaderOptions,
   ensureRlbGroupState,
@@ -21,7 +22,7 @@ import {
   resolveRlbLightSourceName,
   saveRlbTuningState,
   syncRlbTypeGroupToCatalog
-} from "./rlb-shader-tuning.js?v=rlb-range-restore-20260907j";
+} from "./rlb-shader-tuning.js?v=editor-shared-20260908";
 import {
   bakeRlbOccluderAabbs,
   bakeRlbPortalAabbs,
@@ -107,7 +108,11 @@ export function isAngjiInteriorPriorityMaterialName(name) {
 }
 
 function isRlbLightFixtureMesh(mesh) {
-  return getMaterialNamesFromMesh(mesh).some((name) => isRlbLightFixtureMaterialName(name));
+  if (getMaterialNamesFromMesh(mesh).some((name) => resolveRlbFixtureTypeFromMaterialName(name))) {
+    return true;
+  }
+
+  return Boolean(resolveRlbFixtureTypeFromMesh(mesh));
 }
 
 function isPriorityReceiverMesh(mesh) {
@@ -661,7 +666,7 @@ export function setupAngjiRlbProximityGlow(BABYLON, scene, modelState, options =
   const glowOptions = { ...(modelState?.config?.rlbProximityGlow || {}), ...options };
   const tuningState = glowOptions.tuningState || loadRlbTuningState();
   glowOptions.tuningState = ensureRlbGroupState(tuningState);
-  const lightEntries = collectRlbLightEntries(BABYLON, meshes);
+  let lightEntries = collectRlbLightEntries(BABYLON, meshes);
   const catalog = buildRlbLightCatalog(lightEntries);
   const remappedGroupMembers = remapRlbGroupMemberIds(
     glowOptions.tuningState,
@@ -1075,6 +1080,19 @@ export function setupAngjiRlbProximityGlow(BABYLON, scene, modelState, options =
     }
   })();
 
+  const refreshLights = () => {
+    if (lifecycle.disposed) {
+      return lightEntries;
+    }
+
+    const sourceMeshes = (scene.meshes && scene.meshes.length)
+      ? scene.meshes
+      : meshes;
+    lightEntries = collectRlbLightEntries(BABYLON, sourceMeshes);
+    stats.lightCount = lightEntries.length;
+    return lightEntries;
+  };
+
   const logStatus = (reason = "status") => {
     if (lifecycle.disposed) {
       logRlbGlow(
@@ -1120,6 +1138,7 @@ export function setupAngjiRlbProximityGlow(BABYLON, scene, modelState, options =
     setNameLabelsVisible,
     setFocusedLight,
     setHoveredLight,
+    refreshLights,
     getTuningState: () => glowOptions.tuningState,
     getLightTypeCounts: () => buildRlbLightTypeInfo(lightEntries).counts,
     getLightTypeInfo: () => buildRlbLightTypeInfo(lightEntries),

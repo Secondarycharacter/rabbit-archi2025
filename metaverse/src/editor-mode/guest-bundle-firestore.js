@@ -4,19 +4,19 @@
  */
 
 import { FIREBASE_CONFIG } from "../firebase-config.js?v=guest-bundle-firestore-20260902";
-import { normalizeGuestBundle } from "../npc-guest-data.js?v=npc-conversation-events-20260905";
+import { getGuestFirestoreDocIds, getMetaverseProjectId } from "../metaverse-project-context.js?v=editor-shared-20260908";
+import { normalizeGuestBundle } from "../npc-guest-data.js?v=project-scope-20260908";
 
 export const GUEST_BUNDLE_FIRESTORE_COLLECTION = "metaverseGuestBundles";
 export const ANGJI_GUEST_BUNDLE_DOC_ID = "angji";
 export const GUEST_BASE_MANIFEST_DOC_ID = "angji_base_manifest";
 
 /** Current value + up to 3 rotated backups (same collection). */
-export const GUEST_BASE_DOC_IDS = {
-  current: ANGJI_GUEST_BUNDLE_DOC_ID,
-  "backup-1": "angji_base_backup_1",
-  "backup-2": "angji_base_backup_2",
-  "backup-3": "angji_base_backup_3"
-};
+export const GUEST_BASE_DOC_IDS = getGuestFirestoreDocIds("angji");
+
+function guestDocs(projectId) {
+  return getGuestFirestoreDocIds(projectId);
+}
 
 const firestoreState = {
   enabled: false,
@@ -162,7 +162,7 @@ async function writeGuestDoc(docId, bundle, extra = {}) {
 async function readBaseManifest() {
   const { db, firestore } = await ensureGuestBundleFirestore();
   const snapshot = await firestore.getDoc(
-    firestore.doc(db, GUEST_BUNDLE_FIRESTORE_COLLECTION, GUEST_BASE_MANIFEST_DOC_ID)
+    firestore.doc(db, GUEST_BUNDLE_FIRESTORE_COLLECTION, guestDocs().manifest)
   );
 
   if (!snapshot.exists()) {
@@ -178,7 +178,7 @@ async function readBaseManifest() {
 
 async function writeBaseManifest(manifest) {
   const { db, firestore } = await ensureGuestBundleFirestore();
-  const docRef = firestore.doc(db, GUEST_BUNDLE_FIRESTORE_COLLECTION, GUEST_BASE_MANIFEST_DOC_ID);
+  const docRef = firestore.doc(db, GUEST_BUNDLE_FIRESTORE_COLLECTION, guestDocs().manifest);
 
   await firestore.setDoc(docRef, {
     versions: manifest.versions || [],
@@ -186,7 +186,7 @@ async function writeBaseManifest(manifest) {
   });
 }
 
-export async function loadGuestBundleFromFirestore(docId = ANGJI_GUEST_BUNDLE_DOC_ID) {
+export async function loadGuestBundleFromFirestore(docId = getMetaverseProjectId()) {
   if (!isGuestBundleFirestoreConfigured()) {
     return null;
   }
@@ -195,10 +195,10 @@ export async function loadGuestBundleFromFirestore(docId = ANGJI_GUEST_BUNDLE_DO
   return loaded?.data || null;
 }
 
-export async function saveGuestBundleToFirestore(bundle, docId = ANGJI_GUEST_BUNDLE_DOC_ID) {
+export async function saveGuestBundleToFirestore(bundle, docId = getMetaverseProjectId()) {
   const extra = {};
 
-  if (docId === ANGJI_GUEST_BUNDLE_DOC_ID) {
+  if (docId === guestDocs().current) {
     extra.baseVersionId = "current";
   }
 
@@ -213,7 +213,7 @@ export async function listGuestBaseVersionsFromFirestore() {
   let manifest = await readBaseManifest();
 
   if (!manifest.versions?.length) {
-    const current = await readGuestDoc(GUEST_BASE_DOC_IDS.current);
+    const current = await readGuestDoc(guestDocs().current);
     manifest = {
       versions: [
         { id: "current", savedAt: current?.savedAt || null },
@@ -237,8 +237,8 @@ export async function loadGuestBaseVersionFromFirestore(versionId = "current") {
     throw new Error("Firebase 설정이 없어 Firestore를 사용할 수 없습니다.");
   }
 
-  const id = GUEST_BASE_DOC_IDS[versionId] ? versionId : "current";
-  const docId = GUEST_BASE_DOC_IDS[id];
+  const id = guestDocs()[versionId] ? versionId : "current";
+  const docId = guestDocs()[id];
   const loaded = await readGuestDoc(docId);
 
   if (!loaded?.data) {
@@ -265,32 +265,32 @@ export async function saveGuestBaseVersionToFirestore(bundle) {
   const previousById = new Map((previousManifest.versions || []).map((item) => [item.id, item]));
   const nowIso = new Date().toISOString();
 
-  const current = await readGuestDoc(GUEST_BASE_DOC_IDS.current);
-  const backup1 = await readGuestDoc(GUEST_BASE_DOC_IDS["backup-1"]);
-  const backup2 = await readGuestDoc(GUEST_BASE_DOC_IDS["backup-2"]);
+  const current = await readGuestDoc(guestDocs().current);
+  const backup1 = await readGuestDoc(guestDocs()["backup-1"]);
+  const backup2 = await readGuestDoc(guestDocs()["backup-2"]);
 
   if (backup2?.data) {
-    await writeGuestDoc(GUEST_BASE_DOC_IDS["backup-3"], backup2.data, {
+    await writeGuestDoc(guestDocs()["backup-3"], backup2.data, {
       baseVersionId: "backup-3",
       baseSavedAt: previousById.get("backup-2")?.savedAt || backup2.savedAt || nowIso
     });
   }
 
   if (backup1?.data) {
-    await writeGuestDoc(GUEST_BASE_DOC_IDS["backup-2"], backup1.data, {
+    await writeGuestDoc(guestDocs()["backup-2"], backup1.data, {
       baseVersionId: "backup-2",
       baseSavedAt: previousById.get("backup-1")?.savedAt || backup1.savedAt || nowIso
     });
   }
 
   if (current?.data) {
-    await writeGuestDoc(GUEST_BASE_DOC_IDS["backup-1"], current.data, {
+    await writeGuestDoc(guestDocs()["backup-1"], current.data, {
       baseVersionId: "backup-1",
       baseSavedAt: previousById.get("current")?.savedAt || current.savedAt || nowIso
     });
   }
 
-  const normalized = await writeGuestDoc(GUEST_BASE_DOC_IDS.current, bundle, {
+  const normalized = await writeGuestDoc(guestDocs().current, bundle, {
     baseVersionId: "current",
     baseSavedAt: nowIso
   });

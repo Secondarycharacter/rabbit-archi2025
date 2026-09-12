@@ -7,7 +7,7 @@ import {
   loadRuntimeTourData,
   publishTourData,
   subscribeTourDataUpdates
-} from "../angji-guide-tour-data.js?v=guide-orbit-github-20260903";
+} from "../angji-guide-tour-data.js?v=editor-guide-pose-20260908";
 import {
   getDisplayNameMap,
   loadRuntimeGuestBundle,
@@ -16,17 +16,17 @@ import {
   resolveInteractionConfigs,
   loadConversationProgress,
   subscribeGuestBundleUpdates
-} from "../npc-guest-data.js?v=npc-conversation-events-20260905";
+} from "../npc-guest-data.js?v=npc-list-sync-20260908";
 import { isEditorToolsVisible } from "../local-dev.js?v=editor-local-only-20260907";
 import {
   subscribeTourDataRemote,
   subscribeGuestBundleRemote
-} from "./editor-broadcast-sync.js?v=editor-broadcast-sync-20260902";
+} from "./editor-broadcast-sync.js?v=project-scope-20260908";
 import {
   installEditorPopupRpcBridge,
   postPopupUiCommand
 } from "./editor-popup-bridge.js?v=editor-popup-20260902";
-import { openEditorPopupWindow } from "./editor-popup-window.js?v=guide-orbit-github-20260903";
+import { openEditorPopupWindow } from "./editor-popup-window.js?v=npc-list-sync-20260908";
 
 export const APP_MODE = {
   NORMAL: "normal",
@@ -269,6 +269,7 @@ export function createEditorMode(options = {}) {
           };
         }
 
+        glow.refreshLights?.();
         const typeInfo = glow.getLightTypeInfo?.() || { counts: {}, materialNames: {} };
 
         try {

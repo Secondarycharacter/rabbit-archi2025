@@ -115,15 +115,14 @@ export function resolveRlbFixtureTypeFromMaterialName(name) {
 }
 
 export function resolveRlbFixtureTypeFromMesh(mesh) {
-  if (!mesh?.material) {
-    return null;
-  }
+  const materialNames = mesh?.material
+    ? (Array.isArray(mesh.material.subMaterials)
+      ? mesh.material.subMaterials.map((material) => material?.name || material?.id || "")
+      : [mesh.material.name || mesh.material.id || ""])
+    : [];
+  const objectNames = [mesh?.name, mesh?.id, mesh?.parent?.name, mesh?.parent?.id];
 
-  const names = Array.isArray(mesh.material.subMaterials)
-    ? mesh.material.subMaterials.map((material) => material?.name || material?.id || "")
-    : [mesh.material.name || mesh.material.id || ""];
-
-  for (const name of names) {
+  for (const name of [...materialNames, ...objectNames]) {
     const type = resolveRlbFixtureTypeFromMaterialName(name);
 
     if (type) {

@@ -3,8 +3,8 @@
  * Spill must run at CUSTOM_FRAGMENT_BEFORE_FRAGCOLOR — MAIN_END is after gl_FragColor = finalColor.
  */
 
-import { kelvinToSpillRgb, RLB_DEFAULT_COLOR_TEMP_K, RLB_DEFAULT_SPILL_ACCUM_CAP, RLB_DEFAULT_SPILL_MAX_BLEND, RLB_DEFAULT_SPILL_OPACITY } from "./rlb-shader-tuning.js?v=rlb-capture-opt-in-20260907";
-import { resolveRlbSpotlightAimKind } from "./rlb-fixture-types.js";
+import { kelvinToSpillRgb, RLB_DEFAULT_COLOR_TEMP_K, RLB_DEFAULT_SPILL_ACCUM_CAP, RLB_DEFAULT_SPILL_MAX_BLEND, RLB_DEFAULT_SPILL_OPACITY } from "./rlb-shader-tuning.js?v=editor-shared-20260908";
+import { resolveRlbSpotlightAimKind } from "./rlb-fixture-types.js?v=editor-shared-20260908";
 import { selectNearestRlbOccluderAabbs } from "./rlb-spill-occlusion.js?v=rlb-wall-occ-perf-20260907";
 
 // Keep this small: std140 float arrays pad to vec4, so 248 lights blew past 16KB UBO limits.

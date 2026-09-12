@@ -8,7 +8,7 @@ import {
   listGuestBaseVersionsFromFirestore,
   loadGuestBaseVersionFromFirestore,
   saveGuestBaseVersionToFirestore
-} from "./guest-bundle-firestore.js?v=guest-base-firestore-20260905";
+} from "./guest-bundle-firestore.js?v=project-scope-20260908";
 
 export function isGuestBaseStoreAvailable() {
   return isGuestBundleFirestoreConfigured();
