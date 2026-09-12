@@ -38,6 +38,8 @@ const VISIT_STATS_COLLECTION = 'siteStats';
 const VISIT_STATS_DOC = 'visits';
 const TOTAL_VISIT_COUNTED_KEY = 'rabbitTotalVisitCounted';
 const DAILY_VISIT_COUNTED_PREFIX = 'rabbitDailyVisitCounted:';
+const METAVERSE_OVERVIEW_COLLECTION = 'metaverseProjectOverviews';
+const METAVERSE_OVERVIEW_LOCAL_STORAGE_KEY = 'metaverseProjectOverviews';
 
 const H1_ITEM_HEIGHT = 52;
 const H1_ITEM_GAP = 10;
@@ -133,7 +135,8 @@ const state = {
   extraGalleryRaf: null,
   extraGalleryRowHeight: 0,
   descriptionCache: new Map(),
-  projectOverviews: null
+  projectOverviews: null,
+  projectOverviewsBase: null
 };
 
 if (DEBUG_MODE) {
@@ -353,6 +356,125 @@ function subscribeHistoryProjects() {
       state.selectedProjectId = previousId;
     }
   });
+}
+
+/** Match metaverse overview shape: rows as [label, value] pairs. */
+function normalizeOverview(overview) {
+  if (!overview) {
+    return null;
+  }
+
+  const rows = Array.isArray(overview.rows)
+    ? overview.rows
+      .map((row) => {
+        if (Array.isArray(row)) {
+          return [String(row?.[0] || '').trim(), String(row?.[1] || '').trim()];
+        }
+
+        return [
+          String(row?.label ?? row?.key ?? '').trim(),
+          String(row?.value ?? row?.text ?? '').trim()
+        ];
+      })
+      .filter(([label]) => label)
+    : [];
+
+  return {
+    title: String(overview.title || '■ 설계개요'),
+    rows
+  };
+}
+
+function normalizeOverviewMap(overviews) {
+  const normalized = {};
+  Object.entries(overviews || {}).forEach(([overviewId, overview]) => {
+    const next = normalizeOverview(overview);
+    if (next) {
+      normalized[overviewId] = next;
+    }
+  });
+  return normalized;
+}
+
+function mergeOverviewMaps(base, overrides) {
+  const merged = { ...base };
+  Object.entries(overrides || {}).forEach(([overviewId, overview]) => {
+    const next = normalizeOverview(overview);
+    if (next) {
+      merged[overviewId] = next;
+    }
+  });
+  return merged;
+}
+
+function loadLocalMetaverseOverviewOverrides() {
+  try {
+    return normalizeOverviewMap(
+      JSON.parse(localStorage.getItem(METAVERSE_OVERVIEW_LOCAL_STORAGE_KEY) || '{}')
+    );
+  } catch {
+    return {};
+  }
+}
+
+function mapMetaverseOverviewSnapshot(snapshot) {
+  const overviews = {};
+  snapshot.forEach((docSnap) => {
+    const next = normalizeOverview(docSnap.data());
+    if (next) {
+      overviews[docSnap.id] = next;
+    }
+  });
+  return overviews;
+}
+
+function buildMergedProjectOverviews(firestoreOverviews = {}) {
+  return mergeOverviewMaps(
+    mergeOverviewMaps(state.projectOverviewsBase || {}, loadLocalMetaverseOverviewOverrides()),
+    firestoreOverviews
+  );
+}
+
+async function loadMetaverseOverviewsFromFirestore() {
+  try {
+    const snapshot = await getDocs(collection(db, METAVERSE_OVERVIEW_COLLECTION));
+    return mapMetaverseOverviewSnapshot(snapshot);
+  } catch (error) {
+    console.warn('[homepage-shell] metaverse overviews Firestore load failed:', error);
+    return {};
+  }
+}
+
+function refreshMetaverseGalleryOverviews() {
+  if (!metaverseGalleryTrack) {
+    return;
+  }
+
+  metaverseGalleryTrack.querySelectorAll('.h0-metaverse-card').forEach((card) => {
+    const projectId = card.dataset.projectId;
+    const project = state.metaverseGalleryProjects.find((item) => item.id === projectId)
+      || state.projects.metaverse.find((item) => item.id === projectId);
+    const overviewEl = card.querySelector('.h0-metaverse-card__overview');
+    if (!project || !overviewEl) {
+      return;
+    }
+    overviewEl.innerHTML = buildMetaverseCardOverviewHtml(project);
+  });
+}
+
+function subscribeMetaverseProjectOverviews() {
+  onSnapshot(
+    collection(db, METAVERSE_OVERVIEW_COLLECTION),
+    (snapshot) => {
+      state.projectOverviews = buildMergedProjectOverviews(mapMetaverseOverviewSnapshot(snapshot));
+      if (state.category === 'metaverse') {
+        refreshMetaverseGalleryOverviews();
+      }
+    },
+    (error) => {
+      console.warn('[homepage-shell] metaverse overviews Firestore subscribe failed:', error);
+    }
+  );
 }
 
 function centerH1OnLatest() {
@@ -2689,8 +2811,13 @@ async function loadProjectData() {
       registeredAt: project.registeredAt ?? orderIndex
     }))
   );
-  state.projectOverviews = overviewResponse.ok ? await overviewResponse.json() : {};
+  state.projectOverviewsBase = normalizeOverviewMap(
+    overviewResponse.ok ? await overviewResponse.json() : {}
+  );
+  const firestoreOverviews = await loadMetaverseOverviewsFromFirestore();
+  state.projectOverviews = buildMergedProjectOverviews(firestoreOverviews);
   subscribeHistoryProjects();
+  subscribeMetaverseProjectOverviews();
   await loadMetaverseOverviewReferenceMetrics();
 }
 
