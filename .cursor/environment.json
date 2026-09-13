@@ -1,0 +1,15 @@
+{
+  "name": "rabbit-archi2025",
+  "install": "npm install && npx --yes http-server --version",
+  "terminals": [
+    {
+      "name": "homepage",
+      "command": "npx --yes http-server -p 8080 -c-1 -a 0.0.0.0"
+    },
+    {
+      "name": "metaverse",
+      "command": "npx --yes http-server metaverse -p 8081 -c-1 -a 0.0.0.0"
+    }
+  ],
+  "ports": [8080, 8081]
+}
