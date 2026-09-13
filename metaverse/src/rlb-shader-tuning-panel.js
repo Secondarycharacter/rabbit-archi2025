@@ -1415,10 +1415,15 @@ export function createRlbShaderTuningPanel(options = {}) {
 
     if (bake?.ok) {
       setStatus(`저장 + 프로젝트 베이크 완료 (${bake.relativePath || bake.fileName}). 커밋/푸시 필요.`);
+      console.info("[rlb-tune] baked preset", bake);
       return;
     }
 
-    setStatus("브라우저에 저장됨. 프로젝트 베이크는 write-server(npm run editor:write-server) 실행 후 다시 저장하세요.");
+    setStatus(
+      `브라우저에만 저장됨. 베이크 실패: ${bake?.error || "write-server 없음"}. npm run editor:write-server 후 새로고침·재저장.`,
+      true
+    );
+    console.warn("[rlb-tune] bake failed", bake);
   });
 
   resetButton?.addEventListener("click", () => {

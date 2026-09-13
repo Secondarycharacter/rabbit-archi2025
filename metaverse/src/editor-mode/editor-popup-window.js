@@ -48,7 +48,7 @@ export function buildEditorPopupUrl(tab = "guide") {
   next.set("project", project);
   next.set("editor", editor);
   next.set("tab", tab === "guest" ? "guest" : (tab === "rlb" ? "rlb" : "guide"));
-  next.set("v", "npc-list-sync-20260908");
+  next.set("v", "rlb-project-preset-20260913");
 
   return `./editor-popup.html?${next.toString()}`;
 }
