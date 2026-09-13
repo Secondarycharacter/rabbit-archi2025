@@ -10,8 +10,13 @@ import {
   RLB_TUNING_TYPE_ORDER,
   resolveRlbSpillShapeCode
 } from "./rlb-fixture-types.js?v=editor-shared-20260908";
-import { RLB_ANGJI_NIGHT_PRESET } from "./rlb-angji-night-preset.js?v=rlb-range-restore-20260907j";
 import { getMetaverseProjectContext, getMetaverseProjectId } from "./metaverse-project-context.js?v=editor-shared-20260908";
+import {
+  getRlbBakedNightPreset,
+  getRlbPresetExportName,
+  getRlbPresetFileName,
+  hasDedicatedRlbBakedPreset
+} from "./rlb-project-presets.js?v=rlb-project-preset-20260913";
 
 export const RLB_TUNING_STORAGE_KEY = "angji-rlb-shader-tuning-v9";
 export const RLB_PRESET_BUILD_KEY = "angji-rlb-preset-build";
@@ -638,9 +643,11 @@ function isRlbLocalDevHost() {
 }
 
 function bakedNightPresetState() {
-  const merged = mergeTuningState(RLB_ANGJI_NIGHT_PRESET);
+  const projectId = getMetaverseProjectId();
+  const merged = mergeTuningState(getRlbBakedNightPreset(projectId));
 
-  if (!isDefaultRlbProject()) {
+  // Projects without a dedicated baked file share Angji type defaults only.
+  if (!hasDedicatedRlbBakedPreset(projectId)) {
     merged.groups = {};
     merged.lightGroups = {};
     rebuildRlbLightGroups(merged);
@@ -649,31 +656,84 @@ function bakedNightPresetState() {
   return merged;
 }
 
-function maybeCaptureLocalTuningPreset(raw) {
-  if (!isRlbLocalDevHost() || !raw || typeof fetch !== "function") {
-    return;
+function buildRlbPresetBakePayload(rawOrState) {
+  const projectId = getMetaverseProjectId();
+  let tuning = rawOrState;
+
+  if (typeof rawOrState === "string") {
+    tuning = JSON.parse(rawOrState);
   }
 
-  // Optional local capture daemon (port 8766). Off by default — otherwise every
-  // save/load spam "ERR_CONNECTION_REFUSED" in DevTools when the daemon is not running.
+  return {
+    projectId,
+    exportName: getRlbPresetExportName(projectId),
+    fileName: getRlbPresetFileName(projectId),
+    tuning
+  };
+}
+
+/** Write current tuning into metaverse/src/rlb-{project}-night-preset.js via local write-server. */
+export async function bakeRlbTuningPresetToProject(rawOrState) {
+  if (!isRlbLocalDevHost() || typeof fetch !== "function") {
+    return { ok: false, skipped: true, error: "localhost only" };
+  }
+
+  let payload;
+
   try {
-    const params = new URLSearchParams(window.location.search);
-    const enabled = params.get("rlbCapture") === "1"
-      || params.get("rlbCapture") === "true"
-      || window.localStorage?.getItem("angji-rlb-capture") === "1";
-
-    if (!enabled) {
-      return;
-    }
-  } catch {
-    return;
+    payload = buildRlbPresetBakePayload(rawOrState);
+  } catch (error) {
+    return { ok: false, error: error?.message || String(error) };
   }
 
-  fetch("http://127.0.0.1:8766/rlb-preset", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: raw
-  }).catch(() => {});
+  const endpoints = [
+    {
+      health: "http://127.0.0.1:8091/api/editor/health",
+      bake: "http://127.0.0.1:8091/api/rlb/preset"
+    },
+    {
+      health: null,
+      bake: "http://127.0.0.1:8766/rlb-preset"
+    }
+  ];
+
+  let lastError = null;
+
+  for (const endpoint of endpoints) {
+    try {
+      if (endpoint.health) {
+        const health = await fetch(endpoint.health, { method: "GET" });
+
+        if (!health.ok) {
+          lastError = `health HTTP ${health.status}`;
+          continue;
+        }
+      }
+
+      const response = await fetch(endpoint.bake, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const body = await response.json().catch(() => ({}));
+
+      if (response.ok && body?.ok !== false) {
+        return {
+          ok: true,
+          endpoint: endpoint.bake,
+          projectId: payload.projectId,
+          fileName: body.fileName || payload.fileName,
+          relativePath: body.relativePath || `src/${payload.fileName}`
+        };
+      }
+
+      lastError = body?.error || `HTTP ${response.status}`;
+    } catch (error) {
+      lastError = error?.message || String(error);
+    }
+  }
+
+  return { ok: false, error: lastError || "write-server unavailable" };
 }
 
 function readStoredTuningRaw() {
@@ -735,7 +795,6 @@ export function loadRlbTuningState() {
       return bakedNightPresetState();
     }
 
-    maybeCaptureLocalTuningPreset(stored.raw);
     const merged = mergeTuningState(JSON.parse(stored.raw));
 
     if (stored.source && stored.source !== rlbStorageKey()) {
@@ -758,7 +817,6 @@ export function saveRlbTuningState(state) {
   try {
     const raw = JSON.stringify(state);
     localStorage.setItem(rlbStorageKey(), raw);
-    maybeCaptureLocalTuningPreset(raw);
     return true;
   } catch (error) {
     console.warn("[rlb-tune] save failed:", error);

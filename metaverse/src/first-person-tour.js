@@ -130,7 +130,7 @@ import { setupAngjiRlbProximityGlow, shouldSkipMaterialFreeze } from "./rlb-prox
 import {
   createRlbNightDiag,
   shouldAutoRunRlbNightDiag
-} from "./rlb-night-diag.js?v=editor-shared-20260908";
+} from "./rlb-night-diag.js?v=rlb-project-preset-20260913";
 
 function ensureAngjiRlbProximityGlow(BABYLON, scene, modelState, getCamera) {
   if (!modelState) {

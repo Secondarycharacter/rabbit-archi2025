@@ -4,7 +4,7 @@
 
 import { createAngjiGuideManagerPanel } from "../angji-guide-manager-panel.js?v=guide-add-line-20260908";
 import { createNpcGuestManagerPanel } from "../npc-guest-manager-panel.js?v=npc-list-sync-20260908";
-import { createRlbShaderTuningPanel } from "../rlb-shader-tuning-panel.js?v=editor-shared-20260908";
+import { createRlbShaderTuningPanel } from "../rlb-shader-tuning-panel.js?v=rlb-project-preset-20260913";
 import { createOpenerRpc, listenPopupUiCommands } from "./editor-popup-bridge.js?v=editor-popup-rlb-body-20260903";
 import { createRlbGlowRemote } from "./editor-popup-rlb-glow.js?v=editor-shared-20260908";
 import { getMetaverseProjectContext } from "../metaverse-project-context.js?v=editor-shared-20260908";

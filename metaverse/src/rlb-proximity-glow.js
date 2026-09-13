@@ -22,7 +22,7 @@ import {
   resolveRlbLightSourceName,
   saveRlbTuningState,
   syncRlbTypeGroupToCatalog
-} from "./rlb-shader-tuning.js?v=editor-shared-20260908";
+} from "./rlb-shader-tuning.js?v=rlb-project-preset-20260913";
 import {
   bakeRlbOccluderAabbs,
   bakeRlbPortalAabbs,

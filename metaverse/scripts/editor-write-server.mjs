@@ -390,6 +390,63 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === "POST" && url.pathname === "/api/rlb/preset") {
+    try {
+      const body = await readBody(req);
+      const projectId = normalizeProjectId(body.projectId || body.project || DEFAULT_PROJECT_ID);
+      const tuning = body.tuning || body.state || (typeof body === "object" && body.version ? body : null);
+
+      if (!tuning || typeof tuning !== "object") {
+        sendJson(res, 400, { ok: false, error: "tuning 객체가 필요합니다." });
+        return;
+      }
+
+      const fileName = body.fileName
+        || (projectId === DEFAULT_PROJECT_ID
+          ? "rlb-angji-night-preset.js"
+          : `rlb-${projectId}-night-preset.js`);
+      const exportName = body.exportName
+        || (projectId === DEFAULT_PROJECT_ID
+          ? "RLB_ANGJI_NIGHT_PRESET"
+          : `RLB_${projectId.replace(/[^a-z0-9]+/g, "_").toUpperCase()}_NIGHT_PRESET`);
+      const safeFileName = path.basename(String(fileName));
+
+      if (!/^rlb-[a-z0-9_-]+-night-preset\.js$/i.test(safeFileName)) {
+        sendJson(res, 400, { ok: false, error: `허용되지 않은 파일명: ${safeFileName}` });
+        return;
+      }
+
+      if (!/^RLB_[A-Z0-9_]+_NIGHT_PRESET$/.test(String(exportName))) {
+        sendJson(res, 400, { ok: false, error: `허용되지 않은 export 이름: ${exportName}` });
+        return;
+      }
+
+      const targetPath = path.join(METAVERSE_ROOT, "src", safeFileName);
+      const header = projectId === DEFAULT_PROJECT_ID
+        ? "/** Baked Angji night-mode tuning captured from local browser. */\n"
+        : `/** Baked ${projectId} night-mode tuning captured from local browser. */\n`;
+      const source = `${header}export const ${exportName} = ${JSON.stringify(tuning, null, 2)};\n`;
+
+      ensureDirFor(targetPath);
+      fs.writeFileSync(targetPath, source, "utf8");
+
+      sendJson(res, 200, {
+        ok: true,
+        projectId,
+        fileName: safeFileName,
+        exportName,
+        relativePath: path.relative(METAVERSE_ROOT, targetPath).replace(/\\/g, "/"),
+        message: "RLB baked preset 파일을 갱신했습니다. GitHub 반영은 커밋/푸시가 필요합니다."
+      });
+    } catch (error) {
+      sendJson(res, 500, {
+        ok: false,
+        error: error?.message || String(error)
+      });
+    }
+    return;
+  }
+
   sendJson(res, 404, { ok: false, error: "not found" });
 });
 
@@ -397,4 +454,5 @@ server.listen(PORT, HOST, () => {
   console.log(`[editor-write-server] http://${HOST}:${PORT}`);
   console.log(`[editor-write-server] POST /api/editor/apply → metaverse/data/*`);
   console.log(`[editor-write-server] GET/POST /api/guide/* → guide base + backups`);
+  console.log(`[editor-write-server] POST /api/rlb/preset → metaverse/src/rlb-*-night-preset.js`);
 });

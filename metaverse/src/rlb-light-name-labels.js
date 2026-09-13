@@ -2,7 +2,7 @@
  * World-space billboard names for RLB fixtures while the tuning panel is open.
  */
 
-import { formatRlbLightLabel } from "./rlb-shader-tuning.js?v=editor-shared-20260908";
+import { formatRlbLightLabel } from "./rlb-shader-tuning.js?v=rlb-project-preset-20260913";
 
 const LABEL_WIDTH = 256;
 const LABEL_HEIGHT = 64;

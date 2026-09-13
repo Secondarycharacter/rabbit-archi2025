@@ -6,8 +6,10 @@
 import {
   RLB_TUNING_STORAGE_KEY,
   loadRlbTuningState
-} from "./rlb-shader-tuning.js?v=editor-shared-20260908";
-import { RLB_ANGJI_NIGHT_PRESET } from "./rlb-angji-night-preset.js?v=rlb-range-restore-20260907j";
+} from "./rlb-shader-tuning.js?v=rlb-project-preset-20260913";
+import {
+  getRlbBakedNightPreset
+} from "./rlb-project-presets.js?v=rlb-project-preset-20260913";
 import { isLocalDevEnvironment } from "./local-dev.js?v=local-dev-20260819";
 
 const FALLBACK_KEYS = [
@@ -100,7 +102,7 @@ export function createRlbNightDiag(deps = {}) {
 
   function run(reason = "manual") {
     const storage = readStorageSnapshot();
-    const baked = summarizeTuning(RLB_ANGJI_NIGHT_PRESET);
+    const baked = summarizeTuning(getRlbBakedNightPreset());
     const activeTuning = loadRlbTuningState();
     const activeSummary = summarizeTuning(activeTuning);
     const storageOverride = storage.primaryPresent || storage.fallbacks.length > 0;

@@ -22,10 +22,11 @@ import {
   resolveRlbTypeColorTemperatureK,
   resolveRlbTypeSpillColor,
   saveRlbTuningState,
+  bakeRlbTuningPresetToProject,
   setAllRlbShaderEnabled,
   setRlbTypeShaderEnabled,
   syncSpillColorFromTemperature
-} from "./rlb-shader-tuning.js?v=editor-shared-20260908";
+} from "./rlb-shader-tuning.js?v=rlb-project-preset-20260913";
 
 const COLOR_TEMP_FIELD = {
   key: "colorTemperatureK",
@@ -1399,17 +1400,25 @@ export function createRlbShaderTuningPanel(options = {}) {
 
   closeButton?.addEventListener("click", closePanel);
 
-  saveButton?.addEventListener("click", () => {
+  saveButton?.addEventListener("click", async () => {
     const saved = saveRlbTuningState(tuningState);
 
-    if (saved) {
-      dirty = false;
-      setStatus("저장되었습니다. (브라우저 localStorage)");
-      getGlow()?.applyTuning?.(tuningState);
+    if (!saved) {
+      setStatus("저장에 실패했습니다.", true);
       return;
     }
 
-    setStatus("저장에 실패했습니다.", true);
+    dirty = false;
+    getGlow()?.applyTuning?.(tuningState);
+
+    const bake = await bakeRlbTuningPresetToProject(tuningState);
+
+    if (bake?.ok) {
+      setStatus(`저장 + 프로젝트 베이크 완료 (${bake.relativePath || bake.fileName}). 커밋/푸시 필요.`);
+      return;
+    }
+
+    setStatus("브라우저에 저장됨. 프로젝트 베이크는 write-server(npm run editor:write-server) 실행 후 다시 저장하세요.");
   });
 
   resetButton?.addEventListener("click", () => {
