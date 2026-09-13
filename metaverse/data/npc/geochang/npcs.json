@@ -38,6 +38,7 @@
         ],
         "pivots": {}
       },
+      "randomModel": false,
       "movement": null
     }
   ]

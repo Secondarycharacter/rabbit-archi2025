@@ -3,12 +3,12 @@
   "guideSpawnId": "Angji-Guide",
   "dialogDistance": 1.2,
   "interactionDistance": 2,
-  "textSpeed": 0.0583,
+  "textSpeed": 0.1,
   "lineHoldSeconds": 0,
-  "lineHoldPerChar": 0.02,
+  "lineHoldPerChar": 0.01,
   "lineHoldMaxExtra": 3.33,
   "cameraBlendSeconds": 0.85,
-  "idleDanceDelaySeconds": 180,
+  "idleDanceDelaySeconds": 60,
   "idleDanceClips": [
     "Dance_Samba01",
     "Dance_Samba02",
@@ -24,46 +24,70 @@
       "id": "orbit_spin",
       "name": "사이트 전경",
       "position": {
-        "x": -167.35,
-        "y": 25,
-        "z": 73.26
+        "x": -39.97949414493725,
+        "y": 81.24220303443606,
+        "z": 85.46335638505525
       },
       "target": {
-        "x": -10.54,
-        "y": 50,
-        "z": 16.37
+        "x": -39.57224619111718,
+        "y": 26.849727191094953,
+        "z": -46.25053396504614
       },
-      "cameraHeight": 25,
-      "rotationY": 1.9188,
+      "cameraHeight": 81.24220303443606,
+      "rotationY": 20.42344415196653,
       "durationSeconds": 20,
       "rotationTurns": 1,
-      "pitchOffsetDegrees": -20
+      "pitchOffsetDegrees": 0
     }
   ],
   "orbitSpin": {
     "id": "orbit_spin",
     "name": "사이트 전경",
     "position": {
-      "x": -167.35,
-      "y": 25,
-      "z": 73.26
+      "x": -39.97949414493725,
+      "y": 81.24220303443606,
+      "z": 85.46335638505525
     },
     "target": {
-      "x": -10.54,
-      "y": 50,
-      "z": 16.37
+      "x": -39.57224619111718,
+      "y": 26.849727191094953,
+      "z": -46.25053396504614
     },
-    "cameraHeight": 25,
-    "rotationY": 1.9188,
+    "cameraHeight": 81.24220303443606,
+    "rotationY": 20.42344415196653,
     "durationSeconds": 20,
     "rotationTurns": 1,
-    "pitchOffsetDegrees": -20
+    "pitchOffsetDegrees": 0
   },
   "closingAnimations": [
-    "Greeting_bow",
-    "Greeting_Hand",
-    "Idle"
+    "Greeting_Hand"
   ],
+  "transitionPrompt": {
+    "ko": "다음 설명으로 넘어갈까요?",
+    "en": "Shall we move on to the next explanation?"
+  },
+  "declineMessage": {
+    "ko": "설명이 필요하시면 저를 다시 찾아주세요.",
+    "en": "Please find me again if you would like a guided explanation."
+  },
+  "escPrompt": {
+    "ko": "투어에서 빠져나가시겠습니까?",
+    "en": "Would you like to leave the tour?"
+  },
+  "restartTourPrompt": {
+    "ko": "GUIDE 투어를 다시 시작하시겠습니까?",
+    "en": "Would you like to start the GUIDE tour again?"
+  },
+  "talkingClips": [
+    "Talking01",
+    "Talking02"
+  ],
+  "talkingSwitchSeconds": {
+    "min": 3,
+    "max": 6
+  },
+  "talkingBlendSpeed": 0.045,
+  "talkingCrossfadeSeconds": 0.45,
   "events": [
     {
       "id": "00",
@@ -78,7 +102,7 @@
       "dialogues": [
         {
           "id": "00_01",
-          "ko": "",
+          "ko": "거",
           "en": "",
           "textSpeed": null,
           "startTourChoice": false,
@@ -87,6 +111,32 @@
             "type": "none",
             "comment": "",
             "checkpointId": ""
+          }
+        },
+        {
+          "id": "00_02",
+          "ko": "저와하께 투어를 진행하시겠습니까?",
+          "en": "",
+          "textSpeed": null,
+          "startTourChoice": true,
+          "orbitAfter": false,
+          "postEvent": {
+            "type": "yes_no",
+            "comment": "",
+            "checkpointId": ""
+          }
+        },
+        {
+          "id": "00_03",
+          "ko": "아직 투어프로그램이 준비되지 않았습니다. 다음에 다시 찾아주세요.",
+          "en": "",
+          "textSpeed": null,
+          "startTourChoice": false,
+          "orbitAfter": true,
+          "postEvent": {
+            "type": "other",
+            "comment": "",
+            "checkpointId": "orbit_spin"
           }
         }
       ]

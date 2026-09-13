@@ -1,4 +1,4 @@
-/** Baked Geochang night-mode tuning. Overwritten by editor write-server POST /api/rlb/preset. */
+/** Baked geochang night-mode tuning captured from local browser. */
 export const RLB_GEOCHANG_NIGHT_PRESET = {
   "version": 9,
   "global": {
@@ -27,13 +27,13 @@ export const RLB_GEOCHANG_NIGHT_PRESET = {
     },
     "Down02": {
       "shaderEnabled": true,
-      "innerRadius": 12,
-      "outerRadius": 22,
-      "spillMultiplier": 4.4,
-      "intensity": 1,
-      "coneSoftness": 0.65,
+      "innerRadius": 5,
+      "outerRadius": 8,
+      "spillMultiplier": 0.5,
+      "intensity": 0.5,
+      "coneSoftness": 1,
       "shape": "auto",
-      "colorTemperatureK": null
+      "colorTemperatureK": 6500
     },
     "SpotLight": {
       "shaderEnabled": true,
