@@ -36,7 +36,6 @@ const db = getFirestore(app);
 
 const VISIT_STATS_COLLECTION = 'siteStats';
 const VISIT_STATS_DOC = 'visits';
-const TOTAL_VISIT_COUNTED_KEY = 'rabbitTotalVisitCounted';
 const DAILY_VISIT_COUNTED_PREFIX = 'rabbitDailyVisitCounted:';
 const METAVERSE_OVERVIEW_COLLECTION = 'metaverseProjectOverviews';
 const METAVERSE_OVERVIEW_LOCAL_STORAGE_KEY = 'metaverseProjectOverviews';
@@ -2708,26 +2707,22 @@ function renderVisitorCounts(data, todayKey) {
 async function updateVisitorCounter() {
   const todayKey = getKstDateKey();
   const todayStorageKey = `${DAILY_VISIT_COUNTED_PREFIX}${todayKey}`;
-  const shouldCountTotal = safeGetStorage(TOTAL_VISIT_COUNTED_KEY) !== 'true';
-  const shouldCountToday = safeGetStorage(todayStorageKey) !== 'true';
+  // Same browser: count once per KST calendar day for both total and today.
+  const shouldCountVisit = safeGetStorage(todayStorageKey) !== 'true';
   const statsRef = doc(db, VISIT_STATS_COLLECTION, VISIT_STATS_DOC);
 
   try {
-    if (shouldCountTotal || shouldCountToday) {
-      const updates = { lastVisitedAt: serverTimestamp() };
-      if (shouldCountTotal) {
-        updates.totalVisitors = increment(1);
-      }
-      if (shouldCountToday) {
-        updates.dailyVisitors = { [todayKey]: increment(1) };
-      }
-      await setDoc(statsRef, updates, { merge: true });
-      if (shouldCountTotal) {
-        safeSetStorage(TOTAL_VISIT_COUNTED_KEY, 'true');
-      }
-      if (shouldCountToday) {
-        safeSetStorage(todayStorageKey, 'true');
-      }
+    if (shouldCountVisit) {
+      await setDoc(
+        statsRef,
+        {
+          lastVisitedAt: serverTimestamp(),
+          totalVisitors: increment(1),
+          dailyVisitors: { [todayKey]: increment(1) }
+        },
+        { merge: true }
+      );
+      safeSetStorage(todayStorageKey, 'true');
     }
 
     const snapshot = await getDoc(statsRef);
